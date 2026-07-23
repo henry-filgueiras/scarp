@@ -74,3 +74,21 @@ as sprints 4 and 5 accepted it.
   remain parked.
 - The standing bootstrap non-goals: daemon, watcher, index,
   embeddings, MCP, GraphQL.
+
+## Amendment: final pre-release dogfood sprint (2026-07-23)
+
+This is the final pre-release dogfood sprint. It does not replace the
+next sprint, "First Contact", whose expected scope is: an installable
+v0.1.0, a quickstart, clean-machine verification, and a deterministic
+60-second demo. Sprint 7's slices are chosen to be finished and lived
+with before that release sprint opens; nothing here should grow toward
+packaging or presentation work.
+
+The same amendment commit strengthens the acceptance criteria of
+tasks 32, 33, and 34 before implementation begins: task 32 gains
+identity-format, addressing-matrix, lifecycle-refusal, global-invariant,
+and README-projection criteria; task 33's gate claim is narrowed from
+arbitrary corruption to doctor-detectable errors in managed
+collections; task 34 gains hook-source, working-directory,
+stdout-intent, `/next`-coexistence, failure-notice, and verification
+criteria. Task 35 is unchanged.

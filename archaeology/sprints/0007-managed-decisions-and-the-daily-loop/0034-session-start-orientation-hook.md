@@ -20,10 +20,23 @@ its recorded friction is the evidence base for or against
 
 ## Acceptance criteria
 
-- A checked-in project settings hook runs on session start and prints
-  active-sprint status and a fortune produced by strata commands.
-- The hook degrades gracefully — silent or a one-line notice — when
-  the binary cannot be built or run.
-- Observed friction (latency, aggregation gaps, formatting, anything
-  hand-stitched around missing tool support) is recorded in this
-  task's result as desire-path evidence.
+- A checked-in project settings SessionStart hook matches only the
+  `startup` and `resume` sources — not `clear`, `compact`, or `fork` —
+  and prints active-sprint status with pending tasks plus one fortune
+  line, produced by strata commands.
+- The hook runs relative to `$CLAUDE_PROJECT_DIR`, not the incidental
+  working directory.
+- The hook's stdout is written as intentional orientation context for
+  the session that receives it — curated lines, not raw command
+  spillover.
+- `/next` remains the explicit post-`/clear` reorientation path; the
+  hook does not fire on `clear` and does not duplicate the `/next`
+  ceremony.
+- On build or run failure the hook emits at most one controlled
+  one-line notice; raw cargo build noise is suppressed in both the
+  success and failure paths.
+- Observed latency and composition friction (aggregation gaps,
+  formatting, anything hand-stitched around missing tool support) are
+  recorded in this task's result as desire-path evidence.
+- `scripts/check.sh` passes, and the hook is verified once in a real
+  fresh session with the result recorded.
