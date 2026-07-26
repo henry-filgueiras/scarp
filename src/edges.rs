@@ -378,6 +378,119 @@ fn check_marker(
     }
 }
 
+/// Scan one artifact's body prose for reference markers and report each
+/// bound marker whose target no artifact claims (task 39, the minimal
+/// slice of idea 2).
+///
+/// Severity is pinned by decision 10: dangling untyped markers are
+/// diagnostic at most, so every finding here is advice, never
+/// corruption. Deliberately out of scope per the same decision: sugar
+/// references (legal but weak; their verification surface is a future
+/// `links bind --check`), targets claimed by several artifacts (the
+/// duplicated id is already its own error finding), and label/target
+/// consistency (idea 2's addendum). Text inside fenced code blocks is
+/// never a marker, mirroring title extraction, and this scan also skips
+/// inline code spans — a diagnostic-layer choice decision 10 leaves
+/// open, forced by real specimens: grammar discussions write
+/// `[[stable-id|label]]` in backticks as a mention, not a reference.
+/// The grammar itself ([`parse_marker`]) is untouched. One finding per
+/// missing id per artifact, however often it is cited.
+/// The parts of one line lying outside inline code spans.
+///
+/// Spans pair per CommonMark's rule: a backtick run opens a span closed
+/// by the next run of exactly the same length; an unpaired run is
+/// literal text and hides nothing. Backticks are ASCII, so byte offsets
+/// of backtick runs are always character boundaries.
+fn outside_code_spans(line: &str) -> Vec<&str> {
+    let bytes = line.as_bytes();
+    let mut segments = Vec::new();
+    let mut segment_start = 0;
+    let mut pos = 0;
+    while pos < bytes.len() {
+        if bytes[pos] != b'`' {
+            pos += 1;
+            continue;
+        }
+        let run_start = pos;
+        while pos < bytes.len() && bytes[pos] == b'`' {
+            pos += 1;
+        }
+        let run_len = pos - run_start;
+        let mut search = pos;
+        while search < bytes.len() {
+            if bytes[search] != b'`' {
+                search += 1;
+                continue;
+            }
+            let close_start = search;
+            while search < bytes.len() && bytes[search] == b'`' {
+                search += 1;
+            }
+            if search - close_start == run_len {
+                segments.push(&line[segment_start..run_start]);
+                segment_start = search;
+                pos = search;
+                break;
+            }
+        }
+    }
+    segments.push(&line[segment_start..]);
+    segments
+}
+
+pub(crate) fn check_prose(content: &str, catalog: &Catalog) -> Vec<EdgeIssue> {
+    let Some((_, body)) = crate::read::split_front_matter(content) else {
+        return Vec::new();
+    };
+    let mut missing: Vec<&str> = Vec::new();
+    let mut in_fence = false;
+    for line in body.lines() {
+        let line = line.trim_end();
+        if line.starts_with("```") || line.starts_with("~~~") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        for segment in outside_code_spans(line) {
+            let mut rest = segment;
+            while let Some(start) = rest.find("[[") {
+                let candidate = &rest[start..];
+                let Some(close) = candidate.find("]]") else {
+                    break;
+                };
+                match parse_marker(&candidate[..close + 2]) {
+                    Some(Marker::Bound { id, .. }) => {
+                        if matches!(catalog.resolve(id), Resolution::Missing)
+                            && !missing.contains(&id)
+                        {
+                            missing.push(id);
+                        }
+                        rest = &candidate[close + 2..];
+                    }
+                    Some(Marker::Sugar { .. }) => rest = &candidate[close + 2..],
+                    // Not a marker; the next candidate may begin inside it.
+                    None => rest = &rest[start + 1..],
+                }
+            }
+        }
+    }
+    missing
+        .into_iter()
+        .map(|id| {
+            issue(
+                Severity::Advice,
+                "dangling-reference",
+                format!(
+                    "prose references `{id}`, but no artifact in this \
+                     repository carries that id"
+                ),
+            )
+        })
+        .collect()
+}
+
 /// Repository-relative paths of `claimants`, preserving their path-sorted
 /// order.
 fn claimant_paths(claimants: &[&Claimant]) -> Vec<String> {
@@ -1172,6 +1285,96 @@ mod tests {
                 "archaeology/decisions/0002-b.md",
             ]
         );
+    }
+
+    #[test]
+    fn prose_scan_advises_once_per_missing_id_and_skips_resolvable_and_sugar() {
+        // Task 39: dangling bound prose markers are advice; a target
+        // resolving to any claimant (here an unmanaged decision) and
+        // sugar references yield nothing, and repeated citations of one
+        // missing id collapse to one finding.
+        let tmp = tempfile::tempdir().unwrap();
+        seed_md(
+            tmp.path(),
+            "archaeology/decisions",
+            "0001-a.md",
+            "dec-real",
+            "decision",
+        );
+        let catalog = Catalog::build(tmp.path());
+        let content = "---\nid: ide-cite\nkind: idea\n---\n\n# Cite\n\n\
+                       See [[dec-real|present]] and [[dec-gone|missing]];\n\
+                       [[dec-gone|cited again]] plus sugar [[dragon:3]].\n";
+
+        let issues = check_prose(content, &catalog);
+
+        assert_eq!(issues.len(), 1, "{issues:?}");
+        assert_eq!(issues[0].problem, "dangling-reference");
+        assert_eq!(issues[0].severity, Severity::Advice);
+        assert!(
+            issues[0].detail.contains("`dec-gone`"),
+            "{}",
+            issues[0].detail
+        );
+    }
+
+    #[test]
+    fn prose_scan_extracts_multiple_markers_per_line_and_skips_fences() {
+        let tmp = tempfile::tempdir().unwrap();
+        let catalog = Catalog::build(tmp.path());
+        let content = "---\nid: ide-cite\nkind: idea\n---\n\n# Cite\n\n\
+                       [[dec-a|one]] then [[dec-b|two]] share a line, and\n\
+                       [[not a marker target]] is prose.\n\n\
+                       ```\n[[dec-fenced|never scanned]]\n```\n";
+
+        let issues = check_prose(content, &catalog);
+
+        let details: Vec<&str> = issues.iter().map(|i| i.detail.as_str()).collect();
+        assert_eq!(issues.len(), 2, "{details:?}");
+        assert!(details[0].contains("`dec-a`"));
+        assert!(details[1].contains("`dec-b`"));
+    }
+
+    #[test]
+    fn prose_scan_skips_inline_code_spans_but_not_unpaired_backticks() {
+        // The corpus's own grammar discussions write `[[stable-id|label]]`
+        // in backticks as mentions; CommonMark pairing governs, so double
+        // backtick spans hide markers too, while an unpaired backtick
+        // hides nothing after it.
+        let tmp = tempfile::tempdir().unwrap();
+        let catalog = Catalog::build(tmp.path());
+        let content = "---\nid: ide-cite\nkind: idea\n---\n\n# Cite\n\n\
+                       the form `[[dec-mentioned|label]]` and ``[[dec-double|x]]``\n\
+                       a stray ` then [[dec-cited|real]] still counts\n";
+
+        let issues = check_prose(content, &catalog);
+
+        assert_eq!(issues.len(), 1, "{issues:?}");
+        assert!(
+            issues[0].detail.contains("`dec-cited`"),
+            "{}",
+            issues[0].detail
+        );
+    }
+
+    #[test]
+    fn prose_scan_never_advises_on_ambiguous_targets() {
+        // A multiply claimed id is already its own duplicate-id error;
+        // per-marker repetition would be noise.
+        let tmp = tempfile::tempdir().unwrap();
+        for name in ["0001-a.md", "0002-b.md"] {
+            seed_md(
+                tmp.path(),
+                "archaeology/decisions",
+                name,
+                "dec-twin",
+                "decision",
+            );
+        }
+        let catalog = Catalog::build(tmp.path());
+        let content = "---\nid: ide-cite\nkind: idea\n---\n\n# Cite\n\n[[dec-twin|which one]]\n";
+
+        assert!(check_prose(content, &catalog).is_empty());
     }
 
     #[test]

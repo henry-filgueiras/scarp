@@ -52,9 +52,10 @@ pub struct Finding {
     /// Provisional kebab-case problem code: `malformed-artifact`,
     /// `unreadable-artifact`, `artifact-conflict`, `duplicate-id`,
     /// `duplicate-sequence`, `non-canonical-artifact` (a parseable file
-    /// whose representation the decision 12 contract excludes), or a
+    /// whose representation the decision 12 contract excludes), a
     /// typed-edge code (`invalid-edge`, `dangling-edge`, `ambiguous-edge`,
-    /// `unbound-edge`, `stale-edge`).
+    /// `unbound-edge`, `stale-edge`), or `dangling-reference` (a bound
+    /// prose marker targeting an id no artifact claims; always advice).
     pub problem: &'static str,
     /// Repository-relative path of the affected file or directory.
     pub path: String,
@@ -190,16 +191,18 @@ pub fn check(root: &Path) -> Result<Report, Error> {
     // artifacts against the identity claimant catalog, so provenance
     // targets in not-yet-managed collections still resolve, and an edge
     // bound to a multiply claimed id is never validated against an
-    // arbitrary claimant (task 23).
+    // arbitrary claimant (task 23). Body prose rides the same pass:
+    // bound markers with unclaimed targets are advice (task 39).
     for artifact in &artifacts {
-        for edge_issue in
-            crate::edges::check_artifact(&artifact.summary, &artifact.content, &catalog)
+        for issue in crate::edges::check_artifact(&artifact.summary, &artifact.content, &catalog)
+            .into_iter()
+            .chain(crate::edges::check_prose(&artifact.content, &catalog))
         {
             findings.push(Finding {
-                problem: edge_issue.problem,
+                problem: issue.problem,
                 path: artifact.summary.path.clone(),
-                detail: edge_issue.detail,
-                severity: edge_issue.severity,
+                detail: issue.detail,
+                severity: issue.severity,
             });
         }
     }
@@ -941,6 +944,40 @@ mod tests {
 
         assert!(report.healthy(), "{:?}", report.findings);
         assert!(report.findings.is_empty(), "{:?}", report.findings);
+    }
+
+    #[test]
+    fn dangling_prose_reference_is_advice_not_corruption() {
+        // Task 39: a bound prose marker with an unclaimed target is a
+        // dangling-reference advice finding; the repository stays
+        // healthy, and a marker resolving to an unmanaged decision is
+        // clean.
+        let tmp = temp_repo();
+        seed_decision(tmp.path(), "dec-real");
+        seed_idea(
+            tmp.path(),
+            IDEAS_DIR,
+            "0001-cite.md",
+            "---\nid: ide-cite\nsequence: 1\nkind: idea\nstatus: parked\ncreated: 2026-07-20\n---\n\n\
+             # Cite\n\nSee [[dec-real|present]] and [[dec-nowhere|gone]].\n",
+        );
+
+        let report = check(tmp.path()).unwrap();
+
+        assert!(report.healthy(), "advice must not fail validation");
+        let advisory: Vec<&Finding> = report
+            .findings
+            .iter()
+            .filter(|finding| finding.problem == "dangling-reference")
+            .collect();
+        assert_eq!(advisory.len(), 1, "{:?}", report.findings);
+        assert_eq!(advisory[0].severity, Severity::Advice);
+        assert_eq!(advisory[0].path, "archaeology/ideas/0001-cite.md");
+        assert!(
+            advisory[0].detail.contains("`dec-nowhere`"),
+            "{}",
+            advisory[0].detail
+        );
     }
 
     #[test]
