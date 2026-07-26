@@ -103,6 +103,17 @@ pub enum Command {
     /// Surface one open dragon or parked idea at random, favoring stale
     /// artifacts
     Fortune,
+    /// Resolve references to stable ids, one per line in input order
+    Resolve {
+        /// `collection:sequence` references (e.g. `idea:15`) or stable
+        /// ids; a stable id is verified to exist and echoed back
+        #[arg(required = true)]
+        references: Vec<ArtifactTarget>,
+        /// Emit a deterministic JSON array (input, kind, id, sequence,
+        /// reference, path, title per input) instead of bare stable ids
+        #[arg(long)]
+        json: bool,
+    },
     /// Emit a completion script for a shell to stdout
     Completions {
         /// Target shell: `bash`, `zsh`, `fish`, `elvish`, or `powershell`

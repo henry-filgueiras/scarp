@@ -2,9 +2,10 @@
 id: tsk_01KYE1JV7X5NNYYMAH5400T5ZR
 sequence: 38
 kind: task
-status: pending
+status: closed
 sprint: spr_01KY7S6Q69YJ6HATZB48SZBRRM
 created: 2026-07-25
+closed: 2026-07-25
 ---
 
 # Batch reference resolution: strata resolve
@@ -68,3 +69,28 @@ separate mutation, which this verb would underpin, not replace.
 - Tests cover order preservation, duplicates, mixed sugar/id input,
   the all-or-nothing failure mode, and stale stable ids.
 - `scripts/check.sh` passes.
+
+## Result
+
+`strata resolve <REFERENCE>...` ships with the specced semantics
+exactly: one strict scan of all five managed collections serves the
+whole batch, sequence references resolve within their collection,
+bare stable ids resolve over the union (and echo back — a stale id
+is exit 7, never a pass-through), and stdout is one bare id per
+input in input order. All-or-nothing holds: any failure empties
+stdout, every failing input is reported on stderr in input order
+under the decision 4 contract (the process exit code is the last
+failure's), and duplicated sequences refuse as `ambiguous-reference`
+rather than resolving to a scan accident. `--json` emits the pinned
+array — input, kind, id, sequence, reference, path, title — the
+title included for `[[id|label]]` assembly.
+
+No stdin mode, per the first-consumer rule. Nine integration tests
+(`tests/resolve.rs`) pin order preservation, duplicates, mixed
+sugar/id input, both failure modes, stale ids, the JSON shape, and
+the empty-invocation usage error. `scripts/check.sh` passes.
+
+Dogfooded immediately on this corpus:
+`strata resolve idea:13 dragon:1 dec-flat-placement task:32` answers
+four ids in order — the task 37 grep-for-`id:` friction this verb
+was minted to remove.

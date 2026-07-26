@@ -50,6 +50,7 @@ fn run(command: &Command) -> Result<(), Error> {
             transition(reference, "reject", Collection::Idea, Status::Rejected)
         }
         Command::Fortune => fortune(),
+        Command::Resolve { references, json } => resolve(references, *json),
         Command::Completions { shell } => {
             completions(*shell);
             Ok(())
@@ -338,6 +339,106 @@ fn fortune() -> Result<(), Error> {
         println!();
         for line in &excerpt {
             println!("  {line}");
+        }
+    }
+    Ok(())
+}
+
+/// The `resolve --json` projection for one input: the input as given plus
+/// the resolved artifact's identity fields. Field names and order are a
+/// compatibility surface pinned by tests; `title` is included because the
+/// demonstrated consumer assembles `[[id|label]]` markers, where the
+/// frozen label comes from the title.
+#[derive(serde::Serialize)]
+struct ResolveRecord<'a> {
+    input: String,
+    kind: &'a str,
+    id: &'a str,
+    sequence: u32,
+    reference: String,
+    path: &'a str,
+    title: &'a str,
+}
+
+/// `strata resolve` (task 38): map references to stable ids, one output
+/// line per input in input order. All-or-nothing on stdout — if any input
+/// fails, stdout emits nothing, every failure is reported on stderr in
+/// input order under the decision 4 contract, and the exit code is the
+/// last failure's. No in-band not-found sentinel ever reaches stdout: an
+/// empty stdout composes safely with `&&` and `$(...)`.
+fn resolve(targets: &[ArtifactTarget], json: bool) -> Result<(), Error> {
+    let root = repo::discover(&cwd()?)?;
+    // One strict scan of every managed collection serves the whole batch;
+    // a blocking sibling names the batch it blocked (decision 13).
+    let display_all = targets
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(" ");
+    let collections: [(&str, Vec<read::Artifact>); 5] = (|| -> Result<_, Error> {
+        Ok([
+            ("dragon", read::scan(&root, &read::DRAGON)?),
+            ("idea", read::scan(&root, &read::IDEA)?),
+            ("decision", read::scan(&root, &read::DECISION)?),
+            ("sprint", read::scan_sprints(&root)?),
+            ("task", read::scan_tasks(&root)?),
+        ])
+    })()
+    .map_err(|err| err.blocking(&display_all))?;
+    // Bare ids resolve over the union: sequences are collection-scoped,
+    // identities are global.
+    let union: Vec<read::Artifact> = collections
+        .iter()
+        .flat_map(|(_, artifacts)| artifacts.iter().cloned())
+        .collect();
+
+    let mut resolved = Vec::new();
+    let mut failures = Vec::new();
+    for target in targets {
+        let display = target.to_string();
+        let result = match target {
+            ArtifactTarget::Reference(reference) => {
+                let pool = collections
+                    .iter()
+                    .find(|(kind, _)| *kind == reference.collection.name())
+                    .map(|(_, artifacts)| artifacts.as_slice())
+                    .expect("every CLI collection has a scanned pool");
+                read::resolve(pool, read::Selector::Sequence(reference.sequence), &display)
+            }
+            ArtifactTarget::Id(id) => read::resolve(&union, read::Selector::Id(id), &display),
+        };
+        match result {
+            Ok(artifact) => resolved.push((display, artifact)),
+            Err(error) => failures.push(error),
+        }
+    }
+
+    // The returned error is rendered by `main` after the ones printed
+    // here, so returning the last failure keeps stderr in input order.
+    if let Some(last) = failures.pop() {
+        for failure in &failures {
+            eprintln!("{}", failure.render());
+        }
+        return Err(last);
+    }
+
+    if json {
+        let records: Vec<ResolveRecord<'_>> = resolved
+            .iter()
+            .map(|(input, artifact)| ResolveRecord {
+                input: input.clone(),
+                kind: &artifact.summary.kind,
+                id: &artifact.summary.id,
+                sequence: artifact.summary.sequence,
+                reference: artifact.summary.reference(),
+                path: &artifact.summary.path,
+                title: &artifact.summary.title,
+            })
+            .collect();
+        println!("{}", to_json(&records));
+    } else {
+        for (_, artifact) in &resolved {
+            println!("{}", artifact.summary.id);
         }
     }
     Ok(())
