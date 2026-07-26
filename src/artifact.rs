@@ -38,7 +38,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 use crate::error::Error;
-use crate::read::{Collection, DRAGON, IDEA, SPRINT, Status, TASK};
+use crate::read::{Collection, DECISION, DRAGON, IDEA, SPRINT, Status, TASK};
 use crate::repo::{SPRINT_FILE, SPRINTS_DIR};
 
 /// Prefix for generated dragon identities.
@@ -46,6 +46,9 @@ pub const DRAGON_ID_PREFIX: &str = "drg_";
 
 /// Prefix for generated idea identities.
 pub const IDEA_ID_PREFIX: &str = "ide_";
+
+/// Prefix for generated decision identities.
+pub const DECISION_ID_PREFIX: &str = "dec_";
 
 /// Prefix for generated sprint identities.
 pub const SPRINT_ID_PREFIX: &str = "spr_";
@@ -182,6 +185,15 @@ pub fn create_dragon(root: &Path, title: &str) -> Result<NewArtifact, Error> {
 pub fn create_idea(root: &Path, title: &str) -> Result<NewArtifact, Error> {
     const SECTIONS: &[&str] = &["Problem", "Sketch", "Boundaries", "Evidence"];
     create(root, &IDEA, IDEA_ID_PREFIX, SECTIONS, title)
+}
+
+/// Create a new accepted decision in the repository at `root`.
+///
+/// Decisions are created directly in their one admitted state: a decision
+/// worth recording is already settled, and drafts are not artifacts.
+pub fn create_decision(root: &Path, title: &str) -> Result<NewArtifact, Error> {
+    const SECTIONS: &[&str] = &["Context", "Decision", "Consequences"];
+    create(root, &DECISION, DECISION_ID_PREFIX, SECTIONS, title)
 }
 
 /// Create a new active sprint in the repository at `root`.
@@ -722,7 +734,7 @@ fn write_new(dir: &Path, filename: &str, content: &str) -> Result<(), Error> {
 mod tests {
     use super::*;
     use crate::repo;
-    use crate::repo::{DRAGONS_DIR, IDEAS_DIR};
+    use crate::repo::{DECISIONS_DIR, DRAGONS_DIR, IDEAS_DIR};
 
     fn temp_repo() -> tempfile::TempDir {
         let tmp = tempfile::tempdir().expect("create temporary directory");
@@ -841,6 +853,59 @@ mod tests {
                 .unwrap_or_else(|| panic!("missing or out-of-order `{heading}` in:\n{content}"));
             cursor += at + heading.len();
         }
+    }
+
+    #[test]
+    fn create_decision_writes_an_accepted_artifact_with_decision_template() {
+        let tmp = temp_repo();
+
+        let decision = create_decision(tmp.path(), "Adopt the spec engine").unwrap();
+
+        assert_eq!(decision.sequence, 1);
+        assert_eq!(decision.reference(), "decision:1");
+        assert!(
+            decision.id.starts_with(DECISION_ID_PREFIX),
+            "{}",
+            decision.id
+        );
+        assert_eq!(
+            decision.relative_path,
+            Path::new(DECISIONS_DIR).join("0001-adopt-the-spec-engine.md")
+        );
+        let content = fs::read_to_string(tmp.path().join(&decision.relative_path)).unwrap();
+        for line in ["kind: decision", "status: accepted", "sequence: 1"] {
+            assert!(
+                content.contains(&format!("\n{line}\n")),
+                "missing `{line}` in:\n{content}"
+            );
+        }
+        let mut cursor = 0;
+        for heading in [
+            "# Adopt the spec engine",
+            "## Context",
+            "## Decision",
+            "## Consequences",
+        ] {
+            let at = content[cursor..]
+                .find(heading)
+                .unwrap_or_else(|| panic!("missing or out-of-order `{heading}` in:\n{content}"));
+            cursor += at + heading.len();
+        }
+    }
+
+    #[test]
+    fn decision_sequences_continue_after_the_existing_corpus() {
+        let tmp = temp_repo();
+        fs::create_dir_all(tmp.path().join(DECISIONS_DIR)).unwrap();
+        fs::write(
+            tmp.path().join(DECISIONS_DIR).join("0015-last.md"),
+            "seeded",
+        )
+        .unwrap();
+
+        let decision = create_decision(tmp.path(), "Sixteenth").unwrap();
+
+        assert_eq!(decision.sequence, 16, "must continue after the maximum");
     }
 
     #[test]

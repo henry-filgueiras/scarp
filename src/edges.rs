@@ -730,7 +730,11 @@ fn assess(root: &Path, claim: &Harvested) -> Disposition {
 /// diagnosis.
 fn canonical_parse(root: &Path, path_rel: &str) -> Option<Result<(), crate::error::Error>> {
     let path = root.join(path_rel);
-    for collection in [&crate::read::DRAGON, &crate::read::IDEA] {
+    for collection in [
+        &crate::read::DRAGON,
+        &crate::read::IDEA,
+        &crate::read::DECISION,
+    ] {
         let Some(name) = path_rel
             .strip_prefix(collection.dir)
             .and_then(|rest| rest.strip_prefix('/'))
@@ -1189,14 +1193,22 @@ mod tests {
             "---\nid: drg-broken\nsequence: 2\nkind: dragon\nstatus: done\ncreated: 2026-07-20\n---\n\n# Broken\n",
         )
         .unwrap();
-        // Unassessed: an unmanaged decision carrying every optional
-        // field; no canonical parse exists for its position.
+        // Canonical: a managed decision at its managed position.
         seed_md(
             tmp.path(),
             "archaeology/decisions",
             "0001-a.md",
             "dec-a",
             "decision",
+        );
+        // Unassessed: an unmanaged note carrying every optional field;
+        // no canonical parse exists for its position.
+        seed_md(
+            tmp.path(),
+            "archaeology/notes",
+            "0001-n.md",
+            "note-a",
+            "note",
         );
 
         let catalog = Catalog::build(tmp.path());
@@ -1214,7 +1226,8 @@ mod tests {
         );
         assert_eq!(broken.claim.sequence, Some(2), "fields stay recoverable");
         assert_eq!(broken.claim.title.as_deref(), Some("Broken"));
-        assert_eq!(by_id("dec-a").disposition, Disposition::Unassessed);
+        assert_eq!(by_id("dec-a").disposition, Disposition::Canonical);
+        assert_eq!(by_id("note-a").disposition, Disposition::Unassessed);
         assert!(matches!(catalog.resolve("absent"), Resolution::Missing));
     }
 

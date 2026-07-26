@@ -99,7 +99,7 @@ pub fn check(root: &Path) -> Result<Report, Error> {
     let mut findings = Vec::new();
     let mut artifacts = Vec::new();
 
-    for collection in [&read::DRAGON, &read::IDEA] {
+    for collection in [&read::DRAGON, &read::IDEA, &read::DECISION] {
         scan_dir(root, collection, &mut findings, &mut artifacts)?;
     }
     scan_sprints_dir(root, &mut findings, &mut artifacts)?;
@@ -832,6 +832,108 @@ mod tests {
         }
     }
 
+    fn decision_markdown(id: &str, sequence: u32, status: &str, title: &str) -> String {
+        format!(
+            "---\nid: {id}\nsequence: {sequence}\nkind: decision\nstatus: {status}\ncreated: 2026-07-20\n---\n\n# {title}\n"
+        )
+    }
+
+    fn seed_decision_file(root: &Path, name: &str, content: &str) {
+        let dir = root.join("archaeology/decisions");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join(name), content).unwrap();
+    }
+
+    #[test]
+    fn decisions_are_validated_under_the_same_invariants() {
+        // Task 32: the fifth managed collection enters the same per-file
+        // pipeline — a non-decision status is malformed, healthy files are
+        // checked artifacts.
+        let tmp = temp_repo();
+        seed_decision_file(
+            tmp.path(),
+            "0001-fine.md",
+            &decision_markdown("dec-fine", 1, "accepted", "Fine"),
+        );
+        seed_decision_file(
+            tmp.path(),
+            "0002-wrong-status.md",
+            &decision_markdown("dec-wrong", 2, "open", "Wrong status"),
+        );
+
+        let report = check(tmp.path()).unwrap();
+
+        assert_eq!(report.artifacts_checked, 1);
+        assert_eq!(
+            problems(&report),
+            vec![(
+                "malformed-artifact",
+                "archaeology/decisions/0002-wrong-status.md"
+            )]
+        );
+    }
+
+    #[test]
+    fn duplicate_decision_ids_and_sequences_are_findings() {
+        // Task 32: the global duplicate checks widen over decisions.
+        let tmp = temp_repo();
+        seed_decision_file(
+            tmp.path(),
+            "0001-a.md",
+            &decision_markdown("dec-same", 1, "accepted", "A"),
+        );
+        seed_decision_file(
+            tmp.path(),
+            "0001-b.md",
+            &decision_markdown("dec-same", 1, "accepted", "B"),
+        );
+
+        let report = check(tmp.path()).unwrap();
+
+        let by_problem: Vec<&str> = report.findings.iter().map(|f| f.problem).collect();
+        assert!(
+            by_problem.contains(&"duplicate-id"),
+            "{:?}",
+            report.findings
+        );
+        assert!(
+            by_problem.contains(&"duplicate-sequence"),
+            "{:?}",
+            report.findings
+        );
+        for finding in &report.findings {
+            assert!(
+                finding.detail.contains("archaeology/decisions/0001-a.md")
+                    && finding.detail.contains("archaeology/decisions/0001-b.md"),
+                "detail must name every involved path: {}",
+                finding.detail
+            );
+        }
+    }
+
+    #[test]
+    fn decision_sequences_are_collection_scoped_against_other_kinds() {
+        // `dragon:1` and `decision:1` coexist: sequence duplication is
+        // judged within one collection only.
+        let tmp = temp_repo();
+        write_dragon(
+            tmp.path(),
+            DRAGONS_DIR,
+            "0001-risk.md",
+            &dragon_markdown("drg-one", 1, "open", "Risk"),
+        );
+        seed_decision_file(
+            tmp.path(),
+            "0001-choice.md",
+            &decision_markdown("dec-one", 1, "accepted", "Choice"),
+        );
+
+        let report = check(tmp.path()).unwrap();
+
+        assert!(report.healthy(), "{:?}", report.findings);
+        assert_eq!(report.artifacts_checked, 2);
+    }
+
     fn idea_markdown(id: &str, sequence: u32, status: &str, title: &str) -> String {
         format!(
             "---\nid: {id}\nsequence: {sequence}\nkind: idea\nstatus: {status}\ncreated: 2026-07-20\n---\n\n# {title}\n"
@@ -909,7 +1011,7 @@ mod tests {
         );
     }
 
-    /// Seed an unmanaged decision artifact so the id universe contains a
+    /// Seed a managed decision artifact so the id universe contains a
     /// legal typed-edge target.
     fn seed_decision(root: &Path, id: &str) {
         let dir = root.join("archaeology/decisions");
@@ -930,7 +1032,7 @@ mod tests {
     }
 
     #[test]
-    fn valid_provenance_edges_pass_and_target_unmanaged_artifacts() {
+    fn valid_provenance_edges_pass_and_target_managed_decisions() {
         let tmp = temp_repo();
         seed_decision(tmp.path(), "dec-settles-it");
         write_dragon(
@@ -950,8 +1052,7 @@ mod tests {
     fn dangling_prose_reference_is_advice_not_corruption() {
         // Task 39: a bound prose marker with an unclaimed target is a
         // dangling-reference advice finding; the repository stays
-        // healthy, and a marker resolving to an unmanaged decision is
-        // clean.
+        // healthy, and a marker resolving to a claimed id is clean.
         let tmp = temp_repo();
         seed_decision(tmp.path(), "dec-real");
         seed_idea(
@@ -1520,17 +1621,23 @@ mod tests {
             "0001-risk.md",
             &dragon_markdown("dup-shared", 1, "open", "Risk"),
         );
-        seed_decision(tmp.path(), "dup-shared");
+        let logs = tmp.path().join("archaeology/logs");
+        fs::create_dir_all(&logs).unwrap();
+        fs::write(
+            logs.join("0001-log.md"),
+            "---\nid: dup-shared\nkind: log\n---\n\n# A log\n",
+        )
+        .unwrap();
 
         let report = check(tmp.path()).unwrap();
 
         assert_eq!(
             problems(&report),
-            vec![("duplicate-id", "archaeology/decisions/0001-a-decision.md")]
+            vec![("duplicate-id", "archaeology/dragons/0001-risk.md")]
         );
         let detail = &report.findings[0].detail;
         assert!(
-            detail.contains("archaeology/decisions/0001-a-decision.md (unmanaged)")
+            detail.contains("archaeology/logs/0001-log.md (unmanaged)")
                 && detail.contains("archaeology/dragons/0001-risk.md"),
             "every claimant and its disposition must be named: {detail}"
         );
@@ -1541,12 +1648,18 @@ mod tests {
         // Thread 5 specimen 2: both claimants sit outside the strong set;
         // the catalog still sees the collision.
         let tmp = temp_repo();
-        seed_decision(tmp.path(), "dec-twin");
         let logs = tmp.path().join("archaeology/logs");
         fs::create_dir_all(&logs).unwrap();
         fs::write(
             logs.join("0001-log.md"),
-            "---\nid: dec-twin\nkind: log\n---\n\n# A log\n",
+            "---\nid: note-twin\nkind: log\n---\n\n# A log\n",
+        )
+        .unwrap();
+        let notes = tmp.path().join("archaeology/notes");
+        fs::create_dir_all(&notes).unwrap();
+        fs::write(
+            notes.join("0001-note.md"),
+            "---\nid: note-twin\nkind: note\n---\n\n# A note\n",
         )
         .unwrap();
 
@@ -1555,12 +1668,12 @@ mod tests {
         assert_eq!(report.artifacts_checked, 0);
         assert_eq!(
             problems(&report),
-            vec![("duplicate-id", "archaeology/decisions/0001-a-decision.md")]
+            vec![("duplicate-id", "archaeology/logs/0001-log.md")]
         );
         assert!(
             report.findings[0]
                 .detail
-                .contains("archaeology/logs/0001-log.md"),
+                .contains("archaeology/notes/0001-note.md"),
             "{}",
             report.findings[0].detail
         );
@@ -1693,10 +1806,10 @@ mod tests {
 
     #[test]
     fn unaddressable_claimant_ids_are_non_canonical_findings() {
-        // Task 25: a colon-bearing managed id (quoted — addressability
-        // judges the decoded value) and a whitespace-bearing unmanaged
-        // decision id both draw error findings; decisions do not enter
-        // `artifacts_checked`.
+        // Task 25: a colon-bearing dragon id (quoted — addressability
+        // judges the decoded value) and a whitespace-bearing decision id
+        // both draw error findings; both artifacts parse cleanly, since
+        // any non-empty id is a valid identity.
         let tmp = temp_repo();
         write_dragon(
             tmp.path(),
@@ -1714,7 +1827,7 @@ mod tests {
 
         let report = check(tmp.path()).unwrap();
 
-        assert_eq!(report.artifacts_checked, 1);
+        assert_eq!(report.artifacts_checked, 2);
         assert_eq!(
             problems(&report),
             vec![
@@ -1825,12 +1938,12 @@ mod tests {
         // Decision 12: addressability never filters the catalog — two
         // claimants of an unaddressable id remain duplicate evidence.
         let tmp = temp_repo();
-        let decisions = tmp.path().join("archaeology/decisions");
-        fs::create_dir_all(&decisions).unwrap();
+        let notes = tmp.path().join("archaeology/notes");
+        fs::create_dir_all(&notes).unwrap();
         for name in ["0001-a.md", "0002-b.md"] {
             fs::write(
-                decisions.join(name),
-                "---\nid: dec spacey\nkind: decision\n---\n\n# Twin\n",
+                notes.join(name),
+                "---\nid: note spacey\nkind: note\n---\n\n# Twin\n",
             )
             .unwrap();
         }
@@ -1840,9 +1953,9 @@ mod tests {
         assert_eq!(
             problems(&report),
             vec![
-                ("duplicate-id", "archaeology/decisions/0001-a.md"),
-                ("non-canonical-artifact", "archaeology/decisions/0001-a.md"),
-                ("non-canonical-artifact", "archaeology/decisions/0002-b.md"),
+                ("duplicate-id", "archaeology/notes/0001-a.md"),
+                ("non-canonical-artifact", "archaeology/notes/0001-a.md"),
+                ("non-canonical-artifact", "archaeology/notes/0002-b.md"),
             ]
         );
     }

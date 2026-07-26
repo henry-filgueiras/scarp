@@ -24,9 +24,9 @@ pub enum Command {
     Init,
     /// Create an artifact; Strata assigns its sequence, slug, and identity
     New {
-        /// Collection for the new artifact (`dragon`, `idea`, `sprint`, or
-        /// `task`; tasks are created in an active sprint, chosen with
-        /// `--sprint` when several are active)
+        /// Collection for the new artifact (`dragon`, `idea`, `decision`,
+        /// `sprint`, or `task`; tasks are created in an active sprint,
+        /// chosen with `--sprint` when several are active)
         collection: Collection,
         /// Human-readable title for the artifact
         title: String,
@@ -41,7 +41,8 @@ pub enum Command {
     },
     /// List the artifacts in a collection
     List {
-        /// Collection to list (`dragons`, `ideas`, `sprints`, or `tasks`)
+        /// Collection to list (`dragons`, `ideas`, `decisions`, `sprints`,
+        /// or `tasks`)
         collection: Collection,
         /// Emit a deterministic JSON array instead of human-readable lines
         #[arg(long)]
@@ -109,6 +110,7 @@ pub enum Command {
 pub enum Collection {
     Dragon,
     Idea,
+    Decision,
     Sprint,
     Task,
 }
@@ -119,6 +121,7 @@ impl Collection {
         match self {
             Collection::Dragon => "dragon",
             Collection::Idea => "idea",
+            Collection::Decision => "decision",
             Collection::Sprint => "sprint",
             Collection::Task => "task",
         }
@@ -132,11 +135,12 @@ impl FromStr for Collection {
         match s {
             "dragon" | "dragons" => Ok(Collection::Dragon),
             "idea" | "ideas" => Ok(Collection::Idea),
+            "decision" | "decisions" => Ok(Collection::Decision),
             "sprint" | "sprints" => Ok(Collection::Sprint),
             "task" | "tasks" => Ok(Collection::Task),
             other => Err(format!(
                 "unknown collection `{other}`; collections are: dragon, idea, \
-                 sprint, task"
+                 decision, sprint, task"
             )),
         }
     }

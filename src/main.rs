@@ -39,12 +39,16 @@ fn run(command: &Command) -> Result<(), Error> {
             reference,
             resolved_by,
         } => close(reference, resolved_by.as_deref()),
-        Command::Reopen { reference } => transition(reference, Collection::Dragon, Status::Open),
+        Command::Reopen { reference } => {
+            transition(reference, "reopen", Collection::Dragon, Status::Open)
+        }
         Command::Adopt {
             reference,
             adopted_by,
         } => adopt(reference, adopted_by.as_deref()),
-        Command::Reject { reference } => transition(reference, Collection::Idea, Status::Rejected),
+        Command::Reject { reference } => {
+            transition(reference, "reject", Collection::Idea, Status::Rejected)
+        }
         Command::Fortune => fortune(),
     }
 }
@@ -54,6 +58,7 @@ fn scan(root: &std::path::Path, collection: Collection) -> Result<Vec<read::Arti
     match collection {
         Collection::Dragon => read::scan(root, &read::DRAGON),
         Collection::Idea => read::scan(root, &read::IDEA),
+        Collection::Decision => read::scan(root, &read::DECISION),
         Collection::Sprint => read::scan_sprints(root),
         Collection::Task => read::scan_tasks(root),
     }
@@ -73,9 +78,34 @@ fn verb_guidance(collection: Collection) -> &'static str {
     match collection {
         Collection::Dragon => "dragons close and reopen: use `strata close` or `strata reopen`",
         Collection::Idea => "ideas adopt or reject: use `strata adopt` or `strata reject`",
+        Collection::Decision => "decisions have no lifecycle verbs; they are permanent records",
         Collection::Sprint => "sprints close: use `strata close`",
         Collection::Task => "tasks close: use `strata close`",
     }
+}
+
+/// The lifecycle refusal for decisions (task 32): truthful guidance naming
+/// the operation, the artifact, and why decisions have no such transition —
+/// never a generic parse or not-found error.
+fn decision_refusal(verb: &str, display: &str) -> Error {
+    Error::InvalidInvocation {
+        message: format!(
+            "cannot {verb} `{display}`: it is a decision, and decisions have \
+             no lifecycle transitions — an accepted decision is a permanent \
+             record, and a changed position is recorded as a new decision \
+             that supersedes it"
+        ),
+    }
+}
+
+/// Best-effort probe: does a cleanly parsed decision claim this stable id?
+/// A failing decision scan answers no — the probe only upgrades a would-be
+/// not-found diagnostic into the truthful decision refusal and must never
+/// block another collection's lifecycle.
+fn id_names_a_decision(root: &std::path::Path, id: &str) -> bool {
+    read::scan(root, &read::DECISION)
+        .map(|decisions| decisions.iter().any(|d| d.summary.id == id))
+        .unwrap_or(false)
 }
 
 /// Transition one artifact between lifecycle states and render the outcome.
@@ -83,10 +113,18 @@ fn verb_guidance(collection: Collection) -> &'static str {
 /// Each transition verb belongs to one collection's lifecycle; a reference
 /// into another collection is refused with the verbs that do apply, rather
 /// than resolved into a surprising rewrite.
-fn transition(target: &ArtifactTarget, collection: Collection, to: Status) -> Result<(), Error> {
+fn transition(
+    target: &ArtifactTarget,
+    verb: &str,
+    collection: Collection,
+    to: Status,
+) -> Result<(), Error> {
     if let ArtifactTarget::Reference(reference) = target
         && reference.collection != collection
     {
+        if reference.collection == Collection::Decision {
+            return Err(decision_refusal(verb, &target.to_string()));
+        }
         return Err(Error::InvalidInvocation {
             message: format!(
                 "`{target}` is a {} reference; {}",
@@ -96,11 +134,17 @@ fn transition(target: &ArtifactTarget, collection: Collection, to: Status) -> Re
         });
     }
     let root = repo::discover(&cwd()?)?;
+    if let ArtifactTarget::Id(id) = target
+        && id_names_a_decision(&root, id)
+    {
+        return Err(decision_refusal(verb, id));
+    }
     let done = transition::transition(
         &root,
         match collection {
             Collection::Dragon => &read::DRAGON,
             Collection::Idea => &read::IDEA,
+            Collection::Decision => &read::DECISION,
             Collection::Sprint => &read::SPRINT,
             Collection::Task => &read::TASK,
         },
@@ -118,6 +162,9 @@ fn adopt(target: &ArtifactTarget, adopted_by: Option<&str>) -> Result<(), Error>
     if let ArtifactTarget::Reference(reference) = target
         && reference.collection != Collection::Idea
     {
+        if reference.collection == Collection::Decision {
+            return Err(decision_refusal("adopt", &target.to_string()));
+        }
         return Err(Error::InvalidInvocation {
             message: format!(
                 "`{target}` is a {} reference; {}",
@@ -127,6 +174,11 @@ fn adopt(target: &ArtifactTarget, adopted_by: Option<&str>) -> Result<(), Error>
         });
     }
     let root = repo::discover(&cwd()?)?;
+    if let ArtifactTarget::Id(id) = target
+        && id_names_a_decision(&root, id)
+    {
+        return Err(decision_refusal("adopt", id));
+    }
     let done = transition::transition_with_provenance(
         &root,
         &read::IDEA,
@@ -150,6 +202,7 @@ fn close(target: &ArtifactTarget, resolved_by: Option<&str>) -> Result<(), Error
         ArtifactTarget::Id(id) => {
             let union = || -> Result<Vec<read::Artifact>, Error> {
                 let mut all = read::scan(&root, &read::DRAGON)?;
+                all.extend(read::scan(&root, &read::DECISION)?);
                 all.extend(read::scan_sprints(&root)?);
                 all.extend(read::scan_tasks(&root)?);
                 Ok(all)
@@ -159,10 +212,14 @@ fn close(target: &ArtifactTarget, resolved_by: Option<&str>) -> Result<(), Error
             match artifact.summary.kind.as_str() {
                 "sprint" => Collection::Sprint,
                 "task" => Collection::Task,
+                "decision" => Collection::Decision,
                 _ => Collection::Dragon,
             }
         }
     };
+    if collection == Collection::Decision {
+        return Err(decision_refusal("close", &target.to_string()));
+    }
     if resolved_by.is_some() && collection != Collection::Dragon {
         return Err(Error::InvalidInvocation {
             message: format!(
@@ -199,6 +256,7 @@ fn close(target: &ArtifactTarget, resolved_by: Option<&str>) -> Result<(), Error
                 ),
             });
         }
+        Collection::Decision => unreachable!("decision targets are refused before dispatch"),
     };
     render_transition(&done);
     Ok(())
@@ -214,6 +272,7 @@ fn render_transition(done: &transition::Transition) {
         Status::Parked => "parked",
         Status::Active => "activated",
         Status::Pending => "pended",
+        Status::Accepted => "accepted",
     };
     println!(
         "{verb} {} ({} -> {}) at {}",
@@ -335,6 +394,7 @@ fn new_artifact(
     let created = match collection {
         Collection::Dragon => artifact::create_dragon(&root, title)?,
         Collection::Idea => artifact::create_idea(&root, title)?,
+        Collection::Decision => artifact::create_decision(&root, title)?,
         Collection::Sprint => artifact::create_sprint(&root, title)?,
         Collection::Task => artifact::create_task(
             &root,
@@ -347,6 +407,7 @@ fn new_artifact(
     let reachability = match collection {
         Collection::Dragon => artifact::probe_reachability(&root, &read::DRAGON, &created),
         Collection::Idea => artifact::probe_reachability(&root, &read::IDEA, &created),
+        Collection::Decision => artifact::probe_reachability(&root, &read::DECISION, &created),
         Collection::Sprint | Collection::Task => artifact::Reachability::Reachable,
     };
     if json {
@@ -447,6 +508,7 @@ fn show(target: &ArtifactTarget, json: bool) -> Result<(), Error> {
             let union = || -> Result<Vec<read::Artifact>, Error> {
                 let mut all = read::scan(&root, &read::DRAGON)?;
                 all.extend(read::scan(&root, &read::IDEA)?);
+                all.extend(read::scan(&root, &read::DECISION)?);
                 all.extend(read::scan_sprints(&root)?);
                 all.extend(read::scan_tasks(&root)?);
                 Ok(all)

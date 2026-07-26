@@ -42,6 +42,10 @@ pub const DRAGONS_DIR: &str = "archaeology/dragons";
 /// lifecycle state (decision 11: placement is flat).
 pub const IDEAS_DIR: &str = "archaeology/ideas";
 
+/// Root-relative directory holding every decision artifact. Decisions have
+/// a single lifecycle state (`accepted`), so placement is trivially flat.
+pub const DECISIONS_DIR: &str = "archaeology/decisions";
+
 /// Root-relative directory holding one containment directory per sprint.
 /// Containment is not lifecycle (decision 11): a sprint's directory never
 /// changes over its life, and its tasks file inside it.

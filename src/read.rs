@@ -39,7 +39,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::artifact::MAX_SEQUENCE;
 use crate::error::Error;
-use crate::repo::{DRAGONS_DIR, IDEAS_DIR, SPRINTS_DIR};
+use crate::repo::{DECISIONS_DIR, DRAGONS_DIR, IDEAS_DIR, SPRINTS_DIR};
 
 /// Per-file byte cap on every managed content read (thread 4, task 22).
 ///
@@ -155,6 +155,7 @@ pub enum Status {
     Rejected,
     Active,
     Pending,
+    Accepted,
 }
 
 impl Status {
@@ -168,6 +169,7 @@ impl Status {
             Status::Rejected => "rejected",
             Status::Active => "active",
             Status::Pending => "pending",
+            Status::Accepted => "accepted",
         }
     }
 }
@@ -221,6 +223,19 @@ pub static IDEA: Collection = Collection {
         (Status::Parked, Status::Adopted),
         (Status::Parked, Status::Rejected),
     ],
+    stamp_closed: false,
+};
+
+/// The decision collection: settled tradeoffs. Decisions are permanent
+/// records with a single admitted state (`accepted`) and no transitions:
+/// a decision is amended or superseded by a later decision, never
+/// reopened or closed. Supersession waits for the first real
+/// supersession event (sprint 7 non-goal).
+pub static DECISION: Collection = Collection {
+    kind: "decision",
+    dir: DECISIONS_DIR,
+    states: &[Status::Accepted],
+    transitions: &[],
     stamp_closed: false,
 };
 
@@ -985,6 +1000,45 @@ mod tests {
         let err = scan(tmp.path(), &IDEA).unwrap_err();
 
         expect_malformed(err, "0001-open-idea.md", "parked");
+    }
+
+    #[test]
+    fn decision_status_vocabulary_admits_only_accepted() {
+        let tmp = temp_repo();
+        fs::create_dir_all(tmp.path().join(DECISIONS_DIR)).unwrap();
+        fs::write(
+            tmp.path().join(DECISIONS_DIR).join("0001-fine.md"),
+            "---\nid: dec-fine\nsequence: 1\nkind: decision\nstatus: accepted\ncreated: 2026-07-20\n---\n\n# Fine\n",
+        )
+        .unwrap();
+
+        let decisions = scan(tmp.path(), &DECISION).unwrap();
+        assert_eq!(decisions.len(), 1);
+        assert_eq!(decisions[0].summary.status, Status::Accepted);
+        assert_eq!(decisions[0].summary.reference(), "decision:1");
+
+        fs::write(
+            tmp.path().join(DECISIONS_DIR).join("0002-proposed.md"),
+            "---\nid: dec-proposed\nsequence: 2\nkind: decision\nstatus: proposed\ncreated: 2026-07-20\n---\n\n# Proposed\n",
+        )
+        .unwrap();
+
+        let err = scan(tmp.path(), &DECISION).unwrap_err();
+
+        expect_malformed(err, "0002-proposed.md", "accepted");
+    }
+
+    #[test]
+    fn decisions_define_no_lifecycle_transitions() {
+        assert!(DECISION.transitions.is_empty());
+        for to in [Status::Closed, Status::Adopted, Status::Rejected] {
+            assert!(
+                !DECISION.allows(Status::Accepted, to),
+                "accepted -> {to} must be illegal"
+            );
+        }
+        assert_eq!(DECISION.parse_status("accepted"), Some(Status::Accepted));
+        assert_eq!(DECISION.parse_status("open"), None);
     }
 
     #[test]

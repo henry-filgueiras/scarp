@@ -120,6 +120,9 @@ flowchart LR
         i1([parked]) --> i2([adopted])
         i1 --> i3([rejected])
     end
+    subgraph decision
+        a1([accepted])
+    end
     subgraph task["sprint task"]
         t1([pending]) --> t2([closed])
     end
@@ -157,10 +160,12 @@ Strata is bootstrapping its smallest useful vertical slice. Honest scoreboard:
 | `strata close dragon:N` / `strata reopen dragon:N` | transition an artifact between lifecycle states, safely | ✅ |
 | `strata fortune` | resurface one open dragon or parked idea, favoring stale artifacts | ✅ |
 
-Dragons, ideas, sprints, and tasks are managed collections: `new`, `list`,
-and `show` cover all four (the rows above show the dragon spelling), and
-each collection's lifecycle commands apply — `close`, `reopen`, `adopt`,
-`reject`. Decisions and logs remain manually maintained.
+Dragons, ideas, decisions, sprints, and tasks are managed collections:
+`new`, `list`, and `show` cover all five (the rows above show the dragon
+spelling), and each collection's lifecycle commands apply — `close`,
+`reopen`, `adopt`, `reject`. Decisions are permanent records with no
+lifecycle verbs: a changed position is a new decision that supersedes the
+old one. Logs remain manually maintained.
 Daemons, indexes, embeddings, semantic search, MCP, GraphQL, and dashboards
 are deliberately deferred — each would need a recorded decision and evidence
 that the layer beneath it is useful.
