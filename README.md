@@ -176,7 +176,19 @@ that the layer beneath it is useful.
 cargo build
 cargo test
 cargo run -- --help
-scripts/check.sh   # format, lint, test
+scripts/check.sh   # format, lint, test, doctor
+```
+
+### Shell completions
+
+`strata completions <shell>` emits a completion script for `bash`,
+`zsh`, `fish`, `elvish`, or `powershell`. For zsh:
+
+```sh
+mkdir -p ~/.zfunc
+strata completions zsh > ~/.zfunc/_strata
+# in ~/.zshrc, before compinit:
+#   fpath=(~/.zfunc $fpath)
 ```
 
 Strata is also a case study in human–AI collaboration on long-lived projects.

@@ -103,6 +103,11 @@ pub enum Command {
     /// Surface one open dragon or parked idea at random, favoring stale
     /// artifacts
     Fortune,
+    /// Emit a completion script for a shell to stdout
+    Completions {
+        /// Target shell: `bash`, `zsh`, `fish`, `elvish`, or `powershell`
+        shell: clap_complete::Shell,
+    },
 }
 
 /// Artifact collections known to this implementation.

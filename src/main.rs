@@ -50,7 +50,20 @@ fn run(command: &Command) -> Result<(), Error> {
             transition(reference, "reject", Collection::Idea, Status::Rejected)
         }
         Command::Fortune => fortune(),
+        Command::Completions { shell } => {
+            completions(*shell);
+            Ok(())
+        }
     }
+}
+
+/// Emit a completion script for `shell` on stdout. Generation is pure
+/// (no repository discovery): the script is derived entirely from the
+/// clap command definition, so it works outside any Strata repository.
+fn completions(shell: clap_complete::Shell) {
+    use clap::CommandFactory;
+    let mut command = Cli::command();
+    clap_complete::generate(shell, &mut command, "strata", &mut std::io::stdout());
 }
 
 /// Scan one command-line collection into the shared read model.
