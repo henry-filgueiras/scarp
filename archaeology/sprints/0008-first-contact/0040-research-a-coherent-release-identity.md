@@ -435,3 +435,52 @@ contender, run that pass before deciding. The ranked recommendation
 above stands unchanged; this addendum adds a third option class to
 the adjudication: `outcrop` (semantic), `varve` (semantic
 fallback), or a moniker led by `nost`.
+
+### Addendum (2026-07-26): five-letter extension and cross-round snapshot
+
+A bounded five-letter round extended the moniker direction, using
+the four-letter shortlist's texture (compact, consonant-rich,
+tactile, one strong beat) as the aesthetic target. Method **[V]**:
+the `namegen` cantrip gained a `--len 5` mode (patterns
+CCVCC/CVCVC/CCVCV/CVCCV/VCCVC/VCVCC over the same onset/coda
+tables, ~98.5k legal coinages); the euphony ranking alone favors
+soft CVCV-coinages, so gritty-texture candidates were surfaced with
+a per-pattern filter and hand curation. 64 candidates — curated
+real/archaic/craft words, textured coinages, and raw high-scorers —
+were screened against the crates.io sparse index on 2026-07-26;
+24 crates-free candidates were surfaced in chat. This round used
+crates.io as the only bulk gate; no cross-registry or deep pass.
+
+Findings **[V]**: the stone-and-craft lexicon is heavily mined on
+crates.io (`chert`, `spall`, `clast`, `karst`, `scree`, `swarf`,
+`burin`, `quoin`, `cairn`, `riven` all taken); the survivors are
+the obscurer corners of that vocabulary. `esker` is crates-free but
+collides with Esker S.A. (esker.com), an established
+document-automation software company — admired and excluded for
+trademark risk. Coinage seeds `prow` (Kubernetes Prow) and `knap`
+(a Neovim plugin) are name-occupied by developer tools.
+
+Cross-round top ten, both lengths, one assistant's taste **[A]**
+(registry columns are dated 2026-07-26 snapshots **[V]**; 5-letter
+rows were probed on crates.io only):
+
+| rank | name | len | registries | why it survives | strongest objection |
+|---|---|---|---|---|---|
+| 1 | scarp | 5 | crates free | the seed texture exactly, and an escarpment is where strata become readable — the product promise in one beat | one transposition from `scrap`; weakly googleable common word |
+| 2 | orlop | 5 | crates free | a ship's deepest deck — the lowest stratum of the vessel; strange in the right amount, clean VCCVC | obscure enough to need its gloss every time; faintly comic "-lop" |
+| 3 | nost | 4 | crates/pypi/brew free, npm squat | the four-letter round's pick stands: *nostos*, the homecoming, snappiest to type of any candidate | zero semantic scaffolding even by moniker standards; "-ost" coinage smell |
+| 4 | quern | 5 | crates free | a hand mill — humble, tactile, daily-grind tool imagery; archaic without fantasy residue | `qu-` spelling/typing tax; spoken it drifts toward "kern" |
+| 5 | sherd | 5 | crates free | archaeology's own word for a recovered fragment of the past | a lifetime of "you misspelled shard"; autocorrect pulls to "shred" |
+| 6 | wold | 4 | free on all four | still the only candidate anywhere with a fully clean namespace | spoken it smears into "would" |
+| 7 | marl | 4 | crates/brew free, pypi taken, npm squat | geology and weaving in one quiet word; effortless to say and type | least distinctive of the ten; marl/Marl place-name noise |
+| 8 | lith | 4 | crates/brew free, pypi taken, npm squat | stone at its most compressed; reads like a tool | feels like a fragment of a longer word — "-lith" is a suffix |
+| 9 | drost | 5 | crates free | best pure coinage across both rounds: consonant-dense, single beat; accidentally Dutch for a district steward — a keeper of records | common Dutch surname; one letter from Droste, reads borrowed |
+| 10 | winze | 5 | crates free | a shaft sunk between mine levels — descent through the workings' layers; pleasant to type | spoken aloud it is "wins" |
+
+Near-misses recorded for completeness: `sprag`, `thole`, `arris`,
+`held`, `torm`, `prent` (Scots "imprint" — print-adjacency is the
+same daily typo tax that sank `forn`), `wista`. Henry's early,
+explicitly non-committal leanings at snapshot time: `scarp` and
+`orlop`, with `esker` admired but set aside for the trademark wall
+**[V]**. The scope caveat above applies unchanged: promotion of any
+of these requires the deep pass the tournament finalists received.
