@@ -2,9 +2,10 @@
 id: tsk_01KY7S6QB3EZY0A441WRG301FX
 sequence: 34
 kind: task
-status: pending
+status: closed
 sprint: spr_01KY7S6Q69YJ6HATZB48SZBRRM
 created: 2026-07-23
+closed: 2026-07-25
 ---
 
 # Session-start orientation hook
@@ -40,3 +41,45 @@ its recorded friction is the evidence base for or against
   recorded in this task's result as desire-path evidence.
 - `scripts/check.sh` passes, and the hook is verified once in a real
   fresh session with the result recorded.
+
+## Result
+
+The checked-in project settings register a SessionStart hook matching
+`startup|resume` only — `clear` keeps `/next` as the explicit
+reorientation path — running `scripts/session-start.sh`, which cds to
+`$CLAUDE_PROJECT_DIR`, builds quietly, and composes curated lines
+from `strata list sprints`, `strata list tasks --active`, and
+`strata fortune`. Both failure paths (build failure, scan failure)
+collapse to one controlled notice; raw cargo noise is suppressed in
+success and failure alike, verified by running with cargo removed
+from PATH.
+
+Verified in a real fresh session (2026-07-25): a headless
+`claude -p` run in this repository — a genuine `startup` source —
+was asked to quote the injected orientation and returned the fortune
+line verbatim. Script latency: ~90 ms warm (build no-op plus three
+strata invocations); a cold first build after a clean checkout would
+add its full compile time, accepted for a dev-only repository.
+
+Composition friction (the desire-path evidence this task was
+instrumented to collect, for [[ide_01KY7S6GHMQ8ZWNXPX7TX21X7N|idea
+24]]):
+
+- "Active sprints with their pending tasks" is not one query. The
+  script stitches two `list` invocations and filters each with
+  `awk '$2 == ...'`, keying on the *column position* of status in
+  human output — an informal contract no test pins for external
+  consumers. The robust alternative (`--json` + jq) would add a jq
+  dependency to a checked-in hook.
+- `strata fortune` emits a multi-line card; honoring the one-line
+  spec meant `head -n 1`, discarding the age/path line the card
+  format considers essential.
+- Nothing aggregates across collections; every line of orientation
+  is hand-formatted shell. A `strata status` would replace the
+  entire body of this script.
+
+One hook-shaped friction outside strata itself: the agent
+implementing this task was correctly permission-blocked from editing
+`.claude/settings.json` (hook registration is self-granting
+execution), so the settings edit was performed by Henry — worth
+remembering for any future task whose deliverable is hook wiring.

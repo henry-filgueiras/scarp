@@ -19,5 +19,15 @@
       "Bash(./target/debug/strata --help)",
       "Bash(./target/debug/strata --version)"
     ]
+  },
+  "hooks": {
+  "SessionStart": [
+    {
+      "matcher": "startup|resume",
+      "hooks": [
+        { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/session-start.sh" }
+      ]
+    }
+  ]
   }
 }
