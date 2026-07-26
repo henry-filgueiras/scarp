@@ -168,7 +168,13 @@ pub fn probe_reachability(
 
 /// Create a new open dragon in the repository at `root`.
 pub fn create_dragon(root: &Path, title: &str) -> Result<NewArtifact, Error> {
-    const SECTIONS: &[&str] = &["Context", "Question", "Constraints", "Resolution criteria"];
+    const SECTIONS: &[&str] = &[
+        "Context",
+        "Question",
+        "Constraints",
+        "Candidate direction",
+        "Resolution criteria",
+    ];
     create(root, &DRAGON, DRAGON_ID_PREFIX, SECTIONS, title)
 }
 
@@ -786,17 +792,19 @@ mod tests {
                 "missing `{line}` in:\n{content}"
             );
         }
+        let mut cursor = 0;
         for heading in [
             "# Branch sequence collisions",
             "## Context",
             "## Question",
             "## Constraints",
+            "## Candidate direction",
             "## Resolution criteria",
         ] {
-            assert!(
-                content.contains(heading),
-                "missing `{heading}` in:\n{content}"
-            );
+            let at = content[cursor..]
+                .find(heading)
+                .unwrap_or_else(|| panic!("missing or out-of-order `{heading}` in:\n{content}"));
+            cursor += at + heading.len();
         }
     }
 
