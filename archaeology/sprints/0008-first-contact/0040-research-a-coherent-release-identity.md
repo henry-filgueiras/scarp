@@ -371,3 +371,67 @@ SlateDB users who installed criccomini's dashboard already have an
 Not done here, by design: no naming decision artifact, no rename,
 no crate reservation, no repository-settings change. Adjudication
 is Henry's.
+
+### Addendum (2026-07-26): the evocative-moniker direction
+
+After the tournament closed, a third direction was explored in
+discussion: instead of a word from a relevant semantic family, a
+short evocative moniker whose meaning is supplied by the project
+description — the `git` strategy. Constraints: four letters,
+unambiguously pronounceable in English, easy to type, pleasant as
+the canonical executable.
+
+Method **[V]**: a generator was built (now the `namegen` cantrip,
+destined for the dev-env repository) that enumerates every 4-letter
+string legal under a conservative model of English phonotactics
+(patterns CVCV/CVCC/CCVC/VCVC/VCCV; no soft-c/soft-g forks, no
+silent-e), ranks ~9.7k candidates by a dictionary-trained trigram
+euphony model blended with QWERTY ergonomics, and probes registries
+for collisions. The top 300 pseudowords plus 18 curated real words
+were screened against the crates.io sparse index on 2026-07-26:
+**243 of 318 were free**. Survivors were hand-filtered for sound
+and accidental meaning **[A]**, and the shortlist was cross-checked
+against all four registries the same day **[V]**:
+
+| name | says | crates | pypi | brew | npm | notes [A unless noted] |
+|---|---|---|---|---|---|---|
+| nost | NOST | free | free | free | squat | Greek *nostos*, the homecoming — root of "nostalgia"; quietly about returning to a project and knowing it |
+| forn | FORN | free | free | free | squat | Old Norse "ancient"; Icelandic for archaeology is *fornleifafræði*. n/m adjacency makes "form" typos and autocorrect a daily tax |
+| held | HELD | free | free | free | squat | what the repository held; common-word ungoogleability, the full git tradeoff |
+| prow | PROW | free | free | free | squat | ship's leading edge; forward-facing, slightly fights the memory mission |
+| wold | rhymes "old" | free | free | free | free | only candidate free on all four registries **[V]**; rolling upland; spoken it can smear into "would" |
+| torm | TORM | free | taken | free | squat | pure sound; minor D&D deity noise |
+| vist | VIST | free | taken | free | squat | vista-adjacent, clean |
+| marl | MARL | free | taken | free | squat | lime-rich mudstone and marled yarn — geology and weaving in one quiet word |
+| lith | LITH | free | taken | free | squat | stone, as in lithic |
+| knap | trap | free | taken | free | squat | flint-knapping; silent k invites "kuh-nap" |
+
+Casualty: `wist` (archaic English "knew" — near-perfect semantics)
+is taken on crates.io, npm, and PyPI **[V]**.
+
+Discussion. npm is a graveyard for pronounceable 4-letter strings,
+but npm is the one registry this project would never publish to;
+crates.io, Homebrew, and the binary name are load-bearing, PyPI
+only if a Python SDK ever exists **[I]**. The strategy's real
+advantage follows from the tournament's own landscape finding: the
+semantic neighborhoods (memory, records, layers) are exactly where
+the 2025–26 near-competitor cluster is squatting, so a distinctive
+pseudoword buys an uncontested search identity — "nost cli" would
+match nothing but this project **[I]**. The cost is zero semantic
+scaffolding: the name does no onboarding work, acceptable for a
+tool met through a README rather than a search box **[A]**.
+
+Within this direction the pick is **nost** — one pronunciation,
+snappy to type (`nost doctor`, `nost new dragon`, `nost resolve
+idea:15`), hidden etymology about return-and-recognition without
+claiming anything **[A]**. `forn`'s archaeology easter egg is
+better still, but the "form" typo gravity is real; `wold` is the
+cleanest namespace with the muddiest mouth.
+
+Scope caveat: moniker candidates received registry screening only —
+not the deep pass (GitHub identities, products, trademark-shaped
+risks) the tournament finalists received. If one becomes a serious
+contender, run that pass before deciding. The ranked recommendation
+above stands unchanged; this addendum adds a third option class to
+the adjudication: `outcrop` (semantic), `varve` (semantic
+fallback), or a moniker led by `nost`.
