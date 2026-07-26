@@ -2,8 +2,9 @@
 id: spr_01KY7S6Q69YJ6HATZB48SZBRRM
 sequence: 7
 kind: sprint
-status: active
+status: closed
 created: 2026-07-23
+closed: 2026-07-25
 ---
 
 # Sprint 7: Managed decisions and the daily loop
@@ -92,3 +93,53 @@ arbitrary corruption to doctor-detectable errors in managed
 collections; task 34 gains hook-source, working-directory,
 stdout-intent, `/next`-coexistence, failure-notice, and verification
 criteria. Task 35 is unchanged.
+
+## Retrospective (2026-07-25)
+
+Eight tasks closed: the four planned slices (32–35) and four minted
+mid-sprint from observed friction (36, 37, 38, 39). Every success
+criterion holds: decisions are the fifth managed collection over the
+unmodified fifteen-file corpus, `scripts/check.sh` fails on
+doctor-detectable corruption (demonstrated against a corrupted
+scratch copy), a fresh session opens with strata-built orientation
+plus one fortune line, and `strata completions zsh` loads cleanly
+under `zsh -f`. Doctor is green over 95 artifacts with zero
+advisories.
+
+Durable learnings, recorded where they belong:
+
+- The idea 10 stop-condition in task 32 resolved *against*
+  extraction: the fifth flat collection cost one `Collection` value,
+  one create wrapper, and enumeration entries, with the interpreting
+  machinery reused unmodified (task 32 result). Flat collections are
+  already spec-driven in practice; the divergence that resisted
+  data-ification in sprint 5 lives entirely in the containment
+  layouts. Extraction pressure went down, not up.
+- The session-start hook earned its "instrument" framing on day one:
+  composing "active sprints with pending tasks" required stitching
+  two `list` calls with `awk` on a column position, which is the
+  concrete evidence [[ide_01KY7S6GHMQ8ZWNXPX7TX21X7N|idea 24]] was
+  waiting for (task 34 result).
+- The desire-path loop closed inside a single sprint: task 37's
+  grep-for-`id:` friction minted task 38, `strata resolve` shipped,
+  and its first real invocation answered the exact query that had
+  been manual. This is the workflow the case study exists to prove.
+- Lifecycle refusals as guidance paid off again: decisions refuse
+  every verb with supersession guidance rather than not-found, at
+  the cost of one best-effort probe that never blocks other
+  collections (task 32 result).
+- An agent implementing hook wiring is correctly permission-blocked
+  from registering hooks itself — self-granting execution is a
+  boundary. Future tasks whose deliverable is hook configuration
+  should plan the human settings edit into the loop (task 34
+  result).
+
+Friction to fix next: idea 24 (`strata status`) now has a written
+consumer — the entire body of `scripts/session-start.sh` is the
+query it would replace, and `strata fortune | head -n 1` shows the
+card format wants a one-line mode. Committing remains ceremony
+beside the tool (idea 9). The pre-release runway is clear: the next
+sprint is "First Contact" per this sprint's amendment — installable
+v0.1.0, quickstart, clean-machine verification, and a deterministic
+60-second demo, for which completions and the doctor gate were the
+groundwork.
