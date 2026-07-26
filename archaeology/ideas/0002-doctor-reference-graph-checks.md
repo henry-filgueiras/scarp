@@ -24,6 +24,19 @@ corruption-level finding; unbound sugar and dangling untyped markers are
 diagnostics; frozen-label drift is information only. Cycle checks apply
 only to typed edge kinds with DAG semantics.
 
+## Addendum: label/target consistency (2026-07-25)
+
+A bound marker can carry a label that names a different artifact than
+the one its stable id resolves to — `[[<id of idea 22>|idea 26]]` —
+and remain structurally valid, since the target exists. This is
+distinct from frozen-label drift (target's title changed under a
+once-correct label): here the label was wrong at write time. A cheap
+check: when a label matches the `kind N` or `kind:N` shape, verify N
+against the resolved target's sequence and report mismatch as a
+diagnostic. Specimen: while authoring idea 28, an agent pasted
+idea 22's ULID into a link labeled "idea 26"; self-caught before
+commit, but doctor could not have flagged it.
+
 ## Evidence
 
 Decision 0006 (`dec-bootstrap-reference-model`), which requires each typed
