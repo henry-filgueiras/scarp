@@ -174,7 +174,7 @@ pub fn create_dragon(root: &Path, title: &str) -> Result<NewArtifact, Error> {
 
 /// Create a new parked idea in the repository at `root`.
 pub fn create_idea(root: &Path, title: &str) -> Result<NewArtifact, Error> {
-    const SECTIONS: &[&str] = &["Problem", "Sketch", "Evidence"];
+    const SECTIONS: &[&str] = &["Problem", "Sketch", "Boundaries", "Evidence"];
     create(root, &IDEA, IDEA_ID_PREFIX, SECTIONS, title)
 }
 
@@ -820,16 +820,18 @@ mod tests {
                 "missing `{line}` in:\n{content}"
             );
         }
+        let mut cursor = 0;
         for heading in [
             "# Declarative specs",
             "## Problem",
             "## Sketch",
+            "## Boundaries",
             "## Evidence",
         ] {
-            assert!(
-                content.contains(heading),
-                "missing `{heading}` in:\n{content}"
-            );
+            let at = content[cursor..]
+                .find(heading)
+                .unwrap_or_else(|| panic!("missing or out-of-order `{heading}` in:\n{content}"));
+            cursor += at + heading.len();
         }
     }
 
