@@ -619,3 +619,169 @@ all affected citations re-verified). Evidence: one clean data point
 **for** safe non-linear task selection when ownership and handoff
 are explicit, and a reminder that the same discipline applies to
 scratch resources, not only the repository.
+
+### Addendum (2026-07-26): storage authority, continuability, and the workflow boundary
+
+Synthesized from a 2026-07-26 follow-up discussion between Henry
+Filgueiras and Lux (OpenAI/ChatGPT); edited and verified against
+Task 41 by Claude. The task stays closed and the research above
+stands as written: this addendum refines two of its judgments
+rather than rewriting them, and records the architectural
+boundaries the comparison exposed. No new claim about Edda,
+SQLite, Temporal, or distributed systems is asserted here as
+verified fact — every **[V]** below points back to something
+already verified in the Result above.
+
+#### Two judgments refined
+
+**1. "Mostly vocabulary" was too dismissive** (refines advantage 3
+in *Classifying Strata's apparent advantages*). Edda deserves full
+credit for openness: its SQLite database is unencrypted, its event
+payloads are readable JSON text, and it maintains Markdown
+projections **[V]**. Someone without the Edda binary can recover
+their history.
+
+The property Strata actually holds is not recoverability but
+**continuability**: its canonical records can be directly edited,
+reviewed, repaired, branched, merged, and evolved with generic
+repository tools. Edda's projections are explicitly read-only,
+direct ledger edits violate its hash-chain contract, and
+independently diverged databases do not Git-merge — all verified
+above **[V]**. Recoverable and continuable are materially
+different properties, and only the second is Strata's claim
+**[J]**.
+
+**2. "Architecturally uncopyable by Edda" was too absolute**
+(refines the *Adjudication*). Edda could add or invert its storage
+contract. That would be a foundational architectural change and
+would trade away advantages it currently holds — transactional
+mutation, indexes, cheap structured queries, safe local
+concurrency — but it is not impossible **[J]**. The honest framing
+is a durable difference between the two projects' *current*
+contracts, not an uncopyable moat. The narrowed verdict does not
+depend on the stronger claim.
+
+#### The storage comparison, stated narrowly
+
+> SQLite is superior inside one mutable, query-heavy authority.
+> Files plus Git are superior when canonical state must fork,
+> travel, merge, and remain directly reviewable.
+
+Neither substrate is universally superior, and nothing here
+suggests Edda chose wrongly **[J]**. Its workload — high-volume
+event capture, structured queries, mutable projections, search,
+hooks, and local concurrent access **[V]** — is well matched to
+SQLite. Strata's workload — comparatively sparse, curated,
+human-reviewed project records intended to travel with the
+repository — is well matched to canonical files and Git **[J]**.
+
+Finer points worth keeping **[J]** except where marked:
+
+- SQLite supplies transactions, indexes, foreign keys, mature
+  storage behavior, and well-understood local concurrency.
+- Foreign keys prove *relational* facts, such as the existence of
+  a referenced row. They do not automatically prove narrative or
+  lifecycle semantics — whether a dragon was resolved by an
+  *authorized* decision is not a constraint a schema can express.
+- Strata's `doctor` is usefully understood as **deferred integrity
+  enforcement at the publication/commit boundary**. That is weaker
+  during mutation than a transaction, but natural for multi-file
+  edits and branch-based work.
+- Authoritative edges should ordinarily be stored once; reverse
+  references and search structures should stay disposable
+  projections.
+- Sequence collisions
+  ([[drg-bootstrap-branch-collisions|dragon 1]]) are primarily a
+  topology problem, not a storage-engine problem. Stable IDs carry
+  identity; human-friendly sequence numbers can be reconciled or
+  renumbered during integration without inventing a distributed
+  gapless allocator.
+- Plain files expose many of Strata's dragons in code, diffs, and
+  validation rules instead of hiding them inside a storage engine.
+  SQLite removes a real class of storage-engine dragons, but
+  neither substrate removes schema evolution, application
+  invariants, projection consistency, divergent histories, or
+  failures involving external effects.
+
+#### Where workflow authority begins
+
+The comparison exposed a boundary that belongs to neither project
+specifically. The test **[J]**:
+
+> State is a disposable projection only if it can be deleted and
+> deterministically reconstructed without deciding whether an
+> external effect happened. If losing it can duplicate, orphan,
+> cancel, or authorize work, it is workflow authority.
+
+SQLite may therefore be an excellent implementation for indexes,
+caches, or local structured state. But once state answers
+questions such as "was this worker dispatched?", "should this
+attempt retry?", or "was this result already promoted?", a
+home-grown loop around it is becoming a workflow engine. No
+database transaction can atomically cover launching an agent,
+pushing a branch, calling an external API, and surviving an
+ambiguous network failure **[J]**. This is recorded as a general
+boundary, **not** as an accusation: no evidence was gathered that
+Edda crosses it.
+
+If Strata ever participates in multi-agent orchestration, four
+planes should stay distinct **[J]**:
+
+| Plane | Likely authority |
+|---|---|
+| Durable project memory and accepted results | Git plus Strata |
+| Live retries, timers, cancellation, in-flight execution | An established durable-workflow system |
+| Provisional task results | Isolated worker branches or clones |
+| Search, indexes, dashboards, cached observations | Disposable projections, possibly SQLite |
+
+Temporal is the illustrative prior art for the second row — an
+example only, not a selected dependency and not an architectural
+decision. The promising future role is that **Strata may become a
+workflow ABI for commissions, constraints, authority boundaries,
+and accepted receipts; it should not become the durable workflow
+runtime** **[J]**. This remains speculative and post-release: no
+implementation task, idea, dragon, or decision is created from it.
+
+#### The multi-worker topology this makes coherent
+
+Git-native canon supports a future experiment that a
+machine-local ledger does not **[J]**: commission attempts from a
+pinned base commit; give each worker an isolated branch or clone;
+treat worker completion as a *proposal* rather than canonical task
+closure; give a single integrator authority over the promoted
+sprint branch; revalidate each result against the latest accepted
+head; integrate continuously to limit drift; and retain task,
+attempt, worker, base-SHA, generation, and result-commit
+provenance. This does not make overlapping task effects safe
+automatically, and none of it is a currently shipped Strata
+capability.
+
+#### Product verdict and engineering-evidence verdict are separate
+
+The product judgment above stands: **continue, narrowed**. Edda is
+substantially ahead for automatically captured, locally queryable
+agent-session memory **[V]**; Strata remains distinct as curated,
+repository-governed project memory; the two have similar outer
+shapes and partly overlap, but optimize different canonical
+authorities and lifetimes **[J]**.
+
+Independently of the product thesis, a case-study conclusion
+**[J]**: discovering close or superior prior art does not erase
+the value of this repository. The corpus is evidence of a real
+engineering exercise — invariants stated progressively, dragons
+left visible, adversarial comparison actually performed, decisions
+revised after evidence, and the tool repeatedly used to preserve
+its own development history. Task 41 is particularly strong
+dogfooding evidence *because* the process found a serious
+neighbor, retired weak claims, corrected overstatements, and
+narrowed the thesis rather than manufacturing novelty. That
+evidence justifies preserving the repository and its archaeology
+even if the eventual market thesis weakens. It does **not** prove
+product-market fit, justify feature parity, or provide an
+unfalsifiable excuse to keep expanding the product.
+
+> Keep the project and its archaeology. Continue testing the
+> narrow product thesis honestly. Even if later evidence kills
+> that thesis, the progressively reasoned and self-dogfooded
+> engineering record remains a legitimate outcome rather than
+> failed residue.
