@@ -1,6 +1,6 @@
-# Contributing to Strata
+# Contributing to Scarp
 
-Thanks for your interest. Strata is early — a single maintainer proving a
+Thanks for your interest. Scarp is early — a single maintainer proving a
 small vertical slice — so the most valuable contributions right now are bug
 reports, ideas, and focused fixes rather than large features.
 
@@ -48,12 +48,13 @@ never touch the working repository.
   architectural choices as decisions. Routine changes don't need ceremony —
   see "What deserves durable archaeology" in `CLAUDE.md`.
 - Commit messages follow `area: what changed` — lowercase, imperative
-  (`doctor: validate repository invariants`, `ideas: park strata fortune`).
+  (`doctor: validate repository invariants`,
+  `resolve: batch reference-to-id resolution`).
 
 ## Bugs and ideas
 
 - **Bug reports**: use the bug-report issue template. Include the command
-  run, the repository state, and `strata doctor` output where relevant.
+  run, the repository state, and `scarp doctor` output where relevant.
 - **Ideas**: use the idea issue template, shaped like the project's idea
   artifacts (Problem / Sketch / Evidence). Ideas are never load-bearing: an
   accepted proposal becomes a parked idea artifact in the archaeology, not a

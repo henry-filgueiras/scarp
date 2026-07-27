@@ -16,12 +16,12 @@ const IDEAS_DIR: &str = "archaeology/ideas";
 const SPRINTS_DIR: &str = "archaeology/sprints";
 const WARNING: &str = "warning[degraded-repository]:";
 
-fn strata_in(dir: &Path, args: &[&str]) -> Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_strata"))
+fn scarp_in(dir: &Path, args: &[&str]) -> Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_scarp"))
         .args(args)
         .current_dir(dir)
         .output()
-        .expect("failed to run strata binary")
+        .expect("failed to run scarp binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -34,7 +34,7 @@ fn stderr(output: &Output) -> String {
 
 fn init_repo() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().unwrap();
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
     assert!(out.status.success(), "init failed:\n{}", stderr(&out));
     tmp
 }
@@ -63,7 +63,7 @@ fn creation_beside_a_malformed_sibling_allocates_past_it_with_the_warning() {
     let tmp = init_repo();
     let sibling = seed_malformed_sibling(tmp.path());
 
-    let out = strata_in(tmp.path(), &["new", "dragon", "Degraded but created"]);
+    let out = scarp_in(tmp.path(), &["new", "dragon", "Degraded but created"]);
 
     // The malformed sibling reserves sequence 1; creation allocates past
     // it and reports success on stdout, qualified on stderr.
@@ -102,7 +102,7 @@ fn new_idea_beside_a_malformed_sibling_is_also_created_with_the_warning() {
     fs::create_dir_all(tmp.path().join(IDEAS_DIR)).unwrap();
     fs::write(tmp.path().join(IDEAS_DIR).join("0003-junk.md"), "junk\n").unwrap();
 
-    let out = strata_in(tmp.path(), &["new", "idea", "Still parked"]);
+    let out = scarp_in(tmp.path(), &["new", "idea", "Still parked"]);
 
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     assert!(stdout(&out).contains("created idea:4"), "{}", stdout(&out));
@@ -116,7 +116,7 @@ fn degraded_json_creation_keeps_stdout_parseable_and_the_warning_on_stderr() {
     let tmp = init_repo();
     seed_malformed_sibling(tmp.path());
 
-    let out = strata_in(tmp.path(), &["new", "dragon", "Machine caller", "--json"]);
+    let out = scarp_in(tmp.path(), &["new", "dragon", "Machine caller", "--json"]);
 
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     let payload: serde_json::Value = serde_json::from_str(stdout(&out).trim())
@@ -139,7 +139,7 @@ fn degraded_json_creation_keeps_stdout_parseable_and_the_warning_on_stderr() {
 fn healthy_json_creation_uses_the_same_schema_with_no_warning() {
     let tmp = init_repo();
 
-    let out = strata_in(tmp.path(), &["new", "dragon", "Healthy caller", "--json"]);
+    let out = scarp_in(tmp.path(), &["new", "dragon", "Healthy caller", "--json"]);
 
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     let text = stdout(&out);
@@ -162,7 +162,7 @@ fn healthy_json_creation_uses_the_same_schema_with_no_warning() {
 fn healthy_human_creation_emits_no_warning() {
     let tmp = init_repo();
 
-    let out = strata_in(tmp.path(), &["new", "dragon", "Plainly reachable"]);
+    let out = scarp_in(tmp.path(), &["new", "dragon", "Plainly reachable"]);
 
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     assert!(
@@ -177,7 +177,7 @@ fn healthy_human_creation_emits_no_warning() {
 fn json_creation_covers_sprint_and_task_kinds() {
     let tmp = init_repo();
 
-    let sprint = strata_in(tmp.path(), &["new", "sprint", "Machine sprint", "--json"]);
+    let sprint = scarp_in(tmp.path(), &["new", "sprint", "Machine sprint", "--json"]);
     assert_eq!(sprint.status.code(), Some(0), "{}", stderr(&sprint));
     let payload: serde_json::Value = serde_json::from_str(stdout(&sprint).trim()).unwrap();
     assert_eq!(payload["kind"], "sprint");
@@ -187,7 +187,7 @@ fn json_creation_covers_sprint_and_task_kinds() {
         "archaeology/sprints/0001-machine-sprint/sprint.md"
     );
 
-    let task = strata_in(tmp.path(), &["new", "task", "Machine task", "--json"]);
+    let task = scarp_in(tmp.path(), &["new", "task", "Machine task", "--json"]);
     assert_eq!(task.status.code(), Some(0), "{}", stderr(&task));
     let payload: serde_json::Value = serde_json::from_str(stdout(&task).trim()).unwrap();
     assert_eq!(payload["kind"], "task");
@@ -202,13 +202,13 @@ fn json_creation_covers_sprint_and_task_kinds() {
 fn creation_adds_no_doctor_finding_beyond_the_preexisting_sibling() {
     let tmp = init_repo();
     seed_malformed_sibling(tmp.path());
-    let before = strata_in(tmp.path(), &["doctor", "--json"]);
+    let before = scarp_in(tmp.path(), &["doctor", "--json"]);
     assert_eq!(before.status.code(), Some(9), "{}", stderr(&before));
 
-    let created = strata_in(tmp.path(), &["new", "dragon", "No new findings"]);
+    let created = scarp_in(tmp.path(), &["new", "dragon", "No new findings"]);
     assert_eq!(created.status.code(), Some(0), "{}", stderr(&created));
 
-    let after = strata_in(tmp.path(), &["doctor", "--json"]);
+    let after = scarp_in(tmp.path(), &["doctor", "--json"]);
     assert_eq!(after.status.code(), Some(9), "{}", stderr(&after));
     assert_eq!(
         stdout(&before),
@@ -221,12 +221,12 @@ fn creation_adds_no_doctor_finding_beyond_the_preexisting_sibling() {
 fn show_by_sequence_and_id_refuses_naming_target_and_blocker() {
     let tmp = init_repo();
     let sibling = seed_malformed_sibling(tmp.path());
-    let out = strata_in(tmp.path(), &["new", "dragon", "Blocked target"]);
+    let out = scarp_in(tmp.path(), &["new", "dragon", "Blocked target"]);
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     let id = created_id(tmp.path(), "archaeology/dragons/0002-blocked-target.md");
 
     for (target, spelled) in [("dragon:2", "dragon:2"), (id.as_str(), id.as_str())] {
-        let shown = strata_in(tmp.path(), &["show", target]);
+        let shown = scarp_in(tmp.path(), &["show", target]);
         assert_eq!(shown.status.code(), Some(5), "{}", stderr(&shown));
         let err = stderr(&shown);
         assert!(
@@ -245,9 +245,9 @@ fn show_by_sequence_and_id_refuses_naming_target_and_blocker() {
 fn list_remains_strict_and_names_the_blocker() {
     let tmp = init_repo();
     let sibling = seed_malformed_sibling(tmp.path());
-    strata_in(tmp.path(), &["new", "dragon", "Unlistable"]);
+    scarp_in(tmp.path(), &["new", "dragon", "Unlistable"]);
 
-    let out = strata_in(tmp.path(), &["list", "dragons"]);
+    let out = scarp_in(tmp.path(), &["list", "dragons"]);
 
     assert_eq!(out.status.code(), Some(5), "{}", stderr(&out));
     assert!(stderr(&out).contains(sibling), "{}", stderr(&out));
@@ -257,14 +257,14 @@ fn list_remains_strict_and_names_the_blocker() {
 fn admitted_transition_refuses_naming_target_and_blocker_leaving_bytes_unchanged() {
     let tmp = init_repo();
     let sibling = seed_malformed_sibling(tmp.path());
-    strata_in(tmp.path(), &["new", "dragon", "Untransitionable"]);
+    scarp_in(tmp.path(), &["new", "dragon", "Untransitionable"]);
     let created_path = tmp
         .path()
         .join(DRAGONS_DIR)
         .join("0002-untransitionable.md");
     let created_bytes = fs::read_to_string(&created_path).unwrap();
 
-    let out = strata_in(tmp.path(), &["close", "dragon:2"]);
+    let out = scarp_in(tmp.path(), &["close", "dragon:2"]);
 
     assert_eq!(out.status.code(), Some(5), "{}", stderr(&out));
     let err = stderr(&out);
@@ -287,7 +287,7 @@ fn admitted_transition_refuses_naming_target_and_blocker_leaving_bytes_unchanged
 fn removing_only_the_blocker_restores_full_access_without_touching_the_artifact() {
     let tmp = init_repo();
     let sibling = seed_malformed_sibling(tmp.path());
-    strata_in(tmp.path(), &["new", "dragon", "Patient artifact"]);
+    scarp_in(tmp.path(), &["new", "dragon", "Patient artifact"]);
     let created_path = tmp
         .path()
         .join(DRAGONS_DIR)
@@ -297,15 +297,15 @@ fn removing_only_the_blocker_restores_full_access_without_touching_the_artifact(
 
     fs::remove_file(tmp.path().join(DRAGONS_DIR).join(sibling)).unwrap();
 
-    let listed = strata_in(tmp.path(), &["list", "dragons"]);
+    let listed = scarp_in(tmp.path(), &["list", "dragons"]);
     assert!(listed.status.success(), "{}", stderr(&listed));
     assert!(stdout(&listed).contains("dragon:2"), "{}", stdout(&listed));
     for target in ["dragon:2", id.as_str()] {
-        let shown = strata_in(tmp.path(), &["show", target]);
+        let shown = scarp_in(tmp.path(), &["show", target]);
         assert!(shown.status.success(), "{target}: {}", stderr(&shown));
         assert_eq!(stdout(&shown), created_bytes, "show is byte-exact");
     }
-    let closed = strata_in(tmp.path(), &["close", "dragon:2"]);
+    let closed = scarp_in(tmp.path(), &["close", "dragon:2"]);
     assert!(closed.status.success(), "{}", stderr(&closed));
     assert_eq!(
         fs::read_to_string(&created_path).unwrap(),
@@ -317,7 +317,7 @@ fn removing_only_the_blocker_restores_full_access_without_touching_the_artifact(
 #[test]
 fn malformed_duplicate_sequence_and_id_claimants_are_never_bypassed() {
     let tmp = init_repo();
-    let created = strata_in(tmp.path(), &["new", "dragon", "Contested"]);
+    let created = scarp_in(tmp.path(), &["new", "dragon", "Contested"]);
     assert_eq!(created.status.code(), Some(0), "{}", stderr(&created));
     let id = created_id(tmp.path(), "archaeology/dragons/0001-contested.md");
 
@@ -325,7 +325,7 @@ fn malformed_duplicate_sequence_and_id_claimants_are_never_bypassed() {
     // rather than silently pick the valid claimant.
     let claimant = tmp.path().join(DRAGONS_DIR).join("0001-impostor.md");
     fs::write(&claimant, "no front matter, claims sequence 1\n").unwrap();
-    let by_sequence = strata_in(tmp.path(), &["show", "dragon:1"]);
+    let by_sequence = scarp_in(tmp.path(), &["show", "dragon:1"]);
     assert_eq!(
         by_sequence.status.code(),
         Some(5),
@@ -344,7 +344,7 @@ fn malformed_duplicate_sequence_and_id_claimants_are_never_bypassed() {
         format!("---\nid: {id}\nsequence: 1\nkind: dragon\n---\nbroken\n"),
     )
     .unwrap();
-    let by_id = strata_in(tmp.path(), &["show", &id]);
+    let by_id = scarp_in(tmp.path(), &["show", &id]);
     assert_eq!(by_id.status.code(), Some(5), "{}", stderr(&by_id));
     assert!(
         stderr(&by_id).contains("0001-impostor.md"),
@@ -359,7 +359,7 @@ fn sprint_and_task_creation_keep_the_strict_containment_boundary() {
     fs::create_dir_all(tmp.path().join(SPRINTS_DIR)).unwrap();
     fs::write(tmp.path().join(SPRINTS_DIR).join("notes.md"), "loose\n").unwrap();
 
-    let sprint = strata_in(tmp.path(), &["new", "sprint", "Refused sprint"]);
+    let sprint = scarp_in(tmp.path(), &["new", "sprint", "Refused sprint"]);
     assert_eq!(sprint.status.code(), Some(5), "{}", stderr(&sprint));
     assert!(
         !tmp.path()
@@ -369,7 +369,7 @@ fn sprint_and_task_creation_keep_the_strict_containment_boundary() {
         "a refused sprint creation writes nothing"
     );
 
-    let task = strata_in(tmp.path(), &["new", "task", "Refused task"]);
+    let task = scarp_in(tmp.path(), &["new", "task", "Refused task"]);
     assert_eq!(task.status.code(), Some(5), "{}", stderr(&task));
     for out in [&sprint, &task] {
         assert!(

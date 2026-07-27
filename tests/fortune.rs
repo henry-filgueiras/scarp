@@ -1,4 +1,4 @@
-//! Integration tests for `strata fortune` through the compiled binary.
+//! Integration tests for `scarp fortune` through the compiled binary.
 //!
 //! Selection is random by design, so these tests pin the output shape, the
 //! empty states, and membership in the open set — never a specific pick.
@@ -11,12 +11,12 @@ use std::process::Output;
 
 const DRAGONS_DIR: &str = "archaeology/dragons";
 
-fn strata_in(dir: &Path, args: &[&str]) -> Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_strata"))
+fn scarp_in(dir: &Path, args: &[&str]) -> Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_scarp"))
         .args(args)
         .current_dir(dir)
         .output()
-        .expect("failed to run strata binary")
+        .expect("failed to run scarp binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -29,7 +29,7 @@ fn stderr(output: &Output) -> String {
 
 fn init_repo() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().unwrap();
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
     assert!(out.status.success(), "init failed:\n{}", stderr(&out));
     tmp
 }
@@ -44,7 +44,7 @@ fn dragon(id: &str, sequence: u32, status: &str, title: &str, body: &str) -> Str
 fn empty_repository_prints_a_friendly_message_and_exits_zero() {
     let tmp = init_repo();
 
-    let out = strata_in(tmp.path(), &["fortune"]);
+    let out = scarp_in(tmp.path(), &["fortune"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(stdout(&out).contains("no open dragons"), "{}", stdout(&out));
@@ -55,7 +55,7 @@ fn marker_only_repository_prints_the_friendly_message() {
     let tmp = init_repo();
     fs::remove_dir_all(tmp.path().join("archaeology")).unwrap();
 
-    let out = strata_in(tmp.path(), &["fortune"]);
+    let out = scarp_in(tmp.path(), &["fortune"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(stdout(&out).contains("no open dragons"), "{}", stdout(&out));
@@ -70,7 +70,7 @@ fn closed_dragons_alone_are_never_recalled() {
     )
     .unwrap();
 
-    let out = strata_in(tmp.path(), &["fortune"]);
+    let out = scarp_in(tmp.path(), &["fortune"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(stdout(&out).contains("no open dragons"), "{}", stdout(&out));
@@ -91,7 +91,7 @@ fn output_names_reference_title_age_path_and_excerpt() {
     )
     .unwrap();
 
-    let out = strata_in(tmp.path(), &["fortune"]);
+    let out = scarp_in(tmp.path(), &["fortune"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     let text = stdout(&out);
@@ -115,7 +115,7 @@ fn unparseable_created_stamp_degrades_to_age_unknown() {
     )
     .unwrap();
 
-    let out = strata_in(tmp.path(), &["fortune"]);
+    let out = scarp_in(tmp.path(), &["fortune"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(stdout(&out).contains("age unknown"), "{}", stdout(&out));
@@ -148,7 +148,7 @@ fn every_recall_names_an_open_dragon_and_never_a_closed_one() {
     .unwrap();
 
     for _ in 0..12 {
-        let out = strata_in(tmp.path(), &["fortune"]);
+        let out = scarp_in(tmp.path(), &["fortune"]);
         assert!(out.status.success(), "{}", stderr(&out));
         let text = stdout(&out);
         assert!(
@@ -189,7 +189,7 @@ fn a_lone_parked_idea_is_recalled_with_the_full_output_shape() {
         ),
     );
 
-    let out = strata_in(tmp.path(), &["fortune"]);
+    let out = scarp_in(tmp.path(), &["fortune"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     let text = stdout(&out);
@@ -232,7 +232,7 @@ fn recalls_span_both_collections_and_never_terminal_states() {
     let mut seen_dragon = false;
     let mut seen_idea = false;
     for _ in 0..40 {
-        let out = strata_in(tmp.path(), &["fortune"]);
+        let out = scarp_in(tmp.path(), &["fortune"]);
         assert!(out.status.success(), "{}", stderr(&out));
         let text = stdout(&out);
         assert!(
@@ -263,12 +263,12 @@ fn the_empty_state_names_both_collections() {
         &idea("id-adopted", 1, "adopted", "Adopted idea", "Prose."),
     );
 
-    let out = strata_in(tmp.path(), &["fortune"]);
+    let out = scarp_in(tmp.path(), &["fortune"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     let text = stdout(&out);
     assert!(text.contains("no open dragons or parked ideas"), "{text}");
-    assert!(text.contains("strata new idea"), "{text}");
+    assert!(text.contains("scarp new idea"), "{text}");
 }
 
 #[test]
@@ -279,7 +279,7 @@ fn fortune_never_mutates_the_repository() {
     fs::write(&path, &content).unwrap();
 
     for _ in 0..3 {
-        assert!(strata_in(tmp.path(), &["fortune"]).status.success());
+        assert!(scarp_in(tmp.path(), &["fortune"]).status.success());
     }
 
     assert_eq!(
@@ -287,6 +287,6 @@ fn fortune_never_mutates_the_repository() {
         content,
         "fortune is read-only"
     );
-    let doctor = strata_in(tmp.path(), &["doctor"]);
+    let doctor = scarp_in(tmp.path(), &["doctor"]);
     assert!(doctor.status.success(), "{}", stdout(&doctor));
 }

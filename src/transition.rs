@@ -13,7 +13,7 @@
 //!
 //! # Concurrency boundary
 //!
-//! Bootstrap does not linearize concurrent Strata processes: two
+//! Bootstrap does not linearize concurrent Scarp processes: two
 //! processes rewriting the same artifact race last-write-wins, matching
 //! creation's scan-then-write posture.
 
@@ -37,7 +37,7 @@ pub struct Transition {
 }
 
 /// Transition one artifact of `collection` to `to`, resolving `target` like
-/// `strata show`.
+/// `scarp show`.
 ///
 /// Resolution reuses the strict read pipeline, so a malformed artifact
 /// refuses with a typed error naming the file. A transition the
@@ -323,7 +323,7 @@ fn replace(dest: &Path, content: &str) -> std::io::Result<()> {
         )
     })?;
     let mut tmp = tempfile::Builder::new()
-        .prefix(".strata.artifact.tmp")
+        .prefix(".scarp.artifact.tmp")
         .tempfile_in(dir)?;
     tmp.write_all(content.as_bytes())?;
     tmp.persist(dest).map_err(|err| err.error)?;

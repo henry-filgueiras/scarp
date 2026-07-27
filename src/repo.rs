@@ -1,6 +1,6 @@
 //! Repository layout, configuration, and initialization.
 //!
-//! A Strata repository root is marked by a `.strata.toml` config file and
+//! A Scarp repository root is marked by a `.scarp.toml` config file and
 //! contains the bootstrap directory layout. The filesystem is canonical:
 //! nothing here creates hidden state, and an initialized repository remains
 //! an ordinary directory tree.
@@ -12,15 +12,15 @@ use std::path::{Path, PathBuf};
 use crate::error::Error;
 
 /// Repository marker and configuration file, at the repository root.
-pub const CONFIG_FILE: &str = ".strata.toml";
+pub const CONFIG_FILE: &str = ".scarp.toml";
 
-/// Config contents written by `strata init`.
+/// Config contents written by `scarp init`.
 pub const CONFIG_TEMPLATE: &str = "version = 1\n";
 
 /// The config schema version this build supports.
 pub const SUPPORTED_VERSION: i64 = 1;
 
-/// Root-relative path of the Git-attributes policy `strata init`
+/// Root-relative path of the Git-attributes policy `scarp init`
 /// materializes. It lives inside `archaeology/` (decision 14 as
 /// amended): the policy governs archaeology Markdown without annexing
 /// the host repository's root Markdown, and a root `.gitattributes`
@@ -28,7 +28,7 @@ pub const SUPPORTED_VERSION: i64 = 1;
 /// merges, rejects, replaces, or deletes one.
 pub const GITATTRIBUTES_FILE: &str = "archaeology/.gitattributes";
 
-/// The line-ending policy written by `strata init` (decision 14 as
+/// The line-ending policy written by `scarp init` (decision 14 as
 /// amended): LF-only for Markdown beneath `archaeology/`, enforced by
 /// Git at checkout where Git is present. The artifact parser enforces
 /// the same format without Git.
@@ -74,11 +74,11 @@ impl InitReport {
     }
 }
 
-/// Initialize a Strata repository at `root`.
+/// Initialize a Scarp repository at `root`.
 ///
 /// Mutation-safety contract:
 ///
-/// - An existing `.strata.toml` is never modified, truncated, or replaced.
+/// - An existing `.scarp.toml` is never modified, truncated, or replaced.
 ///   It is accepted only as a regular file (not a symlink or directory)
 ///   containing a supported config; anything else is a typed error.
 /// - Required directories are created when missing and accepted when
@@ -87,15 +87,15 @@ impl InitReport {
 /// - A missing `archaeology/.gitattributes` gains the decision 14
 ///   line-ending policy, written with the same atomic no-clobber
 ///   discipline as the config. An existing regular file there is
-///   preserved byte-for-byte and never parsed: Strata cannot safely
+///   preserved byte-for-byte and never parsed: Scarp cannot safely
 ///   infer or merge arbitrary Git-attribute policies, so the parser's
 ///   LF diagnosis remains the backstop. A non-regular object at that
 ///   managed path is a conflict. A root `.gitattributes` is outside the
 ///   init surface entirely — never created, inspected, or touched, even
-///   when its contents disagree with Strata's policy. No Git executable
+///   when its contents disagree with Scarp's policy. No Git executable
 ///   or `.git` directory is required.
 /// - The config is written last, via an exclusive temporary file and an
-///   atomic no-clobber persist: after a failed run `.strata.toml` either
+///   atomic no-clobber persist: after a failed run `.scarp.toml` either
 ///   does not exist or is complete — never partial or truncated.
 /// - Directory creation is NOT transactional. A failed run may leave newly
 ///   created empty directories behind. That is the documented atomicity
@@ -187,7 +187,7 @@ pub fn init(root: &Path) -> Result<InitReport, Error> {
 /// Locate the repository root by walking upward from `start`.
 ///
 /// Each directory from `start` to the filesystem root is checked for a
-/// `.strata.toml` marker; the first directory containing a valid one is the
+/// `.scarp.toml` marker; the first directory containing a valid one is the
 /// repository root. `start` should be an absolute path (such as the current
 /// working directory) so the upward walk covers every ancestor.
 ///
@@ -235,12 +235,12 @@ pub fn discover(start: &Path) -> Result<PathBuf, Error> {
     })
 }
 
-/// Validate the contents of a `.strata.toml` config.
+/// Validate the contents of a `.scarp.toml` config.
 ///
 /// The config is ordinary TOML configuration, not a splice-mutated
 /// artifact, so it sits outside decision 14's LF-only artifact-byte
 /// contract (as amended): any line endings the TOML parser accepts —
-/// including CRLF — are valid, and Strata never normalizes or rewrites
+/// including CRLF — are valid, and Scarp never normalizes or rewrites
 /// the file.
 ///
 /// Accepts any TOML table whose `version` equals the supported integer.
@@ -313,7 +313,7 @@ pub(crate) fn ensure_dir(root: &Path, rel: &str, created: &mut Vec<PathBuf>) -> 
 /// never replaced.
 fn write_template(root: &Path, path: &Path, template: &str) -> Result<(), Error> {
     let mut tmp = tempfile::Builder::new()
-        .prefix(".strata.init.tmp")
+        .prefix(".scarp.init.tmp")
         .tempfile_in(root)
         .map_err(|source| Error::Filesystem {
             operation: "create temporary file".into(),
@@ -462,7 +462,7 @@ mod tests {
         let tmp = temp_root();
         let root = tmp.path();
         // Not even valid attribute syntax: preservation must not depend on
-        // Strata understanding the policy.
+        // Scarp understanding the policy.
         let custom = "* text=auto\n<<not attribute syntax>>\n";
         fs::create_dir_all(root.join("archaeology")).unwrap();
         fs::write(root.join(GITATTRIBUTES_FILE), custom).unwrap();
@@ -480,7 +480,7 @@ mod tests {
     fn root_gitattributes_is_ignored_and_untouched_even_when_it_disagrees() {
         let tmp = temp_root();
         let root = tmp.path();
-        // A host policy that contradicts Strata's: still not init's to
+        // A host policy that contradicts Scarp's: still not init's to
         // inspect, merge, reject, replace, or delete.
         let host_policy = "*.md text eol=crlf\n";
         fs::write(root.join(".gitattributes"), host_policy).unwrap();

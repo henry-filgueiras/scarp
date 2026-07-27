@@ -11,12 +11,12 @@ use std::process::Output;
 
 const DECISIONS_DIR: &str = "archaeology/decisions";
 
-fn strata_in(dir: &Path, args: &[&str]) -> Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_strata"))
+fn scarp_in(dir: &Path, args: &[&str]) -> Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_scarp"))
         .args(args)
         .current_dir(dir)
         .output()
-        .expect("failed to run strata binary")
+        .expect("failed to run scarp binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -29,7 +29,7 @@ fn stderr(output: &Output) -> String {
 
 fn init_repo() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().unwrap();
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
     assert!(out.status.success(), "init failed:\n{}", stderr(&out));
     tmp
 }
@@ -52,7 +52,7 @@ fn seed_decision(root: &Path, name: &str, content: &str) {
 fn seed_mixed_corpus(root: &Path) -> (String, String) {
     let legacy = decision_markdown("dec-bootstrap-files-canonical", 1, "Files are canonical");
     seed_decision(root, "0001-files-are-canonical.md", &legacy);
-    let out = strata_in(root, &["new", "decision", "Adopt the spec engine"]);
+    let out = scarp_in(root, &["new", "decision", "Adopt the spec engine"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let created = fs::read_to_string(
         root.join(DECISIONS_DIR)
@@ -71,7 +71,7 @@ fn seed_mixed_corpus(root: &Path) -> (String, String) {
 fn new_decision_creates_an_accepted_artifact_and_reports_it() {
     let tmp = init_repo();
 
-    let out = strata_in(tmp.path(), &["new", "decision", "Files are canonical"]);
+    let out = scarp_in(tmp.path(), &["new", "decision", "Files are canonical"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(
@@ -101,7 +101,7 @@ fn new_decision_creates_an_accepted_artifact_and_reports_it() {
 fn new_decision_json_pins_the_creation_record() {
     let tmp = init_repo();
 
-    let out = strata_in(tmp.path(), &["new", "decision", "Adopt X", "--json"]);
+    let out = scarp_in(tmp.path(), &["new", "decision", "Adopt X", "--json"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     let value: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
@@ -118,7 +118,7 @@ fn list_decisions_orders_the_corpus_by_sequence_in_both_projections() {
     let tmp = init_repo();
     let (_, generated_id) = seed_mixed_corpus(tmp.path());
 
-    let human = strata_in(tmp.path(), &["list", "decisions"]);
+    let human = scarp_in(tmp.path(), &["list", "decisions"]);
     assert!(human.status.success(), "{}", stderr(&human));
     let text = stdout(&human);
     let first = text.find("decision:1").expect(&text);
@@ -126,7 +126,7 @@ fn list_decisions_orders_the_corpus_by_sequence_in_both_projections() {
     assert!(first < second, "sequences must ascend:\n{text}");
     assert!(text.contains("accepted"), "{text}");
 
-    let json = strata_in(tmp.path(), &["list", "decisions", "--json"]);
+    let json = scarp_in(tmp.path(), &["list", "decisions", "--json"]);
     assert!(json.status.success(), "{}", stderr(&json));
     let value: serde_json::Value = serde_json::from_str(&stdout(&json)).unwrap();
     let items = value.as_array().unwrap();
@@ -155,7 +155,7 @@ fn show_resolves_every_address_kind_in_raw_and_json_forms() {
         ("dec-bootstrap-files-canonical", &legacy),
         (generated_id.as_str(), &generated),
     ] {
-        let raw = strata_in(tmp.path(), &["show", address]);
+        let raw = scarp_in(tmp.path(), &["show", address]);
         assert!(raw.status.success(), "show {address}:\n{}", stderr(&raw));
         assert_eq!(
             stdout(&raw),
@@ -163,7 +163,7 @@ fn show_resolves_every_address_kind_in_raw_and_json_forms() {
             "raw show must reproduce the file exactly for `{address}`"
         );
 
-        let json = strata_in(tmp.path(), &["show", address, "--json"]);
+        let json = scarp_in(tmp.path(), &["show", address, "--json"]);
         assert!(
             json.status.success(),
             "show {address} --json:\n{}",
@@ -198,7 +198,7 @@ fn lifecycle_verbs_refuse_decisions_with_truthful_guidance() {
         ("reject", &["reject", "decision:1"]),
         ("reject", &["reject", "dec-bootstrap-files-canonical"]),
     ] {
-        let out = strata_in(tmp.path(), args);
+        let out = scarp_in(tmp.path(), args);
         assert_eq!(out.status.code(), Some(2), "{args:?}:\n{}", stderr(&out));
         let err = stderr(&out);
         assert!(
@@ -238,7 +238,7 @@ fn doctor_validates_decisions_and_stays_green_on_a_conformant_corpus() {
     let tmp = init_repo();
     seed_mixed_corpus(tmp.path());
 
-    let healthy = strata_in(tmp.path(), &["doctor"]);
+    let healthy = scarp_in(tmp.path(), &["doctor"]);
     assert!(healthy.status.success(), "{}", stderr(&healthy));
     assert!(
         stdout(&healthy).contains("2 artifact(s) checked, no problems found"),
@@ -252,7 +252,7 @@ fn doctor_validates_decisions_and_stays_green_on_a_conformant_corpus() {
         "---\nid: dec-broken\nsequence: 3\nkind: decision\nstatus: proposed\ncreated: 2026-07-20\n---\n\n# Broken\n",
     );
 
-    let sick = strata_in(tmp.path(), &["doctor"]);
+    let sick = scarp_in(tmp.path(), &["doctor"]);
     assert_eq!(sick.status.code(), Some(9), "{}", stderr(&sick));
     assert!(
         stdout(&sick).contains("archaeology/decisions/0003-broken.md"),
@@ -268,10 +268,10 @@ fn resolved_by_still_binds_a_dragon_to_a_managed_decision() {
     // repository stays healthy.
     let tmp = init_repo();
     seed_mixed_corpus(tmp.path());
-    let out = strata_in(tmp.path(), &["new", "dragon", "A risk"]);
+    let out = scarp_in(tmp.path(), &["new", "dragon", "A risk"]);
     assert!(out.status.success(), "{}", stderr(&out));
 
-    let closed = strata_in(
+    let closed = scarp_in(
         tmp.path(),
         &["close", "dragon:1", "--resolved-by", "decision:1"],
     );
@@ -287,6 +287,6 @@ fn resolved_by_still_binds_a_dragon_to_a_managed_decision() {
         dragon.contains("resolved-by: \"[[dec-bootstrap-files-canonical|Files are canonical]]\""),
         "{dragon}"
     );
-    let doctor = strata_in(tmp.path(), &["doctor"]);
+    let doctor = scarp_in(tmp.path(), &["doctor"]);
     assert!(doctor.status.success(), "{}", stderr(&doctor));
 }

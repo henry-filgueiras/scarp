@@ -8,12 +8,12 @@ use std::process::Output;
 
 const SPRINTS_DIR: &str = "archaeology/sprints";
 
-fn strata_in(dir: &Path, args: &[&str]) -> Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_strata"))
+fn scarp_in(dir: &Path, args: &[&str]) -> Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_scarp"))
         .args(args)
         .current_dir(dir)
         .output()
-        .expect("failed to run strata binary")
+        .expect("failed to run scarp binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -26,13 +26,13 @@ fn stderr(output: &Output) -> String {
 
 fn init_repo() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().unwrap();
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
     assert!(out.status.success(), "init failed:\n{}", stderr(&out));
     tmp
 }
 
 fn assert_doctor_healthy(root: &Path) {
-    let out = strata_in(root, &["doctor"]);
+    let out = scarp_in(root, &["doctor"]);
     assert!(
         out.status.success(),
         "doctor must be healthy:\n{}\n{}",
@@ -45,7 +45,7 @@ fn assert_doctor_healthy(root: &Path) {
 fn sprint_lifecycle_end_to_end() {
     let tmp = init_repo();
 
-    let created = strata_in(tmp.path(), &["new", "sprint", "Prove the loop"]);
+    let created = scarp_in(tmp.path(), &["new", "sprint", "Prove the loop"]);
     assert!(created.status.success(), "{}", stderr(&created));
     assert!(
         stdout(&created).contains("created sprint:1"),
@@ -59,14 +59,14 @@ fn sprint_lifecycle_end_to_end() {
             .is_file()
     );
 
-    let list = strata_in(tmp.path(), &["list", "sprints"]);
+    let list = scarp_in(tmp.path(), &["list", "sprints"]);
     assert!(list.status.success(), "{}", stderr(&list));
     let line = stdout(&list);
     for needle in ["sprint:1", "active", "Prove the loop"] {
         assert!(line.contains(needle), "missing `{needle}`:\n{line}");
     }
 
-    let show = strata_in(tmp.path(), &["show", "sprint:1"]);
+    let show = scarp_in(tmp.path(), &["show", "sprint:1"]);
     assert!(show.status.success(), "{}", stderr(&show));
     assert!(
         stdout(&show).contains("# Prove the loop"),
@@ -76,7 +76,7 @@ fn sprint_lifecycle_end_to_end() {
 
     assert_doctor_healthy(tmp.path());
 
-    let closed = strata_in(tmp.path(), &["close", "sprint:1"]);
+    let closed = scarp_in(tmp.path(), &["close", "sprint:1"]);
     assert!(closed.status.success(), "{}", stderr(&closed));
     assert!(
         stdout(&closed).contains("closed sprint:1 (active -> closed)"),
@@ -101,12 +101,12 @@ fn sprint_lifecycle_end_to_end() {
 fn list_sprints_json_carries_the_summary_fields() {
     let tmp = init_repo();
     assert!(
-        strata_in(tmp.path(), &["new", "sprint", "Prove the loop"])
+        scarp_in(tmp.path(), &["new", "sprint", "Prove the loop"])
             .status
             .success()
     );
 
-    let out = strata_in(tmp.path(), &["list", "sprints", "--json"]);
+    let out = scarp_in(tmp.path(), &["list", "sprints", "--json"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     let listed: serde_json::Value = serde_json::from_str(stdout(&out).trim()).unwrap();
@@ -127,12 +127,12 @@ fn concurrent_active_sprints_are_created_normally_and_doctor_green() {
     // active-sprint cardinality is not repository validity.
     let tmp = init_repo();
     assert!(
-        strata_in(tmp.path(), &["new", "sprint", "First"])
+        scarp_in(tmp.path(), &["new", "sprint", "First"])
             .status
             .success()
     );
 
-    let out = strata_in(tmp.path(), &["new", "sprint", "Second"]);
+    let out = scarp_in(tmp.path(), &["new", "sprint", "Second"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(
@@ -147,7 +147,7 @@ fn concurrent_active_sprints_are_created_normally_and_doctor_green() {
             .is_file()
     );
 
-    let doctor = strata_in(tmp.path(), &["doctor"]);
+    let doctor = scarp_in(tmp.path(), &["doctor"]);
     assert!(
         doctor.status.success(),
         "concurrent active sprints are doctor-green:\n{}",
@@ -159,7 +159,7 @@ fn concurrent_active_sprints_are_created_normally_and_doctor_green() {
 fn closing_a_sprint_with_pending_tasks_is_refused_naming_them() {
     let tmp = init_repo();
     assert!(
-        strata_in(tmp.path(), &["new", "sprint", "Busy"])
+        scarp_in(tmp.path(), &["new", "sprint", "Busy"])
             .status
             .success()
     );
@@ -177,7 +177,7 @@ fn closing_a_sprint_with_pending_tasks_is_refused_naming_them() {
     )
     .unwrap();
 
-    let out = strata_in(tmp.path(), &["close", "sprint:1"]);
+    let out = scarp_in(tmp.path(), &["close", "sprint:1"]);
 
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     let err = stderr(&out);
@@ -199,11 +199,11 @@ fn hand_seeded_sprint_identities_resolve_and_close_by_id() {
     )
     .unwrap();
 
-    let show = strata_in(tmp.path(), &["show", "spr-legacy"]);
+    let show = scarp_in(tmp.path(), &["show", "spr-legacy"]);
     assert!(show.status.success(), "{}", stderr(&show));
     assert!(stdout(&show).contains("# Legacy sprint"));
 
-    let out = strata_in(tmp.path(), &["close", "spr-legacy"]);
+    let out = scarp_in(tmp.path(), &["close", "spr-legacy"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let content = fs::read_to_string(dir.join("sprint.md")).unwrap();
     assert!(
@@ -218,12 +218,12 @@ fn hand_seeded_sprint_identities_resolve_and_close_by_id() {
 fn sprint_transition_verbs_are_collection_scoped() {
     let tmp = init_repo();
     assert!(
-        strata_in(tmp.path(), &["new", "sprint", "Current"])
+        scarp_in(tmp.path(), &["new", "sprint", "Current"])
             .status
             .success()
     );
 
-    let out = strata_in(tmp.path(), &["reopen", "sprint:1"]);
+    let out = scarp_in(tmp.path(), &["reopen", "sprint:1"]);
 
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(

@@ -87,7 +87,7 @@ pub(crate) fn read_artifact_bytes(path: &Path) -> Result<String, Error> {
             path: path.to_path_buf(),
             reason: format!(
                 "a {} occupies a managed artifact position; artifacts must \
-                 be regular files, and Strata never follows symbolic links \
+                 be regular files, and Scarp never follows symbolic links \
                  inside a repository",
                 crate::repo::file_kind(&meta)
             ),
@@ -103,7 +103,7 @@ pub(crate) fn read_artifact_bytes(path: &Path) -> Result<String, Error> {
             path: path.to_path_buf(),
             reason: format!(
                 "file exceeds the {MAX_ARTIFACT_BYTES}-byte per-file read \
-                 limit; Strata refuses to load oversized artifacts into \
+                 limit; Scarp refuses to load oversized artifacts into \
                  memory"
             ),
         })?;
@@ -121,7 +121,7 @@ pub(crate) fn read_artifact_bytes(path: &Path) -> Result<String, Error> {
 /// front-matter delimiter discovery rather than normalized, so
 /// byte-exact splicing and safe writes never become
 /// line-ending-sensitive. This is the artifact-byte contract only:
-/// `.strata.toml` is ordinary TOML configuration outside it. The
+/// `.scarp.toml` is ordinary TOML configuration outside it. The
 /// diagnosis names the actual cause — it must never decay into "missing
 /// front matter" — and gives the repair.
 pub(crate) fn lf_violation(content: &str) -> Option<String> {
@@ -134,7 +134,7 @@ pub(crate) fn lf_violation(content: &str) -> Option<String> {
         "a bare carriage return (CR) with no following line feed"
     };
     Some(format!(
-        "contains {cause}; Strata artifacts are LF-only (decision 14) — \
+        "contains {cause}; Scarp artifacts are LF-only (decision 14) — \
          convert the file to LF line endings (for example with \
          `dos2unix`) and keep the `archaeology/.gitattributes` \
          line-ending policy"
@@ -522,7 +522,7 @@ fn sprint_dir_names(root: &Path) -> Result<Vec<String>, Error> {
                 path: dir.join(&name),
                 reason: "a symbolic link occupies a sprint containment \
                          position; containment directories must be real \
-                         directories, and Strata never follows symbolic \
+                         directories, and Scarp never follows symbolic \
                          links inside a repository"
                     .into(),
             });
@@ -555,7 +555,7 @@ fn parse_dir_sequence(root: &Path, name: &str) -> Result<u32, Error> {
 /// Resolve `target` to exactly one artifact.
 ///
 /// Zero matches is `artifact-not-found`; more than one is
-/// `ambiguous-reference` naming every candidate — Strata never silently
+/// `ambiguous-reference` naming every candidate — Scarp never silently
 /// picks among duplicates. `display` is the reference as the user wrote it,
 /// used in error messages.
 pub fn resolve<'a>(
@@ -599,7 +599,7 @@ fn non_regular_entry(path: &Path, file_type: &fs::FileType) -> Error {
         path: path.to_path_buf(),
         reason: format!(
             "a {what} occupies a managed artifact position; artifacts must \
-             be regular files, and Strata never follows symbolic links \
+             be regular files, and Scarp never follows symbolic links \
              inside a repository"
         ),
     }
@@ -1174,7 +1174,7 @@ mod tests {
     fn dot_entries_are_ignored_during_scan() {
         let tmp = temp_repo();
         write_dragon(tmp.path(), DRAGONS_DIR, ".gitkeep", "");
-        write_dragon(tmp.path(), DRAGONS_DIR, ".strata.artifact.tmpXYZ", "junk");
+        write_dragon(tmp.path(), DRAGONS_DIR, ".scarp.artifact.tmpXYZ", "junk");
 
         assert!(scan(tmp.path(), &DRAGON).unwrap().is_empty());
     }

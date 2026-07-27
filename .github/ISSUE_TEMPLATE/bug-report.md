@@ -1,15 +1,15 @@
 ---
 name: Bug report
-about: Something Strata did wrong — a crash, wrong output, or damaged files
+about: Something Scarp did wrong — a crash, wrong output, or damaged files
 labels: bug
 ---
 
 ## What happened
 
-<!-- The command you ran and what Strata did. Paste real output. -->
+<!-- The command you ran and what Scarp did. Paste real output. -->
 
 ```console
-$ strata ...
+$ scarp ...
 ```
 
 ## What you expected
@@ -19,17 +19,17 @@ $ strata ...
 <!--
 What the archaeology looked like when it happened, as specifically as
 practical: relevant file paths, front matter, whether the state was
-hand-edited or Strata-created. A minimal reproducing layout is ideal.
+hand-edited or Scarp-created. A minimal reproducing layout is ideal.
 -->
 
-## `strata doctor` output
+## `scarp doctor` output
 
-<!-- If the repository state is involved, paste `strata doctor` (or
-`strata doctor --json`) from before and, if relevant, after. -->
+<!-- If the repository state is involved, paste `scarp doctor` (or
+`scarp doctor --json`) from before and, if relevant, after. -->
 
 ## Environment
 
-- Strata version / commit:
+- Scarp version / commit:
 - OS and filesystem:
 
 <!--

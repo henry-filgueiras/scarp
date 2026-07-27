@@ -1,4 +1,4 @@
-//! Integration tests for `strata list` and `strata show` through the
+//! Integration tests for `scarp list` and `scarp show` through the
 //! compiled binary.
 //!
 //! Every invocation pins its working directory to a fresh temporary
@@ -12,12 +12,12 @@ use std::process::Output;
 
 const DRAGONS_DIR: &str = "archaeology/dragons";
 
-fn strata_in(dir: &Path, args: &[&str]) -> Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_strata"))
+fn scarp_in(dir: &Path, args: &[&str]) -> Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_scarp"))
         .args(args)
         .current_dir(dir)
         .output()
-        .expect("failed to run strata binary")
+        .expect("failed to run scarp binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -30,7 +30,7 @@ fn stderr(output: &Output) -> String {
 
 fn init_repo() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().unwrap();
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
     assert!(out.status.success(), "init failed:\n{}", stderr(&out));
     tmp
 }
@@ -65,7 +65,7 @@ fn list_from_repository_root_prints_reference_status_title_and_path() {
     let tmp = init_repo();
     seed_known_pair(tmp.path());
 
-    let out = strata_in(tmp.path(), &["list", "dragons"]);
+    let out = scarp_in(tmp.path(), &["list", "dragons"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     let text = stdout(&out);
@@ -96,7 +96,7 @@ fn list_from_nested_directory_finds_the_repository() {
     let nested = tmp.path().join("src/deeply/nested");
     fs::create_dir_all(&nested).unwrap();
 
-    let out = strata_in(&nested, &["list", "dragons"]);
+    let out = scarp_in(&nested, &["list", "dragons"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(stdout(&out).contains("dragon:2"), "{}", stdout(&out));
@@ -106,7 +106,7 @@ fn list_from_nested_directory_finds_the_repository() {
 fn list_accepts_singular_and_plural_collection_names() {
     let tmp = init_repo();
     for name in ["dragon", "dragons"] {
-        let out = strata_in(tmp.path(), &["list", name]);
+        let out = scarp_in(tmp.path(), &["list", name]);
         assert!(out.status.success(), "`list {name}`:\n{}", stderr(&out));
     }
 }
@@ -133,7 +133,7 @@ fn list_orders_by_sequence_then_path_across_open_and_closed() {
         &dragon_markdown("id-2", 2, "open", "Second"),
     );
 
-    let out = strata_in(tmp.path(), &["list", "dragons"]);
+    let out = scarp_in(tmp.path(), &["list", "dragons"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     let text = stdout(&out);
@@ -152,7 +152,7 @@ fn list_json_pins_field_names_order_and_sorting() {
     let tmp = init_repo();
     seed_known_pair(tmp.path());
 
-    let out = strata_in(tmp.path(), &["list", "dragons", "--json"]);
+    let out = scarp_in(tmp.path(), &["list", "dragons", "--json"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert_eq!(stderr(&out), "", "stderr must stay clean on success");
@@ -175,7 +175,7 @@ fn list_json_pins_field_names_order_and_sorting() {
 fn empty_collection_prints_a_clear_message_and_an_empty_json_array() {
     let tmp = init_repo();
 
-    let human = strata_in(tmp.path(), &["list", "dragons"]);
+    let human = scarp_in(tmp.path(), &["list", "dragons"]);
     assert!(human.status.success(), "{}", stderr(&human));
     assert!(
         stdout(&human).contains("no dragons found"),
@@ -183,7 +183,7 @@ fn empty_collection_prints_a_clear_message_and_an_empty_json_array() {
         stdout(&human)
     );
 
-    let json = strata_in(tmp.path(), &["list", "dragons", "--json"]);
+    let json = scarp_in(tmp.path(), &["list", "dragons", "--json"]);
     assert!(json.status.success(), "{}", stderr(&json));
     assert_eq!(stdout(&json), "[]\n");
 }
@@ -193,7 +193,7 @@ fn show_by_sequence_prints_canonical_contents_byte_for_byte() {
     let tmp = init_repo();
     let (open, _) = seed_known_pair(tmp.path());
 
-    let out = strata_in(tmp.path(), &["show", "dragon:2"]);
+    let out = scarp_in(tmp.path(), &["show", "dragon:2"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert_eq!(
@@ -206,7 +206,7 @@ fn show_by_sequence_prints_canonical_contents_byte_for_byte() {
 #[test]
 fn show_by_generated_ulid_style_id() {
     let tmp = init_repo();
-    let out = strata_in(tmp.path(), &["new", "dragon", "Freshly created"]);
+    let out = scarp_in(tmp.path(), &["new", "dragon", "Freshly created"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let content =
         fs::read_to_string(tmp.path().join(DRAGONS_DIR).join("0001-freshly-created.md")).unwrap();
@@ -215,7 +215,7 @@ fn show_by_generated_ulid_style_id() {
         .find_map(|line| line.strip_prefix("id: "))
         .expect("created artifact carries an id");
 
-    let shown = strata_in(tmp.path(), &["show", id]);
+    let shown = scarp_in(tmp.path(), &["show", id]);
 
     assert!(shown.status.success(), "{}", stderr(&shown));
     assert_eq!(stdout(&shown), content);
@@ -226,7 +226,7 @@ fn show_by_legacy_hand_seeded_id() {
     let tmp = init_repo();
     let (open, _) = seed_known_pair(tmp.path());
 
-    let out = strata_in(tmp.path(), &["show", "drg-legacy-seeded"]);
+    let out = scarp_in(tmp.path(), &["show", "drg-legacy-seeded"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert_eq!(stdout(&out), open);
@@ -237,7 +237,7 @@ fn show_json_includes_summary_fields_and_exact_content() {
     let tmp = init_repo();
     let (open, _) = seed_known_pair(tmp.path());
 
-    let out = strata_in(tmp.path(), &["show", "dragon:2", "--json"]);
+    let out = scarp_in(tmp.path(), &["show", "dragon:2", "--json"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert_eq!(stderr(&out), "", "stderr must stay clean on success");
@@ -265,7 +265,7 @@ fn show_unknown_sequence_is_artifact_not_found() {
     let tmp = init_repo();
     seed_known_pair(tmp.path());
 
-    let out = strata_in(tmp.path(), &["show", "dragon:41"]);
+    let out = scarp_in(tmp.path(), &["show", "dragon:41"]);
 
     assert_eq!(out.status.code(), Some(7), "{}", stderr(&out));
     let err = stderr(&out);
@@ -279,7 +279,7 @@ fn show_unknown_id_is_artifact_not_found() {
     let tmp = init_repo();
     seed_known_pair(tmp.path());
 
-    let out = strata_in(tmp.path(), &["show", "drg_00000000000000000000000000"]);
+    let out = scarp_in(tmp.path(), &["show", "drg_00000000000000000000000000"]);
 
     assert_eq!(out.status.code(), Some(7), "{}", stderr(&out));
     assert!(
@@ -305,7 +305,7 @@ fn duplicate_sequence_makes_a_human_reference_ambiguous() {
         &dragon_markdown("id-b", 1, "closed", "Branch B"),
     );
 
-    let out = strata_in(tmp.path(), &["show", "dragon:1"]);
+    let out = scarp_in(tmp.path(), &["show", "dragon:1"]);
 
     assert_eq!(out.status.code(), Some(8), "{}", stderr(&out));
     let err = stderr(&out);
@@ -332,7 +332,7 @@ fn duplicate_stable_id_is_ambiguous() {
         &dragon_markdown("id-same", 2, "open", "Copy B"),
     );
 
-    let out = strata_in(tmp.path(), &["show", "id-same"]);
+    let out = scarp_in(tmp.path(), &["show", "id-same"]);
 
     assert_eq!(out.status.code(), Some(8), "{}", stderr(&out));
     assert!(
@@ -358,7 +358,7 @@ fn list_still_succeeds_with_duplicate_sequences() {
         &dragon_markdown("id-b", 1, "closed", "Branch B"),
     );
 
-    let out = strata_in(tmp.path(), &["list", "dragons"]);
+    let out = scarp_in(tmp.path(), &["list", "dragons"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     let text = stdout(&out);
@@ -378,7 +378,7 @@ fn malformed_artifact_fails_list_naming_the_path() {
         "---\nid: x\nsequence: 1\n---\n\n# Missing required fields\n",
     );
 
-    let out = strata_in(tmp.path(), &["list", "dragons"]);
+    let out = scarp_in(tmp.path(), &["list", "dragons"]);
 
     assert_eq!(out.status.code(), Some(5), "{}", stderr(&out));
     let err = stderr(&out);
@@ -398,7 +398,7 @@ fn malformed_artifact_fails_show_even_for_other_references() {
         &dragon_markdown("id-broken", 3, "resolved", "Unknown status"),
     );
 
-    let out = strata_in(tmp.path(), &["show", "dragon:2"]);
+    let out = scarp_in(tmp.path(), &["show", "dragon:2"]);
 
     assert_eq!(out.status.code(), Some(5), "{}", stderr(&out));
     assert!(
@@ -412,9 +412,9 @@ fn malformed_artifact_fails_show_even_for_other_references() {
 fn dot_prefixed_entries_are_ignored_by_list() {
     let tmp = init_repo();
     write_artifact(tmp.path(), DRAGONS_DIR, ".gitkeep", "");
-    write_artifact(tmp.path(), DRAGONS_DIR, ".strata.artifact.tmpABC", "junk");
+    write_artifact(tmp.path(), DRAGONS_DIR, ".scarp.artifact.tmpABC", "junk");
 
-    let out = strata_in(tmp.path(), &["list", "dragons", "--json"]);
+    let out = scarp_in(tmp.path(), &["list", "dragons", "--json"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert_eq!(stdout(&out), "[]\n");
@@ -429,7 +429,7 @@ fn list_and_show_without_a_repository_are_typed_errors() {
         &["show", "dragon:1"],
         &["show", "drg-some-id"],
     ] {
-        let out = strata_in(tmp.path(), args);
+        let out = scarp_in(tmp.path(), args);
         assert_eq!(out.status.code(), Some(3), "{args:?}:\n{}", stderr(&out));
         assert!(
             stderr(&out).starts_with("error[missing-repository]: "),

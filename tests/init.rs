@@ -1,4 +1,4 @@
-//! Integration tests for `strata init` through the compiled binary.
+//! Integration tests for `scarp init` through the compiled binary.
 //!
 //! Every invocation runs inside a fresh temporary directory (which is not a
 //! Git repository), proving Git is optional and keeping the real repository
@@ -8,17 +8,17 @@ use std::fs;
 use std::path::Path;
 use std::process::Output;
 
-const CONFIG_FILE: &str = ".strata.toml";
+const CONFIG_FILE: &str = ".scarp.toml";
 const GITATTRIBUTES_FILE: &str = "archaeology/.gitattributes";
 const GITATTRIBUTES_POLICY: &str = "*.md text eol=lf\n";
 const REQUIRED_DIRS: [&str; 2] = ["archaeology/dragons", "archaeology/dragons"];
 
-fn strata_in(dir: &Path, args: &[&str]) -> Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_strata"))
+fn scarp_in(dir: &Path, args: &[&str]) -> Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_scarp"))
         .args(args)
         .current_dir(dir)
         .output()
-        .expect("failed to run strata binary")
+        .expect("failed to run scarp binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -33,7 +33,7 @@ fn stderr(output: &Output) -> String {
 fn init_creates_expected_layout_in_empty_non_git_directory() {
     let tmp = tempfile::tempdir().unwrap();
 
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
 
     assert!(out.status.success(), "init failed:\n{}", stderr(&out));
     assert!(
@@ -64,7 +64,7 @@ fn init_creates_expected_layout_in_empty_non_git_directory() {
 
 #[test]
 fn shipped_policy_exists_only_at_the_nested_archaeology_path() {
-    // This repository ships the same policy `strata init` writes, only
+    // This repository ships the same policy `scarp init` writes, only
     // inside archaeology/ (decision 14 as amended); the task 26 root
     // file is gone.
     let nested = concat!(env!("CARGO_MANIFEST_DIR"), "/archaeology/.gitattributes");
@@ -79,9 +79,9 @@ fn shipped_policy_exists_only_at_the_nested_archaeology_path() {
 #[test]
 fn init_rerun_leaves_the_line_ending_policy_untouched() {
     let tmp = tempfile::tempdir().unwrap();
-    assert!(strata_in(tmp.path(), &["init"]).status.success());
+    assert!(scarp_in(tmp.path(), &["init"]).status.success());
 
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(
@@ -102,7 +102,7 @@ fn existing_gitattributes_is_preserved_byte_for_byte() {
     fs::create_dir_all(tmp.path().join("archaeology")).unwrap();
     fs::write(tmp.path().join(GITATTRIBUTES_FILE), custom).unwrap();
 
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert_eq!(
@@ -122,7 +122,7 @@ fn gitattributes_path_occupied_by_directory_is_an_artifact_conflict() {
     let tmp = tempfile::tempdir().unwrap();
     fs::create_dir_all(tmp.path().join(GITATTRIBUTES_FILE)).unwrap();
 
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
 
     assert_eq!(out.status.code(), Some(4), "{}", stderr(&out));
     assert!(
@@ -139,11 +139,11 @@ fn gitattributes_path_occupied_by_directory_is_an_artifact_conflict() {
 #[test]
 fn rerun_succeeds_without_changing_existing_files() {
     let tmp = tempfile::tempdir().unwrap();
-    assert!(strata_in(tmp.path(), &["init"]).status.success());
+    assert!(scarp_in(tmp.path(), &["init"]).status.success());
     let custom = "# annotated by hand\nversion = 1\n";
     fs::write(tmp.path().join(CONFIG_FILE), custom).unwrap();
 
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(
@@ -164,7 +164,7 @@ fn invalid_config_is_a_malformed_artifact_error_and_is_not_overwritten() {
     let content = "version = 99\n";
     fs::write(tmp.path().join(CONFIG_FILE), content).unwrap();
 
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
 
     assert_eq!(out.status.code(), Some(5), "{}", stderr(&out));
     assert!(
@@ -184,7 +184,7 @@ fn config_path_occupied_by_directory_is_an_artifact_conflict() {
     let tmp = tempfile::tempdir().unwrap();
     fs::create_dir(tmp.path().join(CONFIG_FILE)).unwrap();
 
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
 
     assert_eq!(out.status.code(), Some(4), "{}", stderr(&out));
     assert!(
@@ -199,7 +199,7 @@ fn required_directory_occupied_by_file_is_an_artifact_conflict() {
     let tmp = tempfile::tempdir().unwrap();
     fs::write(tmp.path().join("archaeology"), "in the way").unwrap();
 
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
 
     assert_eq!(out.status.code(), Some(4), "{}", stderr(&out));
     let err = stderr(&out);

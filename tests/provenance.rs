@@ -10,12 +10,12 @@ const DRAGONS_DIR: &str = "archaeology/dragons";
 const IDEAS_DIR: &str = "archaeology/ideas";
 const DECISIONS_DIR: &str = "archaeology/decisions";
 
-fn strata_in(dir: &Path, args: &[&str]) -> Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_strata"))
+fn scarp_in(dir: &Path, args: &[&str]) -> Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_scarp"))
         .args(args)
         .current_dir(dir)
         .output()
-        .expect("failed to run strata binary")
+        .expect("failed to run scarp binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -28,13 +28,13 @@ fn stderr(output: &Output) -> String {
 
 fn init_repo() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().unwrap();
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
     assert!(out.status.success(), "init failed:\n{}", stderr(&out));
     tmp
 }
 
 fn assert_doctor_healthy(root: &Path) {
-    let out = strata_in(root, &["doctor"]);
+    let out = scarp_in(root, &["doctor"]);
     assert!(
         out.status.success(),
         "doctor must be healthy:\n{}\n{}",
@@ -79,7 +79,7 @@ fn close_resolved_by_writes_the_bound_edge_and_transition_together() {
 
     // A sequence-form target is resolved to its stable id and the
     // target's title is frozen as the label.
-    let out = strata_in(
+    let out = scarp_in(
         tmp.path(),
         &["close", "dragon:1", "--resolved-by", "decision:1"],
     );
@@ -100,7 +100,7 @@ fn adopt_adopted_by_accepts_a_stable_id_target() {
     seed_idea(tmp.path());
     seed_decision(tmp.path());
 
-    let out = strata_in(
+    let out = scarp_in(
         tmp.path(),
         &["adopt", "idea:1", "--adopted-by", "dec-settle-it"],
     );
@@ -121,7 +121,7 @@ fn an_unresolvable_target_fails_the_whole_invocation() {
     seed_dragon(tmp.path());
     let original = fs::read_to_string(tmp.path().join(DRAGONS_DIR).join("0001-risk.md")).unwrap();
 
-    let out = strata_in(
+    let out = scarp_in(
         tmp.path(),
         &["close", "dragon:1", "--resolved-by", "decision:41"],
     );
@@ -145,7 +145,7 @@ fn an_idea_target_is_refused_by_the_vocabulary() {
     seed_dragon(tmp.path());
     seed_idea(tmp.path());
 
-    let out = strata_in(
+    let out = scarp_in(
         tmp.path(),
         &["close", "dragon:1", "--resolved-by", "idea-proposal"],
     );
@@ -175,7 +175,7 @@ fn an_ambiguous_stable_id_target_is_refused_naming_every_claimant() {
     .unwrap();
     let original = fs::read_to_string(tmp.path().join(DRAGONS_DIR).join("0001-risk.md")).unwrap();
 
-    let out = strata_in(
+    let out = scarp_in(
         tmp.path(),
         &["close", "dragon:1", "--resolved-by", "dec-settle-it"],
     );
@@ -210,7 +210,7 @@ fn binding_to_a_single_bracket_title_succeeds_and_doctor_stays_green() {
     )
     .unwrap();
 
-    let out = strata_in(
+    let out = scarp_in(
         tmp.path(),
         &["close", "dragon:1", "--resolved-by", "dec-bracket"],
     );
@@ -239,7 +239,7 @@ fn binding_to_a_double_bracket_title_is_refused_before_mutation() {
     .unwrap();
     let original = fs::read_to_string(tmp.path().join(DRAGONS_DIR).join("0001-risk.md")).unwrap();
 
-    let out = strata_in(
+    let out = scarp_in(
         tmp.path(),
         &["close", "dragon:1", "--resolved-by", "dec-worst"],
     );
@@ -271,7 +271,7 @@ fn binding_to_a_whitespace_bearing_id_is_refused_and_doctor_agrees() {
     .unwrap();
     let original = fs::read_to_string(tmp.path().join(DRAGONS_DIR).join("0001-risk.md")).unwrap();
 
-    let out = strata_in(
+    let out = scarp_in(
         tmp.path(),
         &["close", "dragon:1", "--resolved-by", "dec spacey"],
     );
@@ -286,7 +286,7 @@ fn binding_to_a_whitespace_bearing_id_is_refused_and_doctor_agrees() {
         "refusal must precede any mutation"
     );
 
-    let doctor = strata_in(tmp.path(), &["doctor"]);
+    let doctor = scarp_in(tmp.path(), &["doctor"]);
     assert_eq!(doctor.status.code(), Some(9), "{}", stderr(&doctor));
     let report = stdout(&doctor);
     assert!(report.contains("non-canonical-artifact"), "{report}");
@@ -298,7 +298,7 @@ fn bare_transitions_behave_exactly_as_before() {
     let tmp = init_repo();
     seed_dragon(tmp.path());
 
-    let out = strata_in(tmp.path(), &["close", "dragon:1"]);
+    let out = scarp_in(tmp.path(), &["close", "dragon:1"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     let content = fs::read_to_string(tmp.path().join(DRAGONS_DIR).join("0001-risk.md")).unwrap();
@@ -310,12 +310,12 @@ fn bare_transitions_behave_exactly_as_before() {
 fn resolved_by_belongs_to_no_other_collection() {
     let tmp = init_repo();
     assert!(
-        strata_in(tmp.path(), &["new", "sprint", "Current"])
+        scarp_in(tmp.path(), &["new", "sprint", "Current"])
             .status
             .success()
     );
 
-    let out = strata_in(
+    let out = scarp_in(
         tmp.path(),
         &["close", "sprint:1", "--resolved-by", "decision:1"],
     );
@@ -338,7 +338,7 @@ fn an_existing_edge_is_never_silently_rewritten() {
     )
     .unwrap();
 
-    let out = strata_in(
+    let out = scarp_in(
         tmp.path(),
         &["close", "dragon:1", "--resolved-by", "decision:1"],
     );

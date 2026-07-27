@@ -1,16 +1,16 @@
-//! Integration tests for `strata resolve` (task 38): batch reference
+//! Integration tests for `scarp resolve` (task 38): batch reference
 //! resolution with positional pairing and all-or-nothing stdout.
 
 use std::fs;
 use std::path::Path;
 use std::process::Output;
 
-fn strata_in(dir: &Path, args: &[&str]) -> Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_strata"))
+fn scarp_in(dir: &Path, args: &[&str]) -> Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_scarp"))
         .args(args)
         .current_dir(dir)
         .output()
-        .expect("failed to run strata binary")
+        .expect("failed to run scarp binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -25,7 +25,7 @@ fn stderr(output: &Output) -> String {
 /// known stable ids.
 fn seeded_repo() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().unwrap();
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
     assert!(out.status.success(), "init failed:\n{}", stderr(&out));
     let write = |dir: &str, name: &str, content: &str| {
         let dir = tmp.path().join(dir);
@@ -59,7 +59,7 @@ fn seeded_repo() -> tempfile::TempDir {
 fn resolves_references_in_argument_order_one_id_per_line() {
     let tmp = seeded_repo();
 
-    let out = strata_in(tmp.path(), &["resolve", "idea:2", "dragon:1", "idea:1"]);
+    let out = scarp_in(tmp.path(), &["resolve", "idea:2", "dragon:1", "idea:1"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert_eq!(stdout(&out), "ide-second\ndrg-risk\nide-first\n");
@@ -70,7 +70,7 @@ fn resolves_references_in_argument_order_one_id_per_line() {
 fn duplicate_inputs_resolve_independently_and_repeat() {
     let tmp = seeded_repo();
 
-    let out = strata_in(tmp.path(), &["resolve", "idea:1", "idea:1"]);
+    let out = scarp_in(tmp.path(), &["resolve", "idea:1", "idea:1"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert_eq!(stdout(&out), "ide-first\nide-first\n");
@@ -82,7 +82,7 @@ fn mixed_sugar_and_stable_id_inputs_pair_positionally() {
     // idempotent.
     let tmp = seeded_repo();
 
-    let out = strata_in(
+    let out = scarp_in(
         tmp.path(),
         &["resolve", "dec-choice", "idea:2", "drg-risk", "decision:1"],
     );
@@ -98,7 +98,7 @@ fn mixed_sugar_and_stable_id_inputs_pair_positionally() {
 fn any_failure_empties_stdout_and_reports_every_failing_input() {
     let tmp = seeded_repo();
 
-    let out = strata_in(
+    let out = scarp_in(
         tmp.path(),
         &["resolve", "idea:1", "dragon:99", "idea:2", "ide-stale"],
     );
@@ -126,7 +126,7 @@ fn any_failure_empties_stdout_and_reports_every_failing_input() {
 fn a_stale_stable_id_is_a_resolution_failure_not_a_pass_through() {
     let tmp = seeded_repo();
 
-    let out = strata_in(tmp.path(), &["resolve", "drg-deleted-long-ago"]);
+    let out = scarp_in(tmp.path(), &["resolve", "drg-deleted-long-ago"]);
 
     assert_eq!(out.status.code(), Some(7), "{}", stderr(&out));
     assert_eq!(stdout(&out), "", "no in-band sentinel may reach stdout");
@@ -141,7 +141,7 @@ fn a_stale_stable_id_is_a_resolution_failure_not_a_pass_through() {
 fn json_emits_one_record_per_input_in_input_order() {
     let tmp = seeded_repo();
 
-    let out = strata_in(tmp.path(), &["resolve", "idea:2", "drg-risk", "--json"]);
+    let out = scarp_in(tmp.path(), &["resolve", "idea:2", "drg-risk", "--json"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     let expected = concat!(
@@ -163,7 +163,7 @@ fn json_emits_one_record_per_input_in_input_order() {
 fn json_failure_mode_matches_the_human_one() {
     let tmp = seeded_repo();
 
-    let out = strata_in(tmp.path(), &["resolve", "idea:1", "idea:99", "--json"]);
+    let out = scarp_in(tmp.path(), &["resolve", "idea:1", "idea:99", "--json"]);
 
     assert_eq!(out.status.code(), Some(7), "{}", stderr(&out));
     assert_eq!(stdout(&out), "");
@@ -174,7 +174,7 @@ fn json_failure_mode_matches_the_human_one() {
 fn no_references_is_a_usage_error() {
     let tmp = seeded_repo();
 
-    let out = strata_in(tmp.path(), &["resolve"]);
+    let out = scarp_in(tmp.path(), &["resolve"]);
 
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
 }
@@ -188,7 +188,7 @@ fn a_duplicated_sequence_is_ambiguous_not_first_match() {
     )
     .unwrap();
 
-    let out = strata_in(tmp.path(), &["resolve", "idea:2"]);
+    let out = scarp_in(tmp.path(), &["resolve", "idea:2"]);
 
     assert_eq!(out.status.code(), Some(8), "{}", stderr(&out));
     assert_eq!(stdout(&out), "");

@@ -1,4 +1,4 @@
-//! Integration tests for `strata doctor` through the compiled binary.
+//! Integration tests for `scarp doctor` through the compiled binary.
 
 use std::fs;
 use std::path::Path;
@@ -6,12 +6,12 @@ use std::process::Output;
 
 const DRAGONS_DIR: &str = "archaeology/dragons";
 
-fn strata_in(dir: &Path, args: &[&str]) -> Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_strata"))
+fn scarp_in(dir: &Path, args: &[&str]) -> Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_scarp"))
         .args(args)
         .current_dir(dir)
         .output()
-        .expect("failed to run strata binary")
+        .expect("failed to run scarp binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -24,7 +24,7 @@ fn stderr(output: &Output) -> String {
 
 fn init_repo() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().unwrap();
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
     assert!(out.status.success(), "init failed:\n{}", stderr(&out));
     tmp
 }
@@ -44,7 +44,7 @@ fn healthy_repository_exits_zero_with_a_summary() {
     )
     .unwrap();
 
-    let out = strata_in(tmp.path(), &["doctor"]);
+    let out = scarp_in(tmp.path(), &["doctor"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(
@@ -62,7 +62,7 @@ fn marker_only_repository_is_healthy() {
     let tmp = init_repo();
     fs::remove_dir_all(tmp.path().join("archaeology")).unwrap();
 
-    let out = strata_in(tmp.path(), &["doctor"]);
+    let out = scarp_in(tmp.path(), &["doctor"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
 }
@@ -86,7 +86,7 @@ fn unhealthy_repository_reports_every_finding_and_exits_nine() {
     )
     .unwrap();
 
-    let out = strata_in(tmp.path(), &["doctor"]);
+    let out = scarp_in(tmp.path(), &["doctor"]);
 
     assert_eq!(out.status.code(), Some(9), "{}", stderr(&out));
     let report = stdout(&out);
@@ -115,7 +115,7 @@ fn json_findings_stay_parseable_when_validation_fails() {
     )
     .unwrap();
 
-    let out = strata_in(tmp.path(), &["doctor", "--json"]);
+    let out = scarp_in(tmp.path(), &["doctor", "--json"]);
 
     assert_eq!(out.status.code(), Some(9), "{}", stderr(&out));
     let findings: serde_json::Value = serde_json::from_str(stdout(&out).trim())
@@ -130,7 +130,7 @@ fn json_findings_stay_parseable_when_validation_fails() {
 fn json_findings_are_an_empty_array_when_healthy() {
     let tmp = init_repo();
 
-    let out = strata_in(tmp.path(), &["doctor", "--json"]);
+    let out = scarp_in(tmp.path(), &["doctor", "--json"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert_eq!(stdout(&out).trim(), "[]");
@@ -147,14 +147,14 @@ fn advisory_findings_report_without_failing_validation() {
     )
     .unwrap();
 
-    let human = strata_in(tmp.path(), &["doctor"]);
+    let human = scarp_in(tmp.path(), &["doctor"]);
     assert!(human.status.success(), "{}", stderr(&human));
     let text = stdout(&human);
     assert!(text.contains("advice"), "{text}");
     assert!(text.contains("unbound-edge"), "{text}");
     assert!(text.contains("1 advisory note(s)"), "{text}");
 
-    let json = strata_in(tmp.path(), &["doctor", "--json"]);
+    let json = scarp_in(tmp.path(), &["doctor", "--json"]);
     assert!(json.status.success(), "{}", stderr(&json));
     let findings: serde_json::Value = serde_json::from_str(stdout(&json).trim()).unwrap();
     assert_eq!(findings[0]["problem"], "unbound-edge");
@@ -170,7 +170,7 @@ fn dangling_provenance_edges_are_corruption() {
     )
     .unwrap();
 
-    let out = strata_in(tmp.path(), &["doctor"]);
+    let out = scarp_in(tmp.path(), &["doctor"]);
 
     assert_eq!(out.status.code(), Some(9), "{}", stderr(&out));
     assert!(stdout(&out).contains("dangling-edge"), "{}", stdout(&out));
@@ -187,7 +187,7 @@ fn oversized_artifact_is_refused_by_strict_reads_and_reported_by_doctor() {
     oversized.push_str(&"x".repeat(1024 * 1024));
     fs::write(tmp.path().join(DRAGONS_DIR).join("0001-big.md"), &oversized).unwrap();
 
-    let list = strata_in(tmp.path(), &["list", "dragons"]);
+    let list = scarp_in(tmp.path(), &["list", "dragons"]);
     assert_eq!(list.status.code(), Some(5), "{}", stderr(&list));
     assert!(
         stderr(&list).starts_with("error[malformed-artifact]: "),
@@ -195,7 +195,7 @@ fn oversized_artifact_is_refused_by_strict_reads_and_reported_by_doctor() {
         stderr(&list)
     );
 
-    let list_json = strata_in(tmp.path(), &["list", "dragons", "--json"]);
+    let list_json = scarp_in(tmp.path(), &["list", "dragons", "--json"]);
     assert_eq!(list_json.status.code(), Some(5), "{}", stderr(&list_json));
     assert_eq!(
         stderr(&list_json),
@@ -203,7 +203,7 @@ fn oversized_artifact_is_refused_by_strict_reads_and_reported_by_doctor() {
         "human and JSON callers must see the same typed refusal"
     );
 
-    let doctor = strata_in(tmp.path(), &["doctor"]);
+    let doctor = scarp_in(tmp.path(), &["doctor"]);
     assert_eq!(doctor.status.code(), Some(9), "{}", stderr(&doctor));
     assert!(
         stdout(&doctor).contains("malformed-artifact"),
@@ -225,7 +225,7 @@ fn symlinked_artifact_is_refused_by_strict_reads_and_reported_by_doctor() {
     .unwrap();
     std::os::unix::fs::symlink(&target, tmp.path().join(DRAGONS_DIR).join("0001-evil.md")).unwrap();
 
-    let list = strata_in(tmp.path(), &["list", "dragons"]);
+    let list = scarp_in(tmp.path(), &["list", "dragons"]);
     assert_eq!(list.status.code(), Some(4), "{}", stderr(&list));
     assert!(
         stderr(&list).starts_with("error[artifact-conflict]: "),
@@ -238,7 +238,7 @@ fn symlinked_artifact_is_refused_by_strict_reads_and_reported_by_doctor() {
         stdout(&list)
     );
 
-    let doctor = strata_in(tmp.path(), &["doctor", "--json"]);
+    let doctor = scarp_in(tmp.path(), &["doctor", "--json"]);
     assert_eq!(doctor.status.code(), Some(9), "{}", stderr(&doctor));
     let findings: serde_json::Value = serde_json::from_str(stdout(&doctor).trim()).unwrap();
     assert_eq!(findings[0]["problem"], "artifact-conflict");
@@ -263,10 +263,10 @@ fn human_and_json_output_agree_on_duplicate_claimant_classification() {
     )
     .unwrap();
 
-    let human = strata_in(tmp.path(), &["doctor"]);
+    let human = scarp_in(tmp.path(), &["doctor"]);
     assert_eq!(human.status.code(), Some(9), "{}", stderr(&human));
 
-    let json = strata_in(tmp.path(), &["doctor", "--json"]);
+    let json = scarp_in(tmp.path(), &["doctor", "--json"]);
     assert_eq!(json.status.code(), Some(9), "{}", stderr(&json));
     let findings: serde_json::Value = serde_json::from_str(stdout(&json).trim()).unwrap();
     let findings = findings.as_array().unwrap();
@@ -304,10 +304,10 @@ fn human_and_json_output_agree_on_representation_findings() {
     )
     .unwrap();
 
-    let human = strata_in(tmp.path(), &["doctor"]);
+    let human = scarp_in(tmp.path(), &["doctor"]);
     assert_eq!(human.status.code(), Some(9), "{}", stderr(&human));
 
-    let json = strata_in(tmp.path(), &["doctor", "--json"]);
+    let json = scarp_in(tmp.path(), &["doctor", "--json"]);
     assert_eq!(json.status.code(), Some(9), "{}", stderr(&json));
     let findings: serde_json::Value = serde_json::from_str(stdout(&json).trim()).unwrap();
     let findings = findings.as_array().unwrap();
@@ -349,11 +349,11 @@ fn quoted_status_parses_semantically_but_is_non_canonical_and_untransitionable()
     )
     .unwrap();
 
-    let list = strata_in(tmp.path(), &["list", "dragons"]);
+    let list = scarp_in(tmp.path(), &["list", "dragons"]);
     assert!(list.status.success(), "{}", stderr(&list));
     assert!(stdout(&list).contains("open"), "{}", stdout(&list));
 
-    let doctor = strata_in(tmp.path(), &["doctor"]);
+    let doctor = scarp_in(tmp.path(), &["doctor"]);
     assert_eq!(doctor.status.code(), Some(9), "{}", stderr(&doctor));
     assert!(
         stdout(&doctor).contains("non-canonical-artifact"),
@@ -361,7 +361,7 @@ fn quoted_status_parses_semantically_but_is_non_canonical_and_untransitionable()
         stdout(&doctor)
     );
 
-    let close = strata_in(tmp.path(), &["close", "dragon:1"]);
+    let close = scarp_in(tmp.path(), &["close", "dragon:1"]);
     assert_eq!(close.status.code(), Some(5), "{}", stderr(&close));
     assert!(
         stderr(&close).contains("`status: open`"),
@@ -379,7 +379,7 @@ fn quoted_status_parses_semantically_but_is_non_canonical_and_untransitionable()
 fn doctor_outside_a_repository_is_a_missing_repository_error() {
     let tmp = tempfile::tempdir().unwrap();
 
-    let out = strata_in(tmp.path(), &["doctor"]);
+    let out = scarp_in(tmp.path(), &["doctor"]);
 
     assert_eq!(out.status.code(), Some(3), "{}", stderr(&out));
     assert!(

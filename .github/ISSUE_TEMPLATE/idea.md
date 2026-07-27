@@ -1,11 +1,11 @@
 ---
 name: Idea
-about: Propose a feature or direction, shaped like a Strata idea artifact
+about: Propose a feature or direction, shaped like a Scarp idea artifact
 labels: idea
 ---
 
 <!--
-Strata tracks proposals as "idea" artifacts with three sections. Using
+Scarp tracks proposals as "idea" artifacts with three sections. Using
 the same shape here means an accepted proposal can be parked into
 archaeology/ideas/ nearly verbatim.
 

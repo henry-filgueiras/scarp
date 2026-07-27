@@ -1,10 +1,12 @@
 <div align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
-    <img src="assets/logo.svg" alt="Strata" width="420">
+    <img src="assets/logo.svg" alt="Scarp" width="420">
   </picture>
 
   <p><strong>Git-native project archaeology and structured repository memory<br>for humans and coding agents.</strong></p>
+
+  <p><em>Scarp exposes the strata of a repository: what changed, why, and what remains unsettled.</em></p>
 </div>
 
 ---
@@ -14,7 +16,7 @@ unusual design exists, which risks are known but unresolved, which tradeoffs
 were settled and on what evidence. Most of it evaporates — into closed tabs,
 stale chat threads, and the heads of people who leave.
 
-Strata keeps that knowledge **in the repository, as ordinary files**, and gives
+Scarp keeps that knowledge **in the repository, as ordinary files**, and gives
 humans and coding agents safe, intent-level commands for maintaining it:
 
 - **decisions** — settled tradeoffs, with their reasoning preserved
@@ -23,22 +25,22 @@ humans and coding agents safe, intent-level commands for maintaining it:
 - **logs** — durable discoveries that would otherwise be re-researched
 - **sprints** — scoped slices of work and their outcomes
 
-The filesystem is canonical. Git provides history. Strata supplies numbering,
+The filesystem is canonical. Git provides history. Scarp supplies numbering,
 identity, validation, and machine-readable projections — nothing you can't
 read or edit with a text editor.
 
 ## See it work
 
-This repository is Strata's first user: its own risks, decisions, and work
+This repository is Scarp's first user: its own risks, decisions, and work
 items are tracked with the tool. The output below is real.
 
 ```console
-$ strata list dragons
+$ scarp list dragons
 dragon:1  open  Branch sequence collisions  (archaeology/dragons/0001-branch-sequence-collisions.md)
 dragon:2  open  Repository validity is not closed under Git round-trip  (archaeology/dragons/0002-repository-validity-not-closed-under-git-round-trip.md)
 dragon:3  open  Reference marker syntax and typed edge vocabulary  (archaeology/dragons/0003-reference-marker-syntax-and-typed-edge-vocabulary.md)
 
-$ strata show dragon:3
+$ scarp show dragon:3
 ---
 id: drg_01KY169X7W0YXJ5QFV4D1MK4FB
 sequence: 3
@@ -58,7 +60,7 @@ semantics — stable-ID targets with frozen labels, write-time binding, …
 Automation gets the same facts without parsing prose:
 
 ```console
-$ strata list dragons --json | jq '.[-1]'
+$ scarp list dragons --json | jq '.[-1]'
 {
   "id": "drg_01KY169X7W0YXJ5QFV4D1MK4FB",
   "sequence": 3,
@@ -79,7 +81,7 @@ $ strata list dragons --json | jq '.[-1]'
 
 ```mermaid
 flowchart LR
-    caller["humans and<br/>coding agents"] -- "intent-level commands<br/>new · list · show · doctor" --> cli["strata"]
+    caller["humans and<br/>coding agents"] -- "intent-level commands<br/>new · list · show · doctor" --> cli["scarp"]
     cli -- "numbering · slugs · identity<br/>safe writes · validation" --> files
     subgraph repo["your Git repository"]
         files["plain files<br/>Markdown · JSON · JSONL"]
@@ -90,8 +92,8 @@ flowchart LR
 The arrows only point one way for a reason:
 
 - **Files are canonical.** No database, hidden state, or remote service is
-  required to understand or modify a Strata repository.
-- **Strata never holds a repository hostage.** Everything stays readable and
+  required to understand or modify a Scarp repository.
+- **Scarp never holds a repository hostage.** Everything stays readable and
   editable without the executable — it's just Markdown, JSON, and JSONL.
 - **Display numbers are not identity.** `0003-…` prefixes exist for humans;
   each artifact also carries a stable ID (a ULID), so concurrent branches can
@@ -148,17 +150,17 @@ carried only in front matter.
 
 ## Status
 
-Strata is bootstrapping its smallest useful vertical slice. Honest scoreboard:
+Scarp is bootstrapping its smallest useful vertical slice. Honest scoreboard:
 
 | Command | What it does | Status |
 | --- | --- | --- |
-| `strata init` | initialize a repository | ✅ |
-| `strata new dragon "…"` | create an artifact; sequence, slug, and ID assigned safely | ✅ |
-| `strata list dragons [--json]` | discover and list artifacts | ✅ |
-| `strata show dragon:N` | inspect one artifact | ✅ |
-| `strata doctor [--json]` | validate repository invariants, report every finding | ✅ |
-| `strata close dragon:N` / `strata reopen dragon:N` | transition an artifact between lifecycle states, safely | ✅ |
-| `strata fortune` | resurface one open dragon or parked idea, favoring stale artifacts | ✅ |
+| `scarp init` | initialize a repository | ✅ |
+| `scarp new dragon "…"` | create an artifact; sequence, slug, and ID assigned safely | ✅ |
+| `scarp list dragons [--json]` | discover and list artifacts | ✅ |
+| `scarp show dragon:N` | inspect one artifact | ✅ |
+| `scarp doctor [--json]` | validate repository invariants, report every finding | ✅ |
+| `scarp close dragon:N` / `scarp reopen dragon:N` | transition an artifact between lifecycle states, safely | ✅ |
+| `scarp fortune` | resurface one open dragon or parked idea, favoring stale artifacts | ✅ |
 
 Dragons, ideas, decisions, sprints, and tasks are managed collections:
 `new`, `list`, and `show` cover all five (the rows above show the dragon
@@ -181,17 +183,17 @@ scripts/check.sh   # format, lint, test, doctor
 
 ### Shell completions
 
-`strata completions <shell>` emits a completion script for `bash`,
+`scarp completions <shell>` emits a completion script for `bash`,
 `zsh`, `fish`, `elvish`, or `powershell`. For zsh:
 
 ```sh
 mkdir -p ~/.zfunc
-strata completions zsh > ~/.zfunc/_strata
+scarp completions zsh > ~/.zfunc/_scarp
 # in ~/.zshrc, before compinit:
 #   fpath=(~/.zfunc $fpath)
 ```
 
-Strata is also a case study in human–AI collaboration on long-lived projects.
+Scarp is also a case study in human–AI collaboration on long-lived projects.
 [`CLAUDE.md`](CLAUDE.md) holds the project invariants and agent workflow, and
 [`archaeology/`](archaeology/) is the living record — the decisions, dragons,
 and sprints behind every change in this repository.

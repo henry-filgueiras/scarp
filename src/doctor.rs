@@ -337,7 +337,7 @@ fn non_regular_finding(path: String, file_type: &fs::FileType) -> Finding {
         path,
         detail: format!(
             "a {what} occupies a managed artifact position; artifacts must \
-             be regular files, and Strata never follows symbolic links \
+             be regular files, and Scarp never follows symbolic links \
              inside a repository"
         ),
         severity: Severity::Error,
@@ -393,7 +393,7 @@ fn scan_sprints_dir(
                 path: sprint_dir_rel,
                 detail: "a symbolic link occupies a sprint containment \
                          position; containment directories must be real \
-                         directories, and Strata never follows symbolic \
+                         directories, and Scarp never follows symbolic \
                          links inside a repository"
                     .into(),
                 severity: Severity::Error,

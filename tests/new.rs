@@ -1,4 +1,4 @@
-//! Integration tests for `strata new` through the compiled binary.
+//! Integration tests for `scarp new` through the compiled binary.
 //!
 //! Every invocation pins its working directory to a fresh temporary
 //! directory so discovery can never walk up into a real repository.
@@ -7,15 +7,15 @@ use std::fs;
 use std::path::Path;
 use std::process::Output;
 
-const CONFIG_FILE: &str = ".strata.toml";
+const CONFIG_FILE: &str = ".scarp.toml";
 const DRAGONS_DIR: &str = "archaeology/dragons";
 
-fn strata_in(dir: &Path, args: &[&str]) -> Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_strata"))
+fn scarp_in(dir: &Path, args: &[&str]) -> Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_scarp"))
         .args(args)
         .current_dir(dir)
         .output()
-        .expect("failed to run strata binary")
+        .expect("failed to run scarp binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -28,7 +28,7 @@ fn stderr(output: &Output) -> String {
 
 fn init_repo() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().unwrap();
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
     assert!(out.status.success(), "init failed:\n{}", stderr(&out));
     tmp
 }
@@ -37,7 +37,7 @@ fn init_repo() -> tempfile::TempDir {
 fn new_dragon_from_repository_root_reports_reference_and_path() {
     let tmp = init_repo();
 
-    let out = strata_in(tmp.path(), &["new", "dragon", "Branch sequence collisions"]);
+    let out = scarp_in(tmp.path(), &["new", "dragon", "Branch sequence collisions"]);
 
     assert!(out.status.success(), "new failed:\n{}", stderr(&out));
     let text = stdout(&out);
@@ -72,7 +72,7 @@ fn new_dragon_from_nested_directory_writes_at_the_repository_root() {
     let nested = tmp.path().join("src/deeply/nested");
     fs::create_dir_all(&nested).unwrap();
 
-    let out = strata_in(&nested, &["new", "dragon", "Found from below"]);
+    let out = scarp_in(&nested, &["new", "dragon", "Found from below"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(
@@ -93,8 +93,8 @@ fn sequences_advance_across_invocations_and_closed_artifacts() {
     )
     .unwrap();
 
-    let first = strata_in(tmp.path(), &["new", "dragon", "First"]);
-    let second = strata_in(tmp.path(), &["new", "dragon", "Second"]);
+    let first = scarp_in(tmp.path(), &["new", "dragon", "First"]);
+    let second = scarp_in(tmp.path(), &["new", "dragon", "Second"]);
 
     assert!(first.status.success(), "{}", stderr(&first));
     assert!(second.status.success(), "{}", stderr(&second));
@@ -113,7 +113,7 @@ fn sequences_advance_across_invocations_and_closed_artifacts() {
 fn missing_repository_is_a_typed_error() {
     let tmp = tempfile::tempdir().unwrap();
 
-    let out = strata_in(tmp.path(), &["new", "dragon", "No repository here"]);
+    let out = scarp_in(tmp.path(), &["new", "dragon", "No repository here"]);
 
     assert_eq!(out.status.code(), Some(3), "{}", stderr(&out));
     assert!(
@@ -130,7 +130,7 @@ fn malformed_marker_during_discovery_is_rejected_not_walked_past() {
     fs::create_dir(&inner).unwrap();
     fs::write(inner.join(CONFIG_FILE), "version = \"broken\"").unwrap();
 
-    let out = strata_in(&inner, &["new", "dragon", "Should not resolve upward"]);
+    let out = scarp_in(&inner, &["new", "dragon", "Should not resolve upward"]);
 
     assert_eq!(out.status.code(), Some(5), "{}", stderr(&out));
     assert!(
@@ -148,7 +148,7 @@ fn malformed_marker_during_discovery_is_rejected_not_walked_past() {
 fn unsluggable_title_is_an_invalid_invocation() {
     let tmp = init_repo();
 
-    let out = strata_in(tmp.path(), &["new", "dragon", "!!!"]);
+    let out = scarp_in(tmp.path(), &["new", "dragon", "!!!"]);
 
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(
@@ -164,7 +164,7 @@ fn control_character_titles_are_refused_for_every_creating_command() {
     let title = "Evil title\n# Second heading";
 
     for collection in ["dragon", "idea", "sprint", "task"] {
-        let out = strata_in(tmp.path(), &["new", collection, title]);
+        let out = scarp_in(tmp.path(), &["new", collection, title]);
 
         assert_eq!(
             out.status.code(),
@@ -205,7 +205,7 @@ fn tab_and_carriage_return_titles_are_refused() {
     let tmp = init_repo();
 
     for title in ["tab\there", "carriage\rreturn"] {
-        let out = strata_in(tmp.path(), &["new", "dragon", title]);
+        let out = scarp_in(tmp.path(), &["new", "dragon", title]);
 
         assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
         assert!(
@@ -226,7 +226,7 @@ fn each_kind_round_trips_through_show_and_doctor_stays_green() {
         ("sprint", "Round trip sprint"),
         ("task", "Round trip task"),
     ] {
-        let out = strata_in(tmp.path(), &["new", collection, title]);
+        let out = scarp_in(tmp.path(), &["new", collection, title]);
         assert!(
             out.status.success(),
             "new {collection} failed:\n{}",
@@ -240,7 +240,7 @@ fn each_kind_round_trips_through_show_and_doctor_stays_green() {
         ("sprint:1", "# Round trip sprint"),
         ("task:1", "# Round trip task"),
     ] {
-        let out = strata_in(tmp.path(), &["show", reference]);
+        let out = scarp_in(tmp.path(), &["show", reference]);
         assert!(out.status.success(), "show {reference}:\n{}", stderr(&out));
         assert!(
             stdout(&out).contains(heading),
@@ -249,7 +249,7 @@ fn each_kind_round_trips_through_show_and_doctor_stays_green() {
         );
     }
 
-    let doctor = strata_in(tmp.path(), &["doctor"]);
+    let doctor = scarp_in(tmp.path(), &["doctor"]);
     assert!(
         doctor.status.success(),
         "doctor must stay green:\n{}\n{}",
@@ -268,7 +268,7 @@ fn malformed_artifact_filename_blocks_creation_with_a_named_path() {
     let tmp = init_repo();
     fs::write(tmp.path().join(DRAGONS_DIR).join("scratch.txt"), "junk").unwrap();
 
-    let out = strata_in(tmp.path(), &["new", "dragon", "Blocked"]);
+    let out = scarp_in(tmp.path(), &["new", "dragon", "Blocked"]);
 
     assert_eq!(out.status.code(), Some(5), "{}", stderr(&out));
     let err = stderr(&out);
@@ -279,13 +279,13 @@ fn malformed_artifact_filename_blocks_creation_with_a_named_path() {
 #[test]
 fn marker_only_repository_survives_git_round_trip() {
     // Git does not track empty directories: cloning a freshly initialized
-    // repository preserves `.strata.toml` but drops the empty layout.
+    // repository preserves `.scarp.toml` but drops the empty layout.
     // Validity is defined by the marker alone, so reads see an empty
     // collection and writes materialize the directories on demand.
     let tmp = init_repo();
     fs::remove_dir_all(tmp.path().join("archaeology")).unwrap();
 
-    let out = strata_in(tmp.path(), &["list", "dragons"]);
+    let out = scarp_in(tmp.path(), &["list", "dragons"]);
     assert!(out.status.success(), "list failed:\n{}", stderr(&out));
     assert!(
         stdout(&out).contains("no dragons found"),
@@ -293,7 +293,7 @@ fn marker_only_repository_survives_git_round_trip() {
         stdout(&out)
     );
 
-    let out = strata_in(tmp.path(), &["new", "dragon", "Post-clone risk"]);
+    let out = scarp_in(tmp.path(), &["new", "dragon", "Post-clone risk"]);
     assert!(out.status.success(), "new failed:\n{}", stderr(&out));
     assert!(
         tmp.path()

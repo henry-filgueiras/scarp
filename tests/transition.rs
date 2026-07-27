@@ -1,4 +1,4 @@
-//! Integration tests for `strata close` and `strata reopen` through the
+//! Integration tests for `scarp close` and `scarp reopen` through the
 //! compiled binary, pinning the failure-class contract of decision 8 as
 //! amended by decision 11: a transition is one in-place safe write, and
 //! the file never moves.
@@ -9,12 +9,12 @@ use std::process::Output;
 
 const DRAGONS_DIR: &str = "archaeology/dragons";
 
-fn strata_in(dir: &Path, args: &[&str]) -> Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_strata"))
+fn scarp_in(dir: &Path, args: &[&str]) -> Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_scarp"))
         .args(args)
         .current_dir(dir)
         .output()
-        .expect("failed to run strata binary")
+        .expect("failed to run scarp binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -27,7 +27,7 @@ fn stderr(output: &Output) -> String {
 
 fn init_repo() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().unwrap();
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
     assert!(out.status.success(), "init failed:\n{}", stderr(&out));
     tmp
 }
@@ -42,7 +42,7 @@ fn rich_dragon(status: &str) -> String {
 }
 
 fn assert_doctor_healthy(root: &Path) {
-    let out = strata_in(root, &["doctor"]);
+    let out = scarp_in(root, &["doctor"]);
     assert!(
         out.status.success(),
         "doctor must be healthy:\n{}\n{}",
@@ -60,7 +60,7 @@ fn close_rewrites_only_the_status_and_never_moves_the_file() {
     )
     .unwrap();
 
-    let out = strata_in(tmp.path(), &["close", "dragon:1"]);
+    let out = scarp_in(tmp.path(), &["close", "dragon:1"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     let line = stdout(&out);
@@ -94,11 +94,11 @@ fn reopen_round_trips_to_the_original_bytes() {
     .unwrap();
 
     assert!(
-        strata_in(tmp.path(), &["close", "dragon:1"])
+        scarp_in(tmp.path(), &["close", "dragon:1"])
             .status
             .success()
     );
-    let out = strata_in(tmp.path(), &["reopen", "dragon:1"]);
+    let out = scarp_in(tmp.path(), &["reopen", "dragon:1"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(
@@ -123,7 +123,7 @@ fn close_resolves_stable_ids() {
     )
     .unwrap();
 
-    let out = strata_in(tmp.path(), &["close", "drg-rich"]);
+    let out = scarp_in(tmp.path(), &["close", "drg-rich"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert_eq!(
@@ -142,7 +142,7 @@ fn closing_an_already_closed_artifact_is_an_invalid_invocation() {
     )
     .unwrap();
 
-    let out = strata_in(tmp.path(), &["close", "dragon:1"]);
+    let out = scarp_in(tmp.path(), &["close", "dragon:1"]);
 
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     let err = stderr(&out);
@@ -157,7 +157,7 @@ fn closing_an_already_closed_artifact_is_an_invalid_invocation() {
 #[test]
 fn unknown_reference_is_artifact_not_found() {
     let tmp = init_repo();
-    let out = strata_in(tmp.path(), &["close", "dragon:41"]);
+    let out = scarp_in(tmp.path(), &["close", "dragon:41"]);
     assert_eq!(out.status.code(), Some(7));
     assert!(
         stderr(&out).starts_with("error[artifact-not-found]:"),
@@ -181,7 +181,7 @@ fn duplicate_sequence_is_an_ambiguous_reference() {
         .unwrap();
     }
 
-    let out = strata_in(tmp.path(), &["close", "dragon:1"]);
+    let out = scarp_in(tmp.path(), &["close", "dragon:1"]);
 
     assert_eq!(out.status.code(), Some(8));
     assert!(
@@ -209,7 +209,7 @@ fn failed_write_leaves_the_artifact_untouched() {
     )
     .unwrap();
 
-    let out = strata_in(tmp.path(), &["close", "dragon:1"]);
+    let out = scarp_in(tmp.path(), &["close", "dragon:1"]);
 
     fs::set_permissions(
         tmp.path().join(DRAGONS_DIR),

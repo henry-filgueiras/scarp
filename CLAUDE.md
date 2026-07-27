@@ -2,15 +2,29 @@
 
 ## Project
 
-Strata is a Git-friendly command-line tool for maintaining structured project
+Scarp is a Git-friendly command-line tool for maintaining structured project
 archaeology and repository-local execution memory.
 
 It manages ordinary files representing decisions, unresolved technical risks
 (“dragons”), investigations, development logs, sprints, work items, and
 structured evidence.
 
-Strata may eventually expose rebuildable indexes, semantic retrieval, an MCP
+Scarp may eventually expose rebuildable indexes, semantic retrieval, an MCP
 adapter, or other projections. Those are not part of the bootstrap phase.
+
+### Name
+
+The project was built under the name Strata and renamed to Scarp on
+2026-07-27 (decision 16, `dec_01KYJE2K3VRASS8A1X1E847S1B`). The identity is
+`Scarp` in prose, `scarp` everywhere else — package, executable, library,
+and the `.scarp.toml` marker — never `SCARP`.
+
+"strata" survives lowercase as the geological metaphor for the accumulated
+repository record: the scarp is what exposes the strata. Historical
+archaeology, artifact ids, filenames, titles, and
+`scripts/bootstrap-inception.sh` keep the old product name because they were
+accurate when written; do not rewrite them. Every *current* surface must say
+Scarp.
 
 ## Core invariants
 
@@ -19,14 +33,14 @@ adapter, or other projections. Those are not part of the bootstrap phase.
 The filesystem is the source of truth.
 
 Do not introduce a canonical database, hidden state store, remote service, or
-cache required to understand or modify a Strata repository.
+cache required to understand or modify a Scarp repository.
 
 Any future index must be disposable and rebuildable from canonical files and,
 where relevant, Git history.
 
-### Strata must not hold repositories hostage
+### Scarp must not hold repositories hostage
 
-A Strata repository must remain understandable and editable without the Strata
+A Scarp repository must remain understandable and editable without the Scarp
 executable.
 
 Expected payload formats include:
@@ -66,7 +80,7 @@ Users and agents should express operations such as:
 - transition an artifact between states
 - validate repository invariants
 
-Strata handles numbering, slugging, identity allocation, path selection,
+Scarp handles numbering, slugging, identity allocation, path selection,
 metadata consistency, collision prevention, and safe writes.
 
 ### Human and machine interfaces share one core
@@ -107,11 +121,11 @@ Build the smallest useful vertical slice.
 Initial target commands:
 
 ```text
-strata init
-strata new
-strata list
-strata show
-strata doctor
+scarp init
+scarp new
+scarp list
+scarp show
+scarp doctor
 ```
 
 The first implementation may hardcode a single `dragon` collection while the
@@ -120,12 +134,12 @@ behavior is proven.
 Expected bootstrap workflow:
 
 ```sh
-strata init
-strata new dragon "Branch sequence collisions"
-strata list dragons
-strata list dragons --json
-strata show dragon:1
-strata doctor
+scarp init
+scarp new dragon "Branch sequence collisions"
+scarp list dragons
+scarp list dragons --json
+scarp show dragon:1
+scarp doctor
 ```
 
 The first implementation should support Markdown narrative artifacts.
@@ -159,7 +173,7 @@ frameworks for these features.
 
 ## Manual archaeology layout
 
-Until Strata can manage its own records, maintain:
+Until Scarp can manage its own records, maintain:
 
 ```text
 archaeology/
@@ -354,7 +368,7 @@ Do not add placeholder flags. Implement `--json`, `--quiet`, `--dry-run`, and
 
 Prove this vertical slice:
 
-1. locate or initialize a Strata repository;
+1. locate or initialize a Scarp repository;
 2. create one safely numbered Markdown dragon;
 3. assign it a stable identity;
 4. rediscover and parse it;

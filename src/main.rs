@@ -2,10 +2,10 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::Parser;
-use strata::cli::{ArtifactTarget, Cli, Collection, Command};
-use strata::error::Error;
-use strata::read::Status;
-use strata::{artifact, doctor, fortune, read, repo, transition};
+use scarp::cli::{ArtifactTarget, Cli, Collection, Command};
+use scarp::error::Error;
+use scarp::read::Status;
+use scarp::{artifact, doctor, fortune, read, repo, transition};
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
@@ -60,11 +60,11 @@ fn run(command: &Command) -> Result<(), Error> {
 
 /// Emit a completion script for `shell` on stdout. Generation is pure
 /// (no repository discovery): the script is derived entirely from the
-/// clap command definition, so it works outside any Strata repository.
+/// clap command definition, so it works outside any Scarp repository.
 fn completions(shell: clap_complete::Shell) {
     use clap::CommandFactory;
     let mut command = Cli::command();
-    clap_complete::generate(shell, &mut command, "strata", &mut std::io::stdout());
+    clap_complete::generate(shell, &mut command, "scarp", &mut std::io::stdout());
 }
 
 /// Scan one command-line collection into the shared read model.
@@ -90,11 +90,11 @@ fn selector(target: &ArtifactTarget) -> read::Selector<'_> {
 /// applied to a reference outside its lifecycle.
 fn verb_guidance(collection: Collection) -> &'static str {
     match collection {
-        Collection::Dragon => "dragons close and reopen: use `strata close` or `strata reopen`",
-        Collection::Idea => "ideas adopt or reject: use `strata adopt` or `strata reject`",
+        Collection::Dragon => "dragons close and reopen: use `scarp close` or `scarp reopen`",
+        Collection::Idea => "ideas adopt or reject: use `scarp adopt` or `scarp reject`",
         Collection::Decision => "decisions have no lifecycle verbs; they are permanent records",
-        Collection::Sprint => "sprints close: use `strata close`",
-        Collection::Task => "tasks close: use `strata close`",
+        Collection::Sprint => "sprints close: use `scarp close`",
+        Collection::Task => "tasks close: use `scarp close`",
     }
 }
 
@@ -170,7 +170,7 @@ fn transition(
     Ok(())
 }
 
-/// `strata adopt`: an idea transition that may carry its `adopted-by`
+/// `scarp adopt`: an idea transition that may carry its `adopted-by`
 /// provenance in the same invocation.
 fn adopt(target: &ArtifactTarget, adopted_by: Option<&str>) -> Result<(), Error> {
     if let ArtifactTarget::Reference(reference) = target
@@ -205,7 +205,7 @@ fn adopt(target: &ArtifactTarget, adopted_by: Option<&str>) -> Result<(), Error>
     Ok(())
 }
 
-/// `strata close`: dragons and sprints share the verb, so the reference's
+/// `scarp close`: dragons and sprints share the verb, so the reference's
 /// collection picks the lifecycle; a bare stable id resolves over the
 /// union of the closable collections. `--resolved-by` records dragon
 /// resolution provenance and belongs to no other collection's vocabulary.
@@ -313,8 +313,8 @@ fn fortune() -> Result<(), Error> {
     if pool.is_empty() {
         println!(
             "no open dragons or parked ideas — nothing lurks; record a risk \
-             with `strata new dragon \"<title>\"` or park a proposal with \
-             `strata new idea \"<title>\"`"
+             with `scarp new dragon \"<title>\"` or park a proposal with \
+             `scarp new idea \"<title>\"`"
         );
         return Ok(());
     }
@@ -360,7 +360,7 @@ struct ResolveRecord<'a> {
     title: &'a str,
 }
 
-/// `strata resolve` (task 38): map references to stable ids, one output
+/// `scarp resolve` (task 38): map references to stable ids, one output
 /// line per input in input order. All-or-nothing on stdout — if any input
 /// fails, stdout emits nothing, every failure is reported on stderr in
 /// input order under the decision 4 contract, and the exit code is the
@@ -497,8 +497,8 @@ fn new_artifact(
     if sprint.is_some() && collection != Collection::Task {
         return Err(Error::InvalidInvocation {
             message: format!(
-                "`--sprint` chooses the owning sprint for `strata new task`; \
-                 it does not apply to `strata new {}`",
+                "`--sprint` chooses the owning sprint for `scarp new task`; \
+                 it does not apply to `scarp new {}`",
                 collection.name()
             ),
         });
@@ -559,7 +559,7 @@ fn list(collection: Collection, json: bool, active: bool) -> Result<(), Error> {
             return Err(Error::InvalidInvocation {
                 message: format!(
                     "`--active` filters tasks by the active sprints; it does \
-                     not apply to `strata list {}s`",
+                     not apply to `scarp list {}s`",
                     collection.name()
                 ),
             });
@@ -584,7 +584,7 @@ fn list(collection: Collection, json: bool, active: bool) -> Result<(), Error> {
         println!("{}", to_json(&summaries));
     } else if artifacts.is_empty() {
         println!(
-            "no {}s found; create one with `strata new {} \"<title>\"`",
+            "no {}s found; create one with `scarp new {} \"<title>\"`",
             collection.name(),
             collection.name()
         );
@@ -698,11 +698,11 @@ fn init() -> Result<(), Error> {
     let report = repo::init(&cwd)?;
     if report.already_initialized() {
         println!(
-            "Strata repository at `{}` is already initialized; nothing to change",
+            "Scarp repository at `{}` is already initialized; nothing to change",
             cwd.display()
         );
     } else {
-        println!("initialized Strata repository at `{}`", cwd.display());
+        println!("initialized Scarp repository at `{}`", cwd.display());
         for path in &report.created {
             println!("  created {}", path.display());
         }

@@ -9,12 +9,12 @@ use std::process::Output;
 
 const SPRINTS_DIR: &str = "archaeology/sprints";
 
-fn strata_in(dir: &Path, args: &[&str]) -> Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_strata"))
+fn scarp_in(dir: &Path, args: &[&str]) -> Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_scarp"))
         .args(args)
         .current_dir(dir)
         .output()
-        .expect("failed to run strata binary")
+        .expect("failed to run scarp binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -27,13 +27,13 @@ fn stderr(output: &Output) -> String {
 
 fn init_repo() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().unwrap();
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
     assert!(out.status.success(), "init failed:\n{}", stderr(&out));
     tmp
 }
 
 fn assert_doctor_healthy(root: &Path) {
-    let out = strata_in(root, &["doctor"]);
+    let out = scarp_in(root, &["doctor"]);
     assert!(
         out.status.success(),
         "doctor must be healthy:\n{}\n{}",
@@ -69,12 +69,12 @@ fn seed_closed_sprint_with_task(root: &Path, sequence: u32, task_sequence: u32) 
 fn task_lifecycle_end_to_end() {
     let tmp = init_repo();
     assert!(
-        strata_in(tmp.path(), &["new", "sprint", "Current work"])
+        scarp_in(tmp.path(), &["new", "sprint", "Current work"])
             .status
             .success()
     );
 
-    let created = strata_in(tmp.path(), &["new", "task", "Ship the feature"]);
+    let created = scarp_in(tmp.path(), &["new", "task", "Ship the feature"]);
     assert!(created.status.success(), "{}", stderr(&created));
     assert!(
         stdout(&created).contains("created task:1"),
@@ -98,11 +98,11 @@ fn task_lifecycle_end_to_end() {
     }
     assert_doctor_healthy(tmp.path());
 
-    let show = strata_in(tmp.path(), &["show", "task:1"]);
+    let show = scarp_in(tmp.path(), &["show", "task:1"]);
     assert!(show.status.success(), "{}", stderr(&show));
     assert!(stdout(&show).contains("# Ship the feature"));
 
-    let closed = strata_in(tmp.path(), &["close", "task:1"]);
+    let closed = scarp_in(tmp.path(), &["close", "task:1"]);
     assert!(closed.status.success(), "{}", stderr(&closed));
     assert!(
         stdout(&closed).contains("closed task:1 (pending -> closed)"),
@@ -122,7 +122,7 @@ fn task_lifecycle_end_to_end() {
 fn task_creation_requires_an_active_sprint() {
     let tmp = init_repo();
 
-    let out = strata_in(tmp.path(), &["new", "task", "Orphan work"]);
+    let out = scarp_in(tmp.path(), &["new", "task", "Orphan work"]);
 
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(
@@ -137,12 +137,12 @@ fn task_sequences_are_global_across_sprints() {
     let tmp = init_repo();
     seed_closed_sprint_with_task(tmp.path(), 1, 7);
     assert!(
-        strata_in(tmp.path(), &["new", "sprint", "Current"])
+        scarp_in(tmp.path(), &["new", "sprint", "Current"])
             .status
             .success()
     );
 
-    let out = strata_in(tmp.path(), &["new", "task", "Next work"]);
+    let out = scarp_in(tmp.path(), &["new", "task", "Next work"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(
@@ -164,22 +164,22 @@ fn list_tasks_spans_sprints_and_active_filters_to_the_active_sprint() {
     let tmp = init_repo();
     seed_closed_sprint_with_task(tmp.path(), 1, 1);
     assert!(
-        strata_in(tmp.path(), &["new", "sprint", "Current"])
+        scarp_in(tmp.path(), &["new", "sprint", "Current"])
             .status
             .success()
     );
     assert!(
-        strata_in(tmp.path(), &["new", "task", "Fresh work"])
+        scarp_in(tmp.path(), &["new", "task", "Fresh work"])
             .status
             .success()
     );
 
-    let all = strata_in(tmp.path(), &["list", "tasks"]);
+    let all = scarp_in(tmp.path(), &["list", "tasks"]);
     assert!(all.status.success(), "{}", stderr(&all));
     let text = stdout(&all);
     assert!(text.contains("task:1") && text.contains("task:2"), "{text}");
 
-    let active = strata_in(tmp.path(), &["list", "tasks", "--active"]);
+    let active = scarp_in(tmp.path(), &["list", "tasks", "--active"]);
     assert!(active.status.success(), "{}", stderr(&active));
     let text = stdout(&active);
     assert!(text.contains("task:2"), "{text}");
@@ -188,14 +188,14 @@ fn list_tasks_spans_sprints_and_active_filters_to_the_active_sprint() {
         "closed sprints' tasks must be filtered out:\n{text}"
     );
 
-    let json = strata_in(tmp.path(), &["list", "tasks", "--json"]);
+    let json = scarp_in(tmp.path(), &["list", "tasks", "--json"]);
     let listed: serde_json::Value = serde_json::from_str(stdout(&json).trim()).unwrap();
     let tasks = listed.as_array().unwrap();
     assert_eq!(tasks.len(), 2);
     assert_eq!(tasks[0]["kind"], "task");
     assert_eq!(tasks[0]["sprint"], "spr-history-1");
 
-    let misuse = strata_in(tmp.path(), &["list", "dragons", "--active"]);
+    let misuse = scarp_in(tmp.path(), &["list", "dragons", "--active"]);
     assert_eq!(misuse.status.code(), Some(2), "{}", stderr(&misuse));
 }
 
@@ -212,7 +212,7 @@ fn misfiled_tasks_are_doctor_errors() {
     )
     .unwrap();
 
-    let out = strata_in(tmp.path(), &["doctor"]);
+    let out = scarp_in(tmp.path(), &["doctor"]);
 
     assert_eq!(out.status.code(), Some(9), "{}", stderr(&out));
     let report = stdout(&out);
@@ -236,7 +236,7 @@ fn hand_seeded_task_identities_close_by_id_without_rewrites() {
     )
     .unwrap();
 
-    let out = strata_in(tmp.path(), &["close", "tsk-legacy"]);
+    let out = scarp_in(tmp.path(), &["close", "tsk-legacy"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     let content = fs::read_to_string(dir.join("0001-legacy.md")).unwrap();
@@ -253,12 +253,8 @@ fn hand_seeded_task_identities_close_by_id_without_rewrites() {
 /// Two active sprints created through the CLI; returns the stable id of
 /// the second, harvested from `new sprint --json`.
 fn seed_two_active_sprints(root: &Path) -> String {
-    assert!(
-        strata_in(root, &["new", "sprint", "Alpha"])
-            .status
-            .success()
-    );
-    let out = strata_in(root, &["new", "sprint", "Beta", "--json"]);
+    assert!(scarp_in(root, &["new", "sprint", "Alpha"]).status.success());
+    let out = scarp_in(root, &["new", "sprint", "Beta", "--json"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let payload: serde_json::Value = serde_json::from_str(stdout(&out).trim()).unwrap();
     payload["id"].as_str().unwrap().to_string()
@@ -269,7 +265,7 @@ fn bare_task_creation_with_multiple_active_sprints_refuses_naming_all() {
     let tmp = init_repo();
     seed_two_active_sprints(tmp.path());
 
-    let out = strata_in(tmp.path(), &["new", "task", "Homeless work"]);
+    let out = scarp_in(tmp.path(), &["new", "task", "Homeless work"]);
 
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     let err = stderr(&out);
@@ -291,7 +287,7 @@ fn explicit_sequence_selection_places_the_task_in_the_chosen_sprint() {
     let tmp = init_repo();
     seed_two_active_sprints(tmp.path());
 
-    let out = strata_in(
+    let out = scarp_in(
         tmp.path(),
         &["new", "task", "Alpha work", "--sprint", "sprint:1"],
     );
@@ -318,7 +314,7 @@ fn explicit_stable_id_selection_places_the_task_in_the_chosen_sprint() {
     let tmp = init_repo();
     let beta_id = seed_two_active_sprints(tmp.path());
 
-    let out = strata_in(
+    let out = scarp_in(
         tmp.path(),
         &["new", "task", "Beta work", "--sprint", &beta_id],
     );
@@ -341,12 +337,12 @@ fn a_closed_selected_sprint_is_refused_before_writing() {
     let tmp = init_repo();
     seed_closed_sprint_with_task(tmp.path(), 1, 1);
     assert!(
-        strata_in(tmp.path(), &["new", "sprint", "Current"])
+        scarp_in(tmp.path(), &["new", "sprint", "Current"])
             .status
             .success()
     );
 
-    let out = strata_in(
+    let out = scarp_in(
         tmp.path(),
         &["new", "task", "Late work", "--sprint", "sprint:1"],
     );
@@ -368,7 +364,7 @@ fn non_sprint_selectors_and_misplaced_sprint_flags_are_refused() {
 
     // A sequence reference into a non-sprint collection cannot name the
     // owning sprint.
-    let out = strata_in(
+    let out = scarp_in(
         tmp.path(),
         &["new", "task", "Confused", "--sprint", "dragon:1"],
     );
@@ -377,7 +373,7 @@ fn non_sprint_selectors_and_misplaced_sprint_flags_are_refused() {
 
     // `--sprint` belongs to task creation only.
     for kind in ["dragon", "idea", "sprint"] {
-        let out = strata_in(
+        let out = scarp_in(
             tmp.path(),
             &["new", kind, "Misflagged", "--sprint", "sprint:1"],
         );
@@ -396,7 +392,7 @@ fn task_sequences_are_global_across_concurrent_sprints() {
     let tmp = init_repo();
     seed_two_active_sprints(tmp.path());
 
-    let first = strata_in(
+    let first = scarp_in(
         tmp.path(),
         &["new", "task", "In alpha", "--sprint", "sprint:1"],
     );
@@ -407,7 +403,7 @@ fn task_sequences_are_global_across_concurrent_sprints() {
         stdout(&first)
     );
 
-    let second = strata_in(
+    let second = scarp_in(
         tmp.path(),
         &["new", "task", "In beta", "--sprint", "sprint:2"],
     );
@@ -425,24 +421,24 @@ fn list_tasks_active_is_the_union_across_all_active_sprints() {
     let tmp = init_repo();
     seed_closed_sprint_with_task(tmp.path(), 1, 1);
     assert!(
-        strata_in(tmp.path(), &["new", "sprint", "Alpha"])
+        scarp_in(tmp.path(), &["new", "sprint", "Alpha"])
             .status
             .success()
     );
     assert!(
-        strata_in(tmp.path(), &["new", "sprint", "Beta"])
+        scarp_in(tmp.path(), &["new", "sprint", "Beta"])
             .status
             .success()
     );
     for (title, sprint) in [("Alpha work", "sprint:2"), ("Beta work", "sprint:3")] {
         assert!(
-            strata_in(tmp.path(), &["new", "task", title, "--sprint", sprint])
+            scarp_in(tmp.path(), &["new", "task", title, "--sprint", sprint])
                 .status
                 .success()
         );
     }
 
-    let human = strata_in(tmp.path(), &["list", "tasks", "--active"]);
+    let human = scarp_in(tmp.path(), &["list", "tasks", "--active"]);
     assert!(human.status.success(), "{}", stderr(&human));
     let text = stdout(&human);
     assert!(
@@ -454,7 +450,7 @@ fn list_tasks_active_is_the_union_across_all_active_sprints() {
         "closed sprints' tasks are excluded:\n{text}"
     );
 
-    let json = strata_in(tmp.path(), &["list", "tasks", "--active", "--json"]);
+    let json = scarp_in(tmp.path(), &["list", "tasks", "--active", "--json"]);
     assert!(json.status.success(), "{}", stderr(&json));
     let listed: serde_json::Value = serde_json::from_str(stdout(&json).trim()).unwrap();
     let tasks = listed.as_array().unwrap();

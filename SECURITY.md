@@ -2,12 +2,12 @@
 
 ## Supported versions
 
-Strata is pre-1.0 and has no releases yet. Security fixes land on `main`
+Scarp is pre-1.0 and has no releases yet. Security fixes land on `main`
 only; there are no maintained release branches.
 
 ## Threat model, honestly stated
 
-Strata is a local command-line tool that reads and writes ordinary files
+Scarp is a local command-line tool that reads and writes ordinary files
 inside a repository you already control. It runs no daemon, opens no network
 connections, and executes no code from the repositories it manages. The
 interesting security surface is therefore narrow:

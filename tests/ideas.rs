@@ -10,12 +10,12 @@ use std::process::Output;
 const IDEAS_DIR: &str = "archaeology/ideas";
 const DRAGONS_DIR: &str = "archaeology/dragons";
 
-fn strata_in(dir: &Path, args: &[&str]) -> Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_strata"))
+fn scarp_in(dir: &Path, args: &[&str]) -> Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_scarp"))
         .args(args)
         .current_dir(dir)
         .output()
-        .expect("failed to run strata binary")
+        .expect("failed to run scarp binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -28,7 +28,7 @@ fn stderr(output: &Output) -> String {
 
 fn init_repo() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().unwrap();
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
     assert!(out.status.success(), "init failed:\n{}", stderr(&out));
     tmp
 }
@@ -47,7 +47,7 @@ fn seed_idea(root: &Path, dir: &str, name: &str, content: &str) {
 }
 
 fn assert_doctor_healthy(root: &Path) {
-    let out = strata_in(root, &["doctor"]);
+    let out = scarp_in(root, &["doctor"]);
     assert!(
         out.status.success(),
         "doctor must be healthy:\n{}\n{}",
@@ -60,7 +60,7 @@ fn assert_doctor_healthy(root: &Path) {
 fn new_idea_creates_a_parked_artifact_with_generated_identity() {
     let tmp = init_repo();
 
-    let out = strata_in(tmp.path(), &["new", "idea", "Chore ledgers"]);
+    let out = scarp_in(tmp.path(), &["new", "idea", "Chore ledgers"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(stdout(&out).contains("idea:1"), "{}", stdout(&out));
@@ -89,12 +89,12 @@ fn new_idea_creates_a_parked_artifact_with_generated_identity() {
 fn idea_and_dragon_sequences_are_independent() {
     let tmp = init_repo();
     assert!(
-        strata_in(tmp.path(), &["new", "dragon", "A risk"])
+        scarp_in(tmp.path(), &["new", "dragon", "A risk"])
             .status
             .success()
     );
 
-    let out = strata_in(tmp.path(), &["new", "idea", "An idea"]);
+    let out = scarp_in(tmp.path(), &["new", "idea", "An idea"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(
@@ -121,7 +121,7 @@ fn list_ideas_spans_every_lifecycle_directory() {
         "---\nid: idea-adopted\nsequence: 2\nkind: idea\nstatus: adopted\ncreated: 2026-07-21\n---\n\n# Adopted idea\n",
     );
 
-    let out = strata_in(tmp.path(), &["list", "ideas"]);
+    let out = scarp_in(tmp.path(), &["list", "ideas"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     let text = stdout(&out);
@@ -140,7 +140,7 @@ fn list_ideas_json_pins_field_names_and_values() {
         &rich_idea("parked"),
     );
 
-    let out = strata_in(tmp.path(), &["list", "ideas", "--json"]);
+    let out = scarp_in(tmp.path(), &["list", "ideas", "--json"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     let expected = concat!(
@@ -158,11 +158,11 @@ fn list_ideas_json_pins_field_names_and_values() {
 fn empty_idea_collection_prints_a_clear_message() {
     let tmp = init_repo();
 
-    let out = strata_in(tmp.path(), &["list", "ideas"]);
+    let out = scarp_in(tmp.path(), &["list", "ideas"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(stdout(&out).contains("no ideas found"), "{}", stdout(&out));
-    assert!(stdout(&out).contains("strata new idea"), "{}", stdout(&out));
+    assert!(stdout(&out).contains("scarp new idea"), "{}", stdout(&out));
 }
 
 #[test]
@@ -171,11 +171,11 @@ fn show_resolves_idea_references_and_hand_seeded_ids() {
     let content = rich_idea("parked");
     seed_idea(tmp.path(), IDEAS_DIR, "0001-hand-seeded-idea.md", &content);
 
-    let by_reference = strata_in(tmp.path(), &["show", "idea:1"]);
+    let by_reference = scarp_in(tmp.path(), &["show", "idea:1"]);
     assert!(by_reference.status.success(), "{}", stderr(&by_reference));
     assert_eq!(stdout(&by_reference), content);
 
-    let by_id = strata_in(tmp.path(), &["show", "idea-hand-seeded"]);
+    let by_id = scarp_in(tmp.path(), &["show", "idea-hand-seeded"]);
     assert!(by_id.status.success(), "{}", stderr(&by_id));
     assert_eq!(stdout(&by_id), content);
 }
@@ -196,11 +196,11 @@ fn dragon_and_idea_with_the_same_sequence_resolve_independently() {
         &rich_idea("parked"),
     );
 
-    let dragon_shown = strata_in(tmp.path(), &["show", "dragon:1"]);
+    let dragon_shown = scarp_in(tmp.path(), &["show", "dragon:1"]);
     assert!(dragon_shown.status.success(), "{}", stderr(&dragon_shown));
     assert_eq!(stdout(&dragon_shown), dragon);
 
-    let idea_shown = strata_in(tmp.path(), &["show", "idea:1"]);
+    let idea_shown = scarp_in(tmp.path(), &["show", "idea:1"]);
     assert!(idea_shown.status.success(), "{}", stderr(&idea_shown));
     assert_eq!(stdout(&idea_shown), rich_idea("parked"));
 }
@@ -215,7 +215,7 @@ fn adopt_rewrites_only_the_status_and_never_moves_the_file() {
         &rich_idea("parked"),
     );
 
-    let out = strata_in(tmp.path(), &["adopt", "idea:1"]);
+    let out = scarp_in(tmp.path(), &["adopt", "idea:1"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     let line = stdout(&out);
@@ -247,7 +247,7 @@ fn reject_by_stable_id_rewrites_in_place() {
         &rich_idea("parked"),
     );
 
-    let out = strata_in(tmp.path(), &["reject", "idea-hand-seeded"]);
+    let out = scarp_in(tmp.path(), &["reject", "idea-hand-seeded"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert_eq!(
@@ -267,7 +267,7 @@ fn terminal_idea_states_are_permanent() {
         &rich_idea("adopted"),
     );
 
-    let out = strata_in(tmp.path(), &["reject", "idea:1"]);
+    let out = scarp_in(tmp.path(), &["reject", "idea:1"]);
 
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     let err = stderr(&out);
@@ -295,7 +295,7 @@ fn adopting_an_already_adopted_idea_is_an_invalid_invocation() {
         &rich_idea("adopted"),
     );
 
-    let out = strata_in(tmp.path(), &["adopt", "idea:1"]);
+    let out = scarp_in(tmp.path(), &["adopt", "idea:1"]);
 
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(stderr(&out).contains("already adopted"), "{}", stderr(&out));
@@ -317,15 +317,15 @@ fn transition_verbs_are_collection_scoped() {
     )
     .unwrap();
 
-    let close_idea = strata_in(tmp.path(), &["close", "idea:1"]);
+    let close_idea = scarp_in(tmp.path(), &["close", "idea:1"]);
     assert_eq!(close_idea.status.code(), Some(2), "{}", stderr(&close_idea));
     assert!(
-        stderr(&close_idea).contains("strata adopt"),
+        stderr(&close_idea).contains("scarp adopt"),
         "the refusal must point at the idea verbs:\n{}",
         stderr(&close_idea)
     );
 
-    let adopt_dragon = strata_in(tmp.path(), &["adopt", "dragon:1"]);
+    let adopt_dragon = scarp_in(tmp.path(), &["adopt", "dragon:1"]);
     assert_eq!(
         adopt_dragon.status.code(),
         Some(2),
@@ -333,7 +333,7 @@ fn transition_verbs_are_collection_scoped() {
         stderr(&adopt_dragon)
     );
     assert!(
-        stderr(&adopt_dragon).contains("strata close"),
+        stderr(&adopt_dragon).contains("scarp close"),
         "the refusal must point at the dragon verbs:\n{}",
         stderr(&adopt_dragon)
     );
@@ -364,7 +364,7 @@ fn readopting_an_adopted_idea_is_refused_as_a_no_op() {
         &rich_idea("adopted"),
     );
 
-    let out = strata_in(tmp.path(), &["adopt", "idea:1"]);
+    let out = scarp_in(tmp.path(), &["adopt", "idea:1"]);
 
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(stderr(&out).contains("already adopted"), "{}", stderr(&out));
@@ -378,7 +378,7 @@ fn readopting_an_adopted_idea_is_refused_as_a_no_op() {
 #[test]
 fn unknown_idea_reference_is_artifact_not_found() {
     let tmp = init_repo();
-    let out = strata_in(tmp.path(), &["adopt", "idea:41"]);
+    let out = scarp_in(tmp.path(), &["adopt", "idea:41"]);
     assert_eq!(out.status.code(), Some(7), "{}", stderr(&out));
     assert!(
         stderr(&out).starts_with("error[artifact-not-found]:"),

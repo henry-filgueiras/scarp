@@ -2,11 +2,11 @@
 
 use std::process::Output;
 
-fn strata(args: &[&str]) -> Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_strata"))
+fn scarp(args: &[&str]) -> Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_scarp"))
         .args(args)
         .output()
-        .expect("failed to run strata binary")
+        .expect("failed to run scarp binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -19,7 +19,7 @@ fn stderr(output: &Output) -> String {
 
 #[test]
 fn help_lists_bootstrap_commands() {
-    let out = strata(&["--help"]);
+    let out = scarp(&["--help"]);
     assert!(out.status.success(), "--help must exit 0");
     let help = stdout(&out);
     for command in [
@@ -46,11 +46,11 @@ fn completions_emit_a_script_per_shell_outside_any_repository() {
     // so it must succeed anywhere. Each shell's script carries a
     // recognizable opening.
     for (shell, needle) in [
-        ("zsh", "#compdef strata"),
-        ("bash", "_strata"),
-        ("fish", "strata"),
+        ("zsh", "#compdef scarp"),
+        ("bash", "_scarp"),
+        ("fish", "scarp"),
     ] {
-        let out = strata(&["completions", shell]);
+        let out = scarp(&["completions", shell]);
         assert!(
             out.status.success(),
             "completions {shell}:\n{}",
@@ -65,7 +65,7 @@ fn completions_emit_a_script_per_shell_outside_any_repository() {
 
 #[test]
 fn completions_reject_an_unknown_shell_as_a_usage_error() {
-    let out = strata(&["completions", "csh"]);
+    let out = scarp(&["completions", "csh"]);
     assert_eq!(out.status.code(), Some(2));
     assert!(stderr(&out).contains("csh"), "{}", stderr(&out));
 }
@@ -83,17 +83,17 @@ fn zsh_completion_script_loads_cleanly_when_zsh_is_available() {
     {
         return;
     }
-    let out = strata(&["completions", "zsh"]);
+    let out = scarp(&["completions", "zsh"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("_strata"), &out.stdout).unwrap();
+    std::fs::write(dir.path().join("_scarp"), &out.stdout).unwrap();
     let load = std::process::Command::new("zsh")
         .args([
             "-f",
             "-c",
             &format!(
                 "fpath=({dir} $fpath); autoload -Uz compinit; \
-                 compinit -u -d {dir}/zcompdump; source {dir}/_strata",
+                 compinit -u -d {dir}/zcompdump; source {dir}/_scarp",
                 dir = dir.path().display()
             ),
         ])
@@ -108,14 +108,14 @@ fn zsh_completion_script_loads_cleanly_when_zsh_is_available() {
 
 #[test]
 fn version_flag_reports_version() {
-    let out = strata(&["--version"]);
+    let out = scarp(&["--version"]);
     assert!(out.status.success());
     assert!(stdout(&out).contains(env!("CARGO_PKG_VERSION")));
 }
 
 #[test]
 fn missing_subcommand_is_a_usage_error() {
-    let out = strata(&[]);
+    let out = scarp(&[]);
     assert_eq!(out.status.code(), Some(2), "usage errors must exit 2");
     assert!(
         stderr(&out).contains("Usage"),
@@ -126,13 +126,13 @@ fn missing_subcommand_is_a_usage_error() {
 
 #[test]
 fn unknown_subcommand_is_a_usage_error() {
-    let out = strata(&["daemonize"]);
+    let out = scarp(&["daemonize"]);
     assert_eq!(out.status.code(), Some(2));
 }
 
 #[test]
 fn unknown_collection_is_rejected_with_guidance() {
-    let out = strata(&["new", "widget", "A title"]);
+    let out = scarp(&["new", "widget", "A title"]);
     assert_eq!(out.status.code(), Some(2), "invalid invocation must exit 2");
     let err = stderr(&out);
     assert!(
@@ -147,7 +147,7 @@ fn unknown_collection_is_rejected_with_guidance() {
 
 #[test]
 fn malformed_artifact_reference_is_rejected() {
-    let out = strata(&["show", "dragon:seven"]);
+    let out = scarp(&["show", "dragon:seven"]);
     assert_eq!(out.status.code(), Some(2));
     assert!(
         stderr(&out).contains("positive integer"),
@@ -158,7 +158,7 @@ fn malformed_artifact_reference_is_rejected() {
 
 #[test]
 fn unknown_collection_in_reference_is_rejected() {
-    let out = strata(&["show", "widget:1"]);
+    let out = scarp(&["show", "widget:1"]);
     assert_eq!(out.status.code(), Some(2));
     assert!(
         stderr(&out).contains("widget"),
@@ -169,7 +169,7 @@ fn unknown_collection_in_reference_is_rejected() {
 
 #[test]
 fn zero_sequence_reference_is_rejected() {
-    let out = strata(&["show", "dragon:0"]);
+    let out = scarp(&["show", "dragon:0"]);
     assert_eq!(out.status.code(), Some(2));
     assert!(stderr(&out).contains("start at 1"), "{}", stderr(&out));
 }

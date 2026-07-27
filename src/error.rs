@@ -1,4 +1,4 @@
-//! Typed errors for Strata operations.
+//! Typed errors for Scarp operations.
 //!
 //! Automated callers must never parse prose. Two stable machine contracts
 //! exist:
@@ -16,7 +16,7 @@
 use std::io;
 use std::path::PathBuf;
 
-/// An error from a Strata operation, categorized for machines and explained
+/// An error from a Scarp operation, categorized for machines and explained
 /// for humans.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -25,10 +25,10 @@ pub enum Error {
     #[error("{message}")]
     InvalidInvocation { message: String },
 
-    /// No Strata repository exists at or above the working directory.
+    /// No Scarp repository exists at or above the working directory.
     #[error(
-        "no Strata repository found at or above `{searched_from}`; \
-         run `strata init` in the intended repository root"
+        "no Scarp repository found at or above `{searched_from}`; \
+         run `scarp init` in the intended repository root"
     )]
     MissingRepository { searched_from: PathBuf },
 
@@ -36,15 +36,15 @@ pub enum Error {
     /// artifact.
     #[error(
         "artifact conflict at `{path}`: {reason}; \
-         Strata never overwrites existing artifacts — \
+         Scarp never overwrites existing artifacts — \
          resolve the conflicting file, then retry"
     )]
     ArtifactConflict { path: PathBuf, reason: String },
 
-    /// An artifact exists but cannot be parsed as a valid Strata artifact.
+    /// An artifact exists but cannot be parsed as a valid Scarp artifact.
     #[error(
         "malformed artifact `{path}`: {reason}; \
-         repair the file by hand or run `strata doctor` for a full report"
+         repair the file by hand or run `scarp doctor` for a full report"
     )]
     MalformedArtifact { path: PathBuf, reason: String },
 
@@ -60,8 +60,8 @@ pub enum Error {
     /// No managed artifact matches the requested reference.
     #[error(
         "no artifact matches `{reference}`; \
-         run `strata list dragons` or `strata list ideas` to see the \
-         artifacts Strata manages"
+         run `scarp list dragons` or `scarp list ideas` to see the \
+         artifacts Scarp manages"
     )]
     ArtifactNotFound { reference: String },
 
@@ -78,13 +78,13 @@ pub enum Error {
         candidates: Vec<String>,
     },
 
-    /// `strata doctor` completed its scan and the repository has validation
+    /// `scarp doctor` completed its scan and the repository has validation
     /// findings. The findings themselves are the stdout payload; this error
     /// is the machine-readable summary on stderr.
     #[error(
         "repository validation found {problems} problem(s); \
          the report on stdout names each affected path — \
-         repair the files by hand, then re-run `strata doctor`"
+         repair the files by hand, then re-run `scarp doctor`"
     )]
     UnhealthyRepository { problems: usize },
 }
@@ -295,12 +295,12 @@ mod tests {
         let missing = Error::MissingRepository {
             searched_from: PathBuf::from("/work/project"),
         };
-        assert!(missing.to_string().contains("strata init"));
+        assert!(missing.to_string().contains("scarp init"));
 
         let malformed = Error::MalformedArtifact {
             path: PathBuf::from("a.md"),
             reason: "bad front matter".into(),
         };
-        assert!(malformed.to_string().contains("strata doctor"));
+        assert!(malformed.to_string().contains("scarp doctor"));
     }
 }

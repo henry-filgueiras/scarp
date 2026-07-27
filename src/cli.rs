@@ -1,4 +1,4 @@
-//! The Strata command-line surface.
+//! The Scarp command-line surface.
 //!
 //! Commands express user intent (create, list, inspect, validate); the
 //! mechanics of numbering, slugging, identity, and safe writes belong to the
@@ -11,7 +11,7 @@ use clap::{Parser, Subcommand};
 
 /// Git-friendly project archaeology and repository-local memory.
 #[derive(Debug, Parser)]
-#[command(name = "strata", version, propagate_version = true)]
+#[command(name = "scarp", version, propagate_version = true)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
@@ -20,9 +20,9 @@ pub struct Cli {
 /// The bootstrap command surface.
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Initialize a Strata repository in the current directory
+    /// Initialize a Scarp repository in the current directory
     Init,
-    /// Create an artifact; Strata assigns its sequence, slug, and identity
+    /// Create an artifact; Scarp assigns its sequence, slug, and identity
     New {
         /// Collection for the new artifact (`dragon`, `idea`, `decision`,
         /// `sprint`, or `task`; tasks are created in an active sprint,

@@ -8,7 +8,7 @@ archaeology is the handoff, so no conversational context needs to
 survive the boundary.
 
 1. Read `CLAUDE.md` in full.
-2. Run `strata doctor` and `strata fortune` (build first if needed) —
+2. Run `scarp doctor` and `scarp fortune` (build first if needed) —
    health check and ambient recall, dogfooding both.
 3. Find the newest sprint under `archaeology/sprints/` (highest
    sequence) and read its `sprint.md`.

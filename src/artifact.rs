@@ -1,6 +1,6 @@
 //! Artifact creation for managed collections.
 //!
-//! Strata owns the mechanics callers must not hand-roll: display sequence
+//! Scarp owns the mechanics callers must not hand-roll: display sequence
 //! allocation, deterministic slugging, stable identity assignment, and safe
 //! writes. The filesystem stays canonical — a created artifact is an
 //! ordinary Markdown file with YAML-style front matter.
@@ -11,12 +11,12 @@
 //! here use a per-collection prefix (`drg_`, `ide_`) followed by an
 //! uppercase ULID. Pre-existing hand-seeded identifiers (for example
 //! `drg-bootstrap-branch-collisions` or `idea-strata-fortune`) remain valid:
-//! nothing in Strata may require every `id` to be a ULID, and there is no
+//! nothing in Scarp may require every `id` to be a ULID, and there is no
 //! second identity field.
 //!
 //! # Concurrency boundary
 //!
-//! Creation is scan-then-write without locking. Two simultaneous Strata
+//! Creation is scan-then-write without locking. Two simultaneous Scarp
 //! processes — or two Git branches — can allocate the same next display
 //! sequence; bootstrap deliberately does not make allocation linearizable
 //! and introduces no lock service. What IS guaranteed:
@@ -29,7 +29,7 @@
 //!   only those, in reverse creation order, never a pre-existing directory
 //!   or concurrent content;
 //! - duplicate display sequences produced by concurrent allocation remain on
-//!   disk as distinct files, detectable later by `strata doctor`.
+//!   disk as distinct files, detectable later by `scarp doctor`.
 
 use std::fs;
 use std::io::{self, Write};
@@ -92,7 +92,7 @@ impl NewArtifact {
     }
 }
 
-/// The `strata new --json` stdout payload: one deterministic object per
+/// The `scarp new --json` stdout payload: one deterministic object per
 /// creation, identical for healthy and degraded creation (decision 13 —
 /// the degraded warning rides stderr, never this object).
 #[derive(Debug, Serialize)]
@@ -338,7 +338,7 @@ fn validate_title(kind: &str, title: &str) -> Result<(), Error> {
 /// directory, derives a deterministic kebab-case slug from `title`,
 /// assigns a fresh prefixed ULID identity, and writes the Markdown template
 /// through a temporary file with an atomic no-clobber persist. Neither
-/// `.strata.toml` nor any existing artifact is modified.
+/// `.scarp.toml` nor any existing artifact is modified.
 fn create(
     root: &Path,
     collection: &Collection,
@@ -438,7 +438,7 @@ pub fn create_task(
                 [] => {
                     return Err(Error::InvalidInvocation {
                         message: "tasks belong to a sprint, and no sprint is \
-                                  active; open one with `strata new sprint \
+                                  active; open one with `scarp new sprint \
                                   \"<goal>\"` first"
                             .into(),
                     });
@@ -700,7 +700,7 @@ fn render_artifact(template: &Template<'_>) -> String {
 fn write_new(dir: &Path, filename: &str, content: &str) -> Result<(), Error> {
     let destination = dir.join(filename);
     let mut tmp = tempfile::Builder::new()
-        .prefix(".strata.artifact.tmp")
+        .prefix(".scarp.artifact.tmp")
         .tempfile_in(dir)
         .map_err(|source| Error::Filesystem {
             operation: "create temporary artifact".into(),

@@ -14,10 +14,10 @@
       "Bash(./scripts/check.sh *)",
       "Bash(scripts/check.sh)",
       "Bash(scripts/check.sh *)",
-      "Bash(./target/debug/strata list *)",
-      "Bash(./target/debug/strata show *)",
-      "Bash(./target/debug/strata --help)",
-      "Bash(./target/debug/strata --version)"
+      "Bash(./target/debug/scarp list *)",
+      "Bash(./target/debug/scarp show *)",
+      "Bash(./target/debug/scarp --help)",
+      "Bash(./target/debug/scarp --version)"
     ]
   },
   "hooks": {

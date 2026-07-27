@@ -11,14 +11,14 @@ use std::path::Path;
 use std::process::Output;
 
 const DRAGONS_DIR: &str = "archaeology/dragons";
-const CONFIG_FILE: &str = ".strata.toml";
+const CONFIG_FILE: &str = ".scarp.toml";
 
-fn strata_in(dir: &Path, args: &[&str]) -> Output {
-    std::process::Command::new(env!("CARGO_BIN_EXE_strata"))
+fn scarp_in(dir: &Path, args: &[&str]) -> Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_scarp"))
         .args(args)
         .current_dir(dir)
         .output()
-        .expect("failed to run strata binary")
+        .expect("failed to run scarp binary")
 }
 
 fn stdout(output: &Output) -> String {
@@ -31,7 +31,7 @@ fn stderr(output: &Output) -> String {
 
 fn init_repo() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().unwrap();
-    let out = strata_in(tmp.path(), &["init"]);
+    let out = scarp_in(tmp.path(), &["init"]);
     assert!(out.status.success(), "init failed:\n{}", stderr(&out));
     tmp
 }
@@ -75,7 +75,7 @@ fn show_refuses_a_crlf_artifact_by_sequence_naming_line_endings() {
     let tmp = init_repo();
     let crlf = seed_crlf_dragon(tmp.path(), 1, "0001-windows-checkout.md");
 
-    let out = strata_in(tmp.path(), &["show", "dragon:1"]);
+    let out = scarp_in(tmp.path(), &["show", "dragon:1"]);
 
     expect_line_ending_refusal(&out, "0001-windows-checkout.md");
     assert_eq!(
@@ -95,7 +95,7 @@ fn list_refuses_a_crlf_artifact_naming_line_endings() {
     let tmp = init_repo();
     seed_crlf_dragon(tmp.path(), 1, "0001-windows-checkout.md");
 
-    let out = strata_in(tmp.path(), &["list", "dragons"]);
+    let out = scarp_in(tmp.path(), &["list", "dragons"]);
 
     expect_line_ending_refusal(&out, "0001-windows-checkout.md");
 }
@@ -105,7 +105,7 @@ fn transition_refuses_a_crlf_artifact_and_changes_nothing() {
     let tmp = init_repo();
     let crlf = seed_crlf_dragon(tmp.path(), 1, "0001-windows-checkout.md");
 
-    let out = strata_in(tmp.path(), &["close", "dragon:1"]);
+    let out = scarp_in(tmp.path(), &["close", "dragon:1"]);
 
     expect_line_ending_refusal(&out, "0001-windows-checkout.md");
     assert_eq!(
@@ -130,7 +130,7 @@ fn bare_carriage_return_is_refused_with_its_own_truthful_diagnosis() {
     )
     .unwrap();
 
-    let out = strata_in(tmp.path(), &["show", "dragon:1"]);
+    let out = scarp_in(tmp.path(), &["show", "dragon:1"]);
 
     assert_eq!(out.status.code(), Some(5), "{}", stderr(&out));
     let err = stderr(&out);
@@ -150,7 +150,7 @@ fn doctor_reports_every_crlf_artifact_path_with_the_line_ending_cause() {
     )
     .unwrap();
 
-    let out = strata_in(tmp.path(), &["doctor"]);
+    let out = scarp_in(tmp.path(), &["doctor"]);
 
     assert_eq!(out.status.code(), Some(9), "{}", stderr(&out));
     let report = stdout(&out);
@@ -178,7 +178,7 @@ fn crlf_config_is_valid_and_discovery_succeeds_through_it() {
     fs::write(tmp.path().join(CONFIG_FILE), crlf).unwrap();
     fs::create_dir_all(tmp.path().join(DRAGONS_DIR)).unwrap();
 
-    let out = strata_in(tmp.path(), &["list", "dragons"]);
+    let out = scarp_in(tmp.path(), &["list", "dragons"]);
 
     assert!(out.status.success(), "{}", stderr(&out));
     assert_eq!(
@@ -193,7 +193,7 @@ fn invalid_crlf_toml_keeps_the_ordinary_truthful_toml_diagnosis() {
     let tmp = tempfile::tempdir().unwrap();
     fs::write(tmp.path().join(CONFIG_FILE), "version = [broken\r\n").unwrap();
 
-    let out = strata_in(tmp.path(), &["list", "dragons"]);
+    let out = scarp_in(tmp.path(), &["list", "dragons"]);
 
     assert_eq!(out.status.code(), Some(5), "{}", stderr(&out));
     let err = stderr(&out);
@@ -211,11 +211,11 @@ fn lf_artifacts_still_parse_transition_and_preserve_unrelated_bytes() {
     let path = tmp.path().join(DRAGONS_DIR).join("0001-healthy-risk.md");
     fs::write(&path, &content).unwrap();
 
-    let shown = strata_in(tmp.path(), &["show", "dragon:1"]);
+    let shown = scarp_in(tmp.path(), &["show", "dragon:1"]);
     assert!(shown.status.success(), "{}", stderr(&shown));
     assert_eq!(stdout(&shown), content, "show is byte-exact");
 
-    let closed = strata_in(tmp.path(), &["close", "dragon:1"]);
+    let closed = scarp_in(tmp.path(), &["close", "dragon:1"]);
     assert!(closed.status.success(), "{}", stderr(&closed));
     assert_eq!(
         fs::read_to_string(&path).unwrap(),

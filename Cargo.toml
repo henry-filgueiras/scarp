@@ -1,9 +1,9 @@
 [package]
-name = "strata"
+name = "scarp"
 version = "0.1.0"
 edition = "2024"
 description = "Git-friendly project archaeology and structured repository memory for humans and coding agents"
-repository = "https://github.com/henry-filgueiras/strata"
+repository = "https://github.com/henry-filgueiras/scarp"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
