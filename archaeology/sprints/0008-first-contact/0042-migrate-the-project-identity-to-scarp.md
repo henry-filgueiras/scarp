@@ -512,3 +512,66 @@ above is **pending human execution**. If Henry runs the cutover and
 wants the first performance preserved as dated provenance per
 `CLAUDE.md`, return the actual command output and it will be appended
 to this Result as an addendum.
+
+### Addendum (2026-07-27): the cutover was performed
+
+Henry executed the runbook on 2026-07-27, the same day, while this
+task's report was being written. The section above is preserved
+unamended as what was true when it was written; this addendum records
+the first performance as dated provenance. It documents what happened
+on that day against that interface — not an automation contract.
+
+Reported by Henry, verbatim:
+
+```console
+$ gh repo rename scarp --repo henry-filgueiras/strata --yes
+✓ Renamed repository henry-filgueiras/scarp
+
+$ gh repo edit henry-filgueiras/scarp \
+    --description "Scarp exposes the strata of a repository: what changed, why, and what remains unsettled."
+✓ Edited repository henry-filgueiras/scarp
+```
+
+The push and remote update were not reported as output but are
+verified below by their effects.
+
+Independently verified afterwards:
+
+- `gh repo view henry-filgueiras/scarp` → `nameWithOwner`
+  `henry-filgueiras/scarp`, url
+  `https://github.com/henry-filgueiras/scarp`, description exactly the
+  positioning line, `homepageUrl` empty.
+- `gh repo view henry-filgueiras/strata` → resolves to
+  `henry-filgueiras/scarp`: GitHub's redirect from the old name is
+  live. It must never be broken by creating a new repository under
+  the old name.
+- `gh api repos/henry-filgueiras/scarp/commits/main` →
+  `8543da41c6dc6e2e4cc133d3989eb2081b1c69dc  identity: adopt scarp
+  release name`, so the migration commit was pushed under the old
+  name before the rename, exactly as the runbook sequenced it.
+- `gh run list --repo henry-filgueiras/scarp` → run `30296209838`,
+  CI, push, `main`, **success** in 33s at 18:58:53Z on the migration
+  commit.
+- `git remote get-url origin` →
+  `git@github.com:henry-filgueiras/scarp.git`, SSH transport
+  preserved as the runbook required; `git status --short --branch` →
+  `## main...origin/main` with no divergence.
+
+Steps that were no-ops, each confirmed rather than assumed: Pages
+(disabled, HTTP 404), rulesets (`[]`), branch protection on `main`
+(HTTP 404, unprotected), repository topics (all twelve are generic
+category terms carrying no product name), GitHub Action consumers
+(no `action.yml`; `.github/workflows/ci.yml` hard-codes no repository
+name), the installed pre-release package (`cargo install --list`
+lists neither `strata` nor `scarp`), and the zsh completion
+(`~/.zfunc` does not exist).
+
+Still outstanding and outside this repository: the ChatGPT Project
+instructions, bookmarks, and saved prompts that hard-code the old
+URL. GitHub's redirect masks these indefinitely, which is precisely
+why they tend never to be fixed.
+
+Still outstanding inside the release track: crates.io `scarp` remains
+unclaimed and unreserved. The rename reserved nothing; the `v0.1.0`
+release task must recheck availability immediately before publishing
+and treat an occupied name as a blocker.
