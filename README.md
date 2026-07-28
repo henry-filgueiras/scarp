@@ -98,26 +98,51 @@ quickstart below is separate from that, and near-instant.
 ## Quickstart
 
 This creates a throwaway directory, turns it into a Scarp repository, records
-two artifacts, closes one, and validates the result — then deletes everything.
-It needs no Git repository and no helper programs beyond a shell. Every write
-lands **inside `/tmp/scarp-demo`**; no repository you already have is touched.
+two artifacts, closes one, and validates the result — then deletes the
+directory it created, and nothing else. Reading it takes about a minute;
+running it is near-instant.
+
+It needs a Unix-like shell — `zsh`, `bash`, or any POSIX `sh` — and the
+standard `mktemp` and `rm` utilities. It needs no Git repository, and no
+optional helper: `jq` in particular is **not** required.
 
 ```sh
-mkdir /tmp/scarp-demo && cd /tmp/scarp-demo
-scarp init
-scarp new dragon "Sequence collisions on concurrent branches"
-scarp new decision "Keep canonical records as ordinary files"
-scarp list dragons
-scarp show dragon:1
-scarp close dragon:1
-scarp doctor
+(
+  set -eu
+  scarp_demo_dir="$(mktemp -d "${TMPDIR:-/tmp}/scarp-demo.XXXXXX")"
+  trap 'command rm -rf "$scarp_demo_dir"' EXIT
+  cd "$scarp_demo_dir"
+
+  scarp init
+  scarp new dragon "Sequence collisions on concurrent branches"
+  scarp new decision "Keep canonical records as ordinary files"
+  scarp list dragons
+  scarp show dragon:1
+  scarp close dragon:1
+  scarp doctor
+)
 ```
+
+Every part of that wrapper earns its place, because pasting a demo into a shell
+you care about should be safe:
+
+- The whole block is **one subshell**, so `set -eu`, the `cd`, and
+  `$scarp_demo_dir` all disappear with it. Your shell's options and working
+  directory are exactly as you left them.
+- `mktemp -d` creates a directory that did not exist a moment ago. There is no
+  fixed path to collide with a stale run, another user on the same host, or a
+  symlink someone planted.
+- The **trap is installed only after that directory exists**, and deletes
+  exactly the path `mktemp` returned — on success, on failure, and on `Ctrl-C`
+  alike. Nothing here recursively deletes a path spelled out in advance.
+- `set -e` means that if setup fails, the subshell exits **before the first
+  `scarp` command**. Scarp never runs in the directory you were standing in.
 
 What you should see — this is real output, unedited:
 
 ```console
 $ scarp init
-initialized Scarp repository at `/private/tmp/scarp-demo`
+initialized Scarp repository at `/private/var/folders/pz/6_cybl0j4xq1c9475p1rbv980000gn/T/scarp-demo.I9YldH`
   created archaeology
   created archaeology/dragons
   created archaeology/.gitattributes
@@ -134,7 +159,7 @@ dragon:1  open  Sequence collisions on concurrent branches  (archaeology/dragons
 
 $ scarp show dragon:1
 ---
-id: drg_01KYK39DH3BCQ9T5QQFWHKMQXA
+id: drg_01KYK6JYJYB0VS3BES869P7ZAR
 sequence: 1
 kind: dragon
 status: open
@@ -160,23 +185,24 @@ $ scarp doctor
 doctor: 2 artifact(s) checked, no problems found
 ```
 
-Three things differ on your machine: the stable id is a freshly generated ULID,
-`created` is today's date, and `init` echoes the absolute path — on macOS
-`/tmp/scarp-demo` resolves to `/private/tmp/scarp-demo`, as above.
+Three things differ on your machine. The **temporary path** is whatever
+`mktemp` just made up, and it varies in full rather than in a prefix — macOS
+puts it under `/private/var/folders/…`, most Linux systems under `/tmp/…`. The
+**stable id** is a freshly generated ULID. And **`created`** is today's date.
 
 `scarp init` creates `.scarp.toml`, `archaeology/`, `archaeology/dragons/`, and
-`archaeology/.gitattributes`. Each `scarp new` adds one Markdown file. Nothing
-else on your filesystem changes.
+`archaeology/.gitattributes` inside that temporary directory. Each `scarp new`
+adds one Markdown file, and `scarp close` rewrites a single line of front matter
+in place. Nothing outside the temporary directory is written, and the trap
+removes that directory when the block ends — there is no cleanup step to
+remember, and no fixed path for one to get wrong.
 
-Open `archaeology/dragons/0001-sequence-collisions-on-concurrent-branches.md` in
-any editor: it is an ordinary Markdown file, and Scarp is not required to read,
-edit, or keep it.
-
-When you are done:
-
-```sh
-cd .. && rm -rf /tmp/scarp-demo
-```
+The `scarp show` output above is not a rendering. It is the literal content of
+`archaeology/dragons/0001-sequence-collisions-on-concurrent-branches.md`, front
+matter and all — which is the point: these are ordinary Markdown files, and
+Scarp is not required to read, edit, review, or merge them. To keep them and
+open them yourself, delete the `trap` line before running the block; the
+directory then survives, and `scarp init` prints its path on the first line.
 
 ## How it fits
 

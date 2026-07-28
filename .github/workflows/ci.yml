@@ -32,28 +32,82 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      # `cargo hack --rust-version` runs `rustup run <toolchain> cargo`, and
-      # cargo-hack strips the patch component: `rust-version = "1.88"` resolves
-      # to the toolchain named `1.88`. cargo-hack 0.6.45 would `rustup toolchain
-      # add` it silently if absent, so it is installed explicitly here to keep
-      # the gate deterministic and to make what ran visible in the log. The name
-      # must stay in step with `rust-version` in Cargo.toml.
-      - name: Install Rust 1.88, the declared MSRV
-        uses: dtolnay/rust-toolchain@1.88
+      # This stable toolchain is NOT what the gate checks against. It exists to
+      # provide rustup and a cargo able to read `cargo metadata`, and to host
+      # cargo-hack. The MSRV toolchain is installed by name further down, and
+      # cargo-hack invokes it explicitly, so the default toolchain is irrelevant
+      # to the result.
+      - name: Install stable Rust to read the manifest and host cargo-hack
+        uses: dtolnay/rust-toolchain@stable
 
+      # The MSRV is declared once, in Cargo.toml, and read from there rather
+      # than repeated here where the two could drift apart silently.
+      - name: Read the declared MSRV from the manifest
+        id: msrv
+        run: |
+          set -euo pipefail
+          declared="$(cargo metadata --no-deps --format-version 1 | jq -er '
+            if (.packages | length) != 1 then
+              error("expected exactly one package, found \(.packages | length)")
+            else
+              .packages[0].rust_version // error("the package declares no rust-version")
+            end')"
+          # cargo-hack derives the toolchain name as `format!("1.{minor}")`,
+          # dropping the patch component, so a declared `1.88.0` still gates on
+          # the toolchain named `1.88`. Normalise the same way, so the name
+          # installed below is the name cargo-hack will invoke.
+          toolchain="$(printf '%s\n' "$declared" | cut -d. -f1,2)"
+          echo "declared=$declared" >> "$GITHUB_OUTPUT"
+          echo "toolchain=$toolchain" >> "$GITHUB_OUTPUT"
+          echo "declared rust-version: $declared -> rustup toolchain: $toolchain"
+
+      # Install the toolchain by the exact *name* cargo-hack will pass to
+      # `rustup run`. This is not the same string as the compiler version: the
+      # toolchain named `1.88` reports `rustc 1.88.0`. A toolchain action given
+      # `1.88` expands it to `1.88.0` and installs that instead, which leaves
+      # cargo-hack to fetch `1.88` for itself at gate time — the failure this
+      # step exists to prevent, and one that passes silently.
+      - name: Install the MSRV toolchain by name
+        run: rustup toolchain install "$TOOLCHAIN" --profile minimal --no-self-update
+        env:
+          TOOLCHAIN: ${{ steps.msrv.outputs.toolchain }}
+
+      # Pinned rather than floating on latest: the gate's behaviour depends on
+      # cargo-hack's toolchain-name derivation, so the version whose behaviour
+      # was audited is the version that runs.
       - name: Install cargo-hack (prebuilt)
-        uses: taiki-e/install-action@cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack@0.6.45
 
       - name: Record which toolchain actually runs
         run: |
           rustup toolchain list
-          rustup which cargo
-          cargo --version
-          rustc --version
+          rustup which --toolchain "$TOOLCHAIN" cargo
+          rustup run "$TOOLCHAIN" cargo --version
+          rustup run "$TOOLCHAIN" rustc --version
           cargo hack --version
+        env:
+          TOOLCHAIN: ${{ steps.msrv.outputs.toolchain }}
+
+      - name: Snapshot the toolchain list before the gate
+        run: rustup toolchain list | sort > "$RUNNER_TEMP/toolchains-before.txt"
 
       # Cargo's example invocation adds `--workspace --ignore-private`. Scarp is
       # a single published package with no private members, so both are inert
       # here and are omitted rather than copied.
       - name: cargo hack check --rust-version
         run: cargo hack check --rust-version --all-targets --locked
+
+      # If cargo-hack had to install a toolchain, it did not run on the one this
+      # job pinned, and the gate proved nothing. That is a failure, not a line in
+      # the log for someone to happen to notice.
+      - name: Fail if cargo-hack materialised a toolchain
+        if: always()
+        run: |
+          rustup toolchain list | sort > "$RUNNER_TEMP/toolchains-after.txt"
+          if ! diff -u "$RUNNER_TEMP/toolchains-before.txt" "$RUNNER_TEMP/toolchains-after.txt"; then
+            echo "::error::cargo-hack changed the installed toolchain set; the MSRV gate did not run on the toolchain this job installed"
+            exit 1
+          fi
+          echo "toolchain list unchanged across the gate"

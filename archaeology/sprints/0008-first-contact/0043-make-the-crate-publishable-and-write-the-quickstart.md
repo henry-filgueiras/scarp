@@ -595,3 +595,109 @@ GitHub release made, and no repository setting mutated.
 - `SECURITY.md`, `CONTRIBUTING.md`, and `CODE_OF_CONDUCT.md` are not
   packaged, so they are GitHub-only surfaces; the
   private-vulnerability-reporting blocker is unaffected by packaging.
+
+## Erratum (2026-07-27, post-close)
+
+Two defects in this task's output were found after it closed and are
+repaired by [[tsk_01KYK608A5Q5CAEPYYKW4YFQSH|task 46]]. Nothing above
+is rewritten. The Result stands as what was believed, and evidenced,
+on the day it was written; this section records what later evidence
+falsified and what replaced it.
+
+### The MSRV gate ran on a toolchain it did not install
+
+**What the Result claims.** Under *MSRV CI gate*: the `1.88` toolchain
+is "explicitly installed via `dtolnay/rust-toolchain@1.88`", added so
+that cargo-hack could not silently materialise one.
+
+**The original local evidence, which was sound.** The exact invocation
+was run locally against cargo-hack 0.6.45 and reported `running
+'rustup run 1.88 cargo check --all-targets --locked' on scarp (1/1)`
+… `Finished`, with no `rustup toolchain add` line. That observation
+was correct. It was also incapable of detecting the defect: the
+development machine already had a toolchain named `1.88` installed
+from the MSRV determination earlier in this same task, so cargo-hack
+had nothing to fetch. The check silently depended on prior local
+state, and a green result meant only that the machine was already in
+the right shape.
+
+**The GitHub CI evidence that falsified the claim.** The first run of
+this workflow on a machine without that prior state — run
+`30319275441`, job `90151540325`, on commit
+`d0a3775cb440cceaf9e0ad3ccc12d17c6d1d78cd` — shows all three facts in
+one log:
+
+- `dtolnay/rust-toolchain@1.88` normalises `1.88` **upward** to a full
+  version. The log records `toolchain: 1.88.0` and then `rustup
+  toolchain install 1.88.0 --profile minimal --no-self-update`,
+  yielding `1.88.0-x86_64-unknown-linux-gnu`.
+- The evidence step printed a toolchain list of exactly
+  `stable-x86_64-unknown-linux-gnu` and
+  `1.88.0-x86_64-unknown-linux-gnu (active, default)`. The name `1.88`
+  is **not present**.
+- `cargo hack check --rust-version` then emitted `running 'rustup
+  toolchain add 1.88 --no-self-update'`, installed
+  `1.88-x86_64-unknown-linux-gnu`, and ran `rustup run 1.88 cargo
+  check --all-targets --locked`.
+
+**The job passed.** That is the part worth preserving: the gate
+succeeded while doing exactly what the explicit install existed to
+prevent, and the log said so plainly to anyone who read it. A passing
+job is not evidence that the mechanism it documents is the mechanism
+that ran.
+
+The amendment above had already found half of this — cargo-hack
+strips the patch component, so the name is `1.88` — and `rust-version`
+was set to `"1.88"` precisely so that the manifest and the toolchain
+would agree. What was missed is that `dtolnay/rust-toolchain`
+normalises in the opposite direction. Two correct-looking
+normalisations pointed at different toolchains, and nothing in the job
+compared them.
+
+The distinction that keeps this legible: **`1.88` is a rustup
+toolchain name and `1.88.0` is a compiler version.** The toolchain
+named `1.88` reports `rustc 1.88.0`. Both statements are true
+simultaneously, and conflating them is what produced the defect.
+
+### The quickstart could initialise a reader's own directory
+
+Not a falsified claim — a hazard this task never examined, found while
+reviewing the shipped prose.
+
+The quickstart opened `mkdir /tmp/scarp-demo && cd /tmp/scarp-demo`
+and closed with `cd .. && rm -rf /tmp/scarp-demo`. Every command was
+executed as documented, as the Result records, and all of it worked —
+on the happy path, which is the only path that was run.
+
+An interactive shell does not stop when a pasted line fails. If
+`/tmp/scarp-demo` already exists, `mkdir` fails, `&&` correctly skips
+the `cd`, and every subsequent line runs in the reader's current
+directory. Reproduced on 2026-07-27 against the packaged binary: with
+a stale `/tmp/scarp-demo` present, `mkdir: /tmp/scarp-demo: File
+exists` was followed by `initialized Scarp repository at
+…/olddemo`, and a directory holding an unrelated file acquired
+`.scarp.toml` and `archaeology/`. The documented cleanup then made it
+worse, being a fixed-path `rm -rf` of a directory the quickstart may
+not have created.
+
+Because `README.md` is part of the crate payload, this would have been
+frozen into `0.1.0`.
+
+### Corrected outcome
+
+Task 46 replaced the quickstart with a self-contained subshell —
+`mktemp -d`, a cleanup trap installed only after creation, `set -eu`
+scoped to the subshell, and no fixed path anywhere — verified on the
+success and setup-failure paths in `zsh`, `bash`, and `sh`. It
+replaced the MSRV mechanism with one that reads `rust-version` from
+`cargo metadata`, installs that toolchain **by the name cargo-hack
+invokes**, pins `cargo-hack@0.6.45`, and fails the job if the
+installed toolchain set changes across the gate. The comment in
+`.github/workflows/ci.yml` asserting the old mechanism was removed
+with it.
+
+The packaged file set remained 36; the size moved to 556.2 KiB
+(122.0 KiB compressed) because the README grew. Everything else this
+task established — the `include` allowlist, the metadata, the link
+audit, the Mermaid check, the MSRV of 1.88 itself — was unaffected and
+still stands.

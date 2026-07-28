@@ -72,11 +72,15 @@ load-bearing rather than tidy:
    construction, manifest metadata, README install and quickstart,
    MSRV determination, verification against the packaged artifact,
    and `cargo publish --dry-run`. Nothing is published.
-2. [[tsk_01KYJG0S7SYMYY1FEG7H4QQX8G|Task 44]] — the pre-publication
+2. [[tsk_01KYK608A5Q5CAEPYYKW4YFQSH|Task 46]] — repair of the two
+   defects found in task 43's output after it reached GitHub CI: an
+   unsafe quickstart under ordinary pasted-shell semantics, and an
+   MSRV gate that installed one toolchain and ran on another.
+3. [[tsk_01KYJG0S7SYMYY1FEG7H4QQX8G|Task 44]] — the pre-publication
    claim and landing-surface audit, over the final package and
    README source and every surface that can be checked before a live
    page exists.
-3. [[tsk_01KYK0PTQV9PGZTHRDAPG6YGYM|Task 45]] — publication, tag,
+4. [[tsk_01KYK0PTQV9PGZTHRDAPG6YGYM|Task 45]] — publication, tag,
    GitHub release, verification of the live registry and
    documentation surfaces, a genuinely clean-environment install and
    quickstart, and sprint closure.
@@ -86,6 +90,19 @@ Task 44 runs after 43 so that the install and quickstart prose task
 last because the surfaces it inspects — the rendered crates.io page,
 the docs.rs build, an install from the registry — do not exist until
 publication has happened.
+
+### Amendment (2026-07-27): task 46 sits between 43 and 44
+
+Task 46 was allocated after 44 and 45 and therefore carries a higher
+sequence, but the order above is the sprint's logical order and is
+authoritative. Sequences record allocation, not precedence.
+
+It belongs before 44 for the same reason 44 belongs after 43: 46
+rewrites the quickstart, and the audit must run over the prose that
+will actually ship rather than over prose already known to be
+replaced. It belongs before 45 because `README.md` is part of the
+crate payload, so leaving the defect in place would freeze it into
+`0.1.0` and make it cost a version number to fix.
 
 The division is not merely sequencing. Everything before task 45 is
 reversible; everything task 45 performs is not. `cargo publish`

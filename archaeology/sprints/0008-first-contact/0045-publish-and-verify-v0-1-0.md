@@ -35,9 +35,18 @@ rename, applied to an action with no undo at all.
 
 ### Preconditions
 
-- Tasks 43 and 44 are closed and every blocker they identified is
-  resolved. In particular, publication does not proceed while
-  `SECURITY.md` directs reporters at a channel that is disabled.
+- Tasks 43, [[tsk_01KYK608A5Q5CAEPYYKW4YFQSH|46]], and 44 are closed
+  and every blocker they identified is resolved. In particular,
+  publication does not proceed while `SECURITY.md` directs reporters
+  at a channel that is disabled.
+- Task 46's repairs are present in the release source, and its one
+  externally-unverifiable claim has been verified: the MSRV job must
+  be **green on the release commit as pushed**, with its
+  before-and-after toolchain-list comparison passing. Task 46 could
+  only prove its workflow locally, so that check is inherited here
+  rather than assumed. A gate that silently installs its own
+  toolchain is not a gate, and this is the last point at which that
+  can be caught.
 - The release worktree is clean and exactly equal to `origin/main`;
   `scripts/check.sh` passes; CI is green on the release commit.
 - crates.io `scarp` is re-checked as unclaimed **immediately** before

@@ -22,6 +22,14 @@ It runs after [[tsk_01KYJG0S7GY51W8M1WYFMEV7MQ|task 43]] so that the
 install and quickstart prose that task writes is inside the audit's
 scope rather than outside it.
 
+It also runs after [[tsk_01KYK608A5Q5CAEPYYKW4YFQSH|task 46]], which
+replaced that quickstart wholesale after task 43 closed: the original
+was unsafe under ordinary pasted-shell semantics and could leave
+Scarp output in a reader's own directory. The surface this audit
+covers is therefore task 46's quickstart, not task 43's. Task 46 is
+sequenced later than this task only because it was allocated later;
+the sprint's amended execution order — 43, 46, 44, 45 — governs.
+
 The audit has a specific standard to apply, not merely taste.
 [[tsk_01KYFYKAZRGEJPJYKAWV8W9BB4|Task 41]] compared Scarp against
 Edda and retired a list of claims as unsupportable: not "the only" or
