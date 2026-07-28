@@ -56,25 +56,24 @@ can silently run under 1.96 while appearing to test the floor. Any
 toolchain claim in the Result must therefore be accompanied by
 evidence of which binary actually ran.
 
-Two credible paths. **The choice is Henry's, because both change his
-machine outside this repository**, and neither is performed by this
-task until he picks one:
+Henry chose on 2026-07-27 to make rustup the single source of truth,
+rather than run it alongside the Homebrew toolchain. The alternative
+— installing Homebrew's keg-only `rustup` formula and leaving
+`brew rust` in place — was considered and rejected: it leaves two
+Rust installations racing for `PATH`, which is the failure mode this
+prerequisite exists to eliminate, and it trades a one-time
+uninstall for a permanent ambiguity.
 
-*Path A — rustup becomes the single source of truth (conventional):*
+Removing Homebrew's Rust leaves the machine with **no** Rust
+toolchain until the rustup installation completes, so the two
+commands belong together:
 
 ```sh
 brew uninstall rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-*Path B — rustup alongside Homebrew Rust (smaller blast radius):*
-
-```sh
-brew install rustup
-"$(brew --prefix rustup)"/bin/rustup-init
-```
-
-Then, under either path:
+Then:
 
 ```sh
 rustup toolchain install <MSRV>
@@ -83,10 +82,14 @@ cargo +<MSRV> --version   # must report <MSRV>, not 1.96.1
 command -v cargo          # records which cargo is winning PATH
 ```
 
-The Result records the path actually taken, the verbatim commands
-run, their output, and the resulting `rustup toolchain list` — as
-dated provenance per `CLAUDE.md`, not as an installer this project
-maintains.
+Anything already installed through the old toolchain — `cargo
+install`ed binaries in particular — lives outside the Homebrew keg
+and is not removed by the uninstall, but should be confirmed rather
+than assumed.
+
+The Result records the verbatim commands run, their output, and the
+resulting `rustup toolchain list` — as dated provenance per
+`CLAUDE.md`, not as an installer this project maintains.
 
 ## Acceptance criteria
 
@@ -158,13 +161,32 @@ maintains.
   suite, and documentation as appropriate, with evidence of which
   toolchain actually executed.
 - A narrow persistent CI gate prevents the MSRV from drifting
-  immediately after release. Cargo's current continuous-integration
-  guidance recommends `cargo hack check --rust-version` on a single
-  platform — check-only, one target, unpublished packages skipped —
-  in preference to a full matrix; a job pinned directly to the MSRV
-  toolchain is the simpler alternative. Whichever is chosen, the gate
-  stays narrow: this is a guard against silent drift, not a
-  compatibility matrix.
+  immediately after release, implemented with `cargo hack` per
+  Henry's decision on 2026-07-27 and matching Cargo's current
+  continuous-integration guidance. The recommended shape is a single
+  job on one platform running `cargo hack check --rust-version`,
+  which is check-only rather than a build-and-test matrix. Cargo's
+  rationale is worth preserving: one platform because most projects
+  are platform-agnostic, `check` only because most MSRV breakage is
+  API availability rather than behavioral difference.
+- The gate's one non-obvious requirement is recorded so it is not
+  rediscovered as a CI failure: `cargo hack --rust-version` **does
+  not install toolchains**. It shells out to
+  `rustup run <toolchain> cargo`, so the job must have rustup present
+  *and* the MSRV toolchain already installed — the same PATH-and-
+  toolchain discipline the local prerequisite above imposes,
+  transplanted into CI. Whether the workflow installs it via a
+  toolchain action or an explicit `rustup toolchain install` is an
+  implementation choice; having neither is a silent failure.
+- Flag selection is deliberate rather than copied. Cargo's example
+  invocation carries `--workspace --all-targets --ignore-private`;
+  this repository is a single published package, not a workspace with
+  private members, so `--workspace` and `--ignore-private` are inert
+  here. Keep or drop them on stated reasoning — future-proofing is a
+  legitimate reason, cargo-culting is not.
+- The gate stays narrow either way. This is a guard against silent
+  drift, not a compatibility matrix, and it must not grow into one
+  without a recorded reason.
 - The README gains an install section and a quickstart taking a
   newcomer from a working binary to a meaningful first result in
   about sixty seconds, deterministically. The quickstart operates in
