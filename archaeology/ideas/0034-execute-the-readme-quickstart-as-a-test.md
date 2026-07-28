@@ -85,9 +85,9 @@ section's output going stale against a corpus that moved on
 block against captured output by hand — a check that existed for
 exactly one session and then evaporated.
 
-Related: this is the narrow, mechanised form of the candidate
-principle appended to [[ide_01KYDZVN858BK52A35KJ3ZY5BP|idea 28]] —
-that a verification is blind to a defect whose precondition the work
+Related: this is the narrow, mechanised form of the heuristic recorded
+in [[log_01KYK8RC0YEY51YP37RGV7M7N4|log 3, verification blind spots]]
+— that a verification is blind to a defect whose precondition the work
 itself established. The author's machine always has the directory the
 quickstart creates. Only a fresh run can fail.
 

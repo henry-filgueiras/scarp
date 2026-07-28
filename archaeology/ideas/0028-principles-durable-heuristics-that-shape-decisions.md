@@ -100,65 +100,36 @@ from the forces acting on them; the forces are the principles.
 
 The Boundaries section holds that no collection work is justified
 until the corpus demonstrates need. Sprint 8 supplied a candidate that
-recurred **four times in one sprint**, drafted below in the schema the
-Sketch proposes — partly as evidence, partly to test whether that
-schema survives contact with real material.
+recurred **four times in one sprint**:
 
-> **Statement.** A verification is blind to any defect whose
-> precondition was established by the work being verified. Check in an
-> environment the work did not touch, or the check proves only that
-> the environment is already in the shape the work put it in.
->
-> **Rationale.** Doing the work leaves residue — installed toolchains,
-> warm caches, files present in the tree, a directory created by the
-> first run. That residue is indistinguishable, to a local check, from
-> a property of the artifact under test.
->
-> **Application ordering.** Prefer a genuinely fresh environment
-> (fresh `CARGO_HOME`, unpacked tarball, clean container). Failing
-> that, snapshot the contaminating state and assert it did not change.
-> Failing that, record explicitly which precondition the check assumed
-> rather than claiming the check was clean.
->
-> **Counterpressure.** Fresh environments cost wall-clock time and can
-> themselves be wrong (a container that omits a dependency the real
-> user has). A local check that *names its assumption* beats a slow
-> one that gets skipped. The principle argues for stating the
-> contamination, not for maximal isolation.
->
-> **Failure signals.** A check that passes on the development machine
-> and has never run anywhere else; a verification step positioned
-> after the step that creates its precondition; the phrase "it works
-> here" standing in for evidence; a green result whose mechanism was
-> never distinguished from a plausible alternative.
+> A verification is blind to any defect whose precondition was
+> established by the work being verified.
 
-The four instances, all in [[tsk_01KYJG0S7GY51W8M1WYFMEV7MQ|task 43]]
-and [[tsk_01KYK608A5Q5CAEPYYKW4YFQSH|task 46]]:
+with a narrower companion — *a passing check is not evidence that its
+documented mechanism ran*. The statement, its rationale, application
+ordering, counterpressure, failure signals, and all four instances are
+recorded in
+[[log_01KYK8RC0YEY51YP37RGV7M7N4|log 3, verification blind spots]].
+That log is the canonical copy, deliberately: this idea may be
+rejected, and the reasoning has to survive that.
 
-1. The working tree contained `archaeology/`, so the test suite passed
-   while the *packaged* crate's suite would have failed. Caught only
-   by testing the unpacked tarball.
-2. A warm cargo cache or a `target/debug/scarp` would have satisfied
-   the install test; task 43 pre-empted this with a fresh
-   `CARGO_HOME`, `CARGO_TARGET_DIR`, and install root.
-3. The machine that determined MSRV = 1.88 had thereby installed the
-   toolchain named `1.88`, so the local MSRV-gate check could not
-   observe cargo-hack fetching it. The defect surfaced only on a clean
-   GitHub runner — and surfaced there in a job that **passed**.
-4. Running the quickstart once created `/tmp/scarp-demo`, so the
-   documented `mkdir` could only fail on a *reader's* machine, never
-   on the author's.
+Two things it demonstrates for this idea specifically.
 
-Instance 3 also yields a narrower companion candidate: **a passing
-check is not evidence that its documented mechanism ran.** Job
-90151540325 was green while its own log contradicted the workflow
-comment above it. The repair was to make the mechanism falsifiable —
-snapshot the toolchain list before and after and fail on any change —
-rather than to trust the exit status.
+**The proposed schema survived contact with real material.** The
+candidate was drafted in the Sketch's shape — statement, rationale,
+application ordering, counterpressure, failure signals — and every
+field had something non-obvious to hold. Counterpressure in
+particular was not filler: isolation costs wall-clock time and a
+wrong clean environment proves the opposite of what was intended, so
+the principle argues for *naming* contamination rather than for
+maximal isolation. A principle without that field would have read as
+an absolute and been overapplied.
 
-That repair is the reason this belongs in a principle rather than a
-retrospective: the heuristic is only useful if the *next* decision can
-cite it while choosing between "verify locally and move on" and "build
-a check that can fail". Sprint 8 answered that question four times
-and, absent a principle artifact, left the reasoning recoverable only
-by reading two task Results end to end.
+**The citation need is concrete, not hypothetical.** The heuristic
+earns its keep when a future task chooses between "verify locally and
+move on" and "build a check that can fail" — the choice sprint 8 faced
+four times. Absent a citable artifact, that reasoning is recoverable
+only by reading two task Results end to end, which is how it was
+nearly lost. Writing it as a log is the available approximation;
+what a log cannot do is be cited by a decision as `applies` or
+`overrides`, which is precisely the gap this idea proposes to close.
