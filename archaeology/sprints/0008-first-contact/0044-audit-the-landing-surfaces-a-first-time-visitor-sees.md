@@ -2,9 +2,10 @@
 id: tsk_01KYJG0S7SYMYY1FEG7H4QQX8G
 sequence: 44
 kind: task
-status: pending
+status: closed
 sprint: spr_01KYFRWF0B8QKN89NHVKQG2TQT
 created: 2026-07-27
+closed: 2026-07-27
 ---
 
 # Audit the landing surfaces a first-time visitor sees
@@ -167,3 +168,341 @@ do is leave one unexamined.
   policy in `CLAUDE.md`.
 
 ## Result
+
+All work performed 2026-07-27 from a clean checkout equal to `origin/main`
+at `5c5b2010b24278953440ec4c1917cd70165f69ca`. That is two commits past
+the `f66a94e` this task was commissioned against; both are additive
+archaeology (ideas 23, 26, 28 amended, idea 34 added, log 3 added) and
+touch no landing surface. The audit ran over the later tree.
+
+### Surface inventory
+
+Every surface below was opened and read in full, not sampled. The command
+surface was taken from the **running binary** (`scarp --help` plus
+`--help` on all eleven subcommands), never from `src/`.
+
+| Surface | Verdict |
+|---|---|
+| README hero, wordmark, positioning | **corrected** — memory-for-agents headline retired |
+| README `See it work` | **corrected** — stale corpus paste and `jq` both removed |
+| README install, timing claims | **corrected** — measurement restated precisely |
+| README quickstart block and transcript | **corrected** — two boundary defects fixed |
+| README `How it fits` diagram and invariants | **corrected** — payload formats, safety wording |
+| README lifecycles, containment, `archaeology/` tree | **supported** — checked against decision 11 as amended |
+| README status scoreboard | **corrected** — two shipped commands were missing |
+| README development, completions, case-study note | **supported** |
+| README license section | **corrected** — dual grant made unmistakable |
+| All 10 README link targets | **supported** — verified from GitHub *and* an unpacked crate |
+| `Cargo.toml` description, keywords, categories, `include` | **supported** — see below |
+| Packaged README as shipped | **supported** — byte-identical to source, 36-file set |
+| `assets/logo.svg`, `assets/logo-dark.svg` | **supported** — identical but for text fill; `scarp`, never `SCARP` |
+| `src/cli.rs` `--help` line, `src/lib.rs` crate doc | **corrected** — disagreed with every other surface |
+| `CONTRIBUTING.md` | **corrected** — nonexistent path, MSRV, check-script contents |
+| `SECURITY.md` | **externally resolved** + wording fixes |
+| `CODE_OF_CONDUCT.md` | **supported** — Contributor Covenant, live contact address |
+| `.github/ISSUE_TEMPLATE/bug-report.md` | **supported** — `bug` label exists |
+| `.github/ISSUE_TEMPLATE/idea.md` | **externally resolved** — `idea` label now exists |
+| `.github/PULL_REQUEST_TEMPLATE.md` | **supported** |
+| GitHub About: description, homepage, topics, license | **externally resolved** (topics) / **supported** (rest) |
+
+Deliberately excluded, with reason: the rendered crates.io page, the
+docs.rs build, and a registry install do not exist before publication.
+Asserting anything about them here would be prediction, not verification;
+they belong to [[tsk_01KYK0PTQV9PGZTHRDAPG6YGYM|task 45]].
+
+### Verdict on every recorded suspect
+
+**1. Stale `See it work` output — corrected, and structurally so.**
+The section showed dragons 1–3 all `open` (2 and 3 are closed, 4 absent)
+and a `jq '.[-1]'` example claiming to show dragon 3. Rather than paste a
+fresher snapshot — accurate the day it is written and wrong within a
+sprint — the showcase is now a three-command excerpt of the **quickstart
+fixture**, whose corpus is created and destroyed by the block itself and
+therefore cannot drift. The self-dogfooding story is kept, but as prose
+and a link rather than as pasted output that rots: the claim now made is
+that `scripts/check.sh` gates every commit on `scarp doctor` over the
+whole corpus, which stays true as the corpus grows.
+
+**2. `jq` dependency — retired.** No `jq` appears anywhere in the README.
+Machine-readable output is still shown, as `scarp list dragons --json`
+inside the quickstart, printing one deterministic line that a reader can
+simply look at. The accompanying prose makes the point `jq` was making —
+key on the stable `id`, not the display sequence — without the tool.
+
+**3. Markdown/JSON/JSONL as current payload formats — corrected.** The
+diagram node now reads `plain files / Markdown`. A new invariant bullet
+states that payload format is not the artifact model (decision 3's real
+boundary) and that **only Markdown artifacts ship today**. The Status
+section draws the distinction the old text blurred: `--json` is an
+*output* format that ships; JSON and JSONL *payloads* are architecture,
+not a feature a reader can use.
+
+**4. Hero, "safe writes", "assigned safely", Cargo description —
+corrected against task 41 and dragons 1 and 4.**
+The hero read "structured repository memory for humans and coding agents";
+it now reads **"Git-native, reviewable project archaeology"**, matching
+the manifest `description` and decision 16's positioning line word for
+word. Agents survive as an *audience* ("a person or a coding agent"), never
+as a promised capability. A new Status paragraph states plainly that there
+is no automatic capture, no context injection, no search, no index, and no
+coordination between concurrent writers.
+
+Bare "safely" is gone from the scoreboard. In its place a new section,
+*What "safe" means here, and where the dragons are*, states decision 8's
+three failure classes in a reader's language: returned errors leave one
+valid artifact; abrupt termination is covered by single atomic renames;
+**power loss and kernel crashes are explicitly out of scope because
+nothing is fsynced** ([[drg_01KY3C0S3JQKEMEB9BH6NVJ35F|dragon 4]]). A
+following paragraph states that Scarp does **not** claim concurrent-writer
+safety and that duplicate display sequences after a merge are reconciled
+manually ([[drg-bootstrap-branch-collisions|dragon 1]]). The old bullet
+claiming branches "can collide on sequence numbers without corrupting
+anything" is gone. Both dragons are linked, which is the tool's own
+argument made on itself.
+
+**5. `CONTRIBUTING.md` names `archaeology/dragons/open/` — corrected.**
+Confirmed again: `archaeology/dragons/` holds four files and no
+subdirectories. The instruction now points at `scarp list dragons` and
+`scarp list decisions`, names the real directories, and says explicitly
+that lifecycle state lives in front matter so there are no `open/` or
+`closed/` subdirectories to look in. Two further inaccuracies found in the
+same file while reading it: "Stable Rust toolchain" is now "Stable Rust,
+1.88 or newer", and `scripts/check.sh` was described without the `scarp
+doctor` step it has run since sprint 7.
+
+**6. `SECURITY.md` pointed at a disabled channel — externally resolved.**
+Henry enabled private vulnerability reporting during this task (provenance
+below). The policy keeps its truthful text. Two wording fixes were applied
+while the file was open: "has no releases yet" would have become false the
+moment task 45 publishes, so it now reads in a form true before and after;
+and the decision 8 reference became a real link that names which failure
+classes are out of scope.
+
+**7. `idea` issue template requested a nonexistent label — externally
+resolved.** Henry created the label. The template is unchanged, and now
+actually applies a label.
+
+**8. GitHub reports a single license — corrected on the surfaces, and an
+erratum filed.** The detector's opinion was not fought. Instead: the README
+hero now carries `MIT OR Apache-2.0` on the first screen, and the License
+section states the dual grant and explains the sidebar as a detector
+artifact. The manifest already declared `license = "MIT OR Apache-2.0"`,
+and both license texts are in the 36-file package.
+
+[[dec-dual-mit-apache-licensing|Decision 9]]'s claim that "the dual-file
+layout means GitHub reports both licenses" is **demonstrably false** and
+received a dated erratum. The evidence is sharper than expected: the same
+API query against the three exemplars decision 9 itself cited returns a
+single `Apache-2.0` for all of them.
+
+```text
+serde-rs/serde  -> Apache-2.0
+rust-lang/rust  -> Apache-2.0
+clap-rs/clap    -> Apache-2.0
+```
+
+The decision's *second* clause therefore survives and explains the first:
+the layout is ecosystem-standard and Scarp does appear exactly as serde,
+clap, and rustc appear — the error was believing that appearance ever
+showed both.
+
+**9. GitHub About metadata — adjudicated, one change, externally
+resolved.** Description is decision 16's positioning line: **supported**,
+unchanged. Homepage is empty: **supported** — Scarp has no dedicated site,
+and a repository URL duplicating the sidebar link would be noise.
+
+Topics were **not** treated as exempt from task 41. Discovery metadata
+makes claims to exactly the audience task 41 was about, and the two topics
+split:
+
+- `agent-memory` — **retired.** It is task 41's retired headline job
+  compressed into one word. Someone searching it wants capture and
+  injection; Scarp ships neither, and the topic would recruit precisely
+  the disappointed visitor task 41 warned about. Henry removed it.
+- `ai-agents` — **supported, kept.** It names an audience, not a
+  capability. Agents genuinely are intended callers and the repository is
+  a real human–AI collaboration case study; nothing is promised.
+
+Manifest keywords were adjudicated by the same standard, since they are
+crates.io's equivalent surface. `project-memory` is **supported**: it
+describes what the files are, and unlike `agent-memory` it promises no
+capture mechanism. `archaeology`, `decision-records`, `adr`, and
+`documentation` are supported. Categories
+(`command-line-utilities`, `development-tools`) are supported.
+
+**10. Scoreboard versus the real command surface — corrected; this suspect
+was not on the list and mattered most.** Running the binary rather than
+reading the source found the scoreboard was **missing two shipped
+commands**: `scarp resolve` (absent entirely) and `scarp completions`
+(documented only in a later prose section). Also unlisted: `--json` on
+`new`, `show`, and `resolve`; `--resolved-by` on `close`; `--adopted-by`
+on `adopt`; `--active` on `list`. The table now carries all eleven
+subcommands with their real flags, and the prose corrects a genuine
+overstatement — lifecycle verbs are **collection-specific**, not
+universal: `close` takes dragons, sprints, and tasks; `reopen` only
+dragons; `adopt`/`reject` only ideas.
+
+**11. Surface disagreement found during the audit — corrected.** Four
+surfaces told three different stories. `scarp --help` and the crate-level
+doc (which is docs.rs's front page) both read "Git-friendly project
+archaeology and repository-local memory", disagreeing with the manifest
+and carrying the memory framing task 41 retired. Both now carry the same
+sentence as `Cargo.toml`. The name, positioning line, description, license
+statement, and quickstart now tell one story across README, manifest, CLI
+help, crate docs, and GitHub About.
+
+### The two carried-forward quickstart boundary findings
+
+Both were reproduced before being fixed, and neither reopened task 46's
+closed defect.
+
+**Ctrl-C portability — claim removed, and the reported finding was
+understated.** Tested in a genuine PTY (`pty.fork`, real `INTR` character
+through the line discipline, delivered to the foreground process group),
+three trials per shell, all deterministic:
+
+| Shell | `EXIT` trap after Ctrl-C | Directory removed |
+|---|---|---|
+| `bash` 3.2.57 | runs | yes |
+| `/bin/sh` (bash in POSIX mode) | runs | yes |
+| `zsh` 5.9 | **does not run** | **no** |
+| `dash` | **does not run** | **no** |
+
+The prompt's evidence named Bash and dash; **zsh also leaks**, which
+matters because zsh is Henry's shell and the first one a macOS reader
+will paste into. The README's "on success, on failure, and on `Ctrl-C`
+alike" was therefore false in half the shells tested, including the most
+likely one. The portable guarantee is **removed** rather than defended
+with signal handling. The README now states the proven contract — normal
+completion and ordinary command failure — and names the interrupt
+behaviour honestly, per-shell, with the cost bounded: one throwaway
+directory whose path `scarp init` printed on the first line. No trap
+cathedral was built.
+
+**Relative `TMPDIR` — reproduced, fixed, verified.** With `TMPDIR=tmp`,
+`mktemp -d` returns a *relative* path; after the `cd`, the trap resolves
+that same string against the new working directory, `rm -rf` silently
+succeeds against a nonexistent path because of `-f`, and the real
+directory survives. Reproduced exactly: the block exited 0 and left
+`tmp/scarp-demo.VGfrWV/` containing `.scarp.toml`, `archaeology/`, and the
+created dragon.
+
+The fix is one POSIX line, no subshell trick and no `CDPATH` hazard:
+
+```sh
+case $scarp_demo_dir in /*) ;; *) scarp_demo_dir="$PWD/$scarp_demo_dir" ;; esac
+```
+
+The full matrix was then executed — 4 shells × 4 cases, 16 runs, against
+the binary installed from the unpacked package, each in a caller directory
+seeded with its own `IMPORTANT.md`:
+
+| Case | Result in `zsh`, `bash`, `dash`, `sh` |
+|---|---|
+| Ordinary success | rc 0; no leak; caller `$PWD` and `$-` unchanged |
+| Mid-run failure (`scarp show dragon:99`) | rc 7, typed `artifact-not-found`; trap fired; no leak |
+| Setup failure (`TMPDIR=/nonexistent-xyz/`) | rc 1; **no `scarp` command ran at all**; no `.scarp.toml`, no `archaeology/`, nothing new in the caller's directory |
+| Relative `TMPDIR=reltmp` | rc 0; **no leak** — `reltmp/` verified empty afterwards |
+
+All sixteen passed. The caller's working directory and shell options were
+unchanged in every run.
+
+### Package and gate verification
+
+`README.md` is crate payload, so task 46's product checks were repeated
+rather than inherited. `--allow-dirty` and `--no-verify` were not used;
+no publishing credential was inspected or requested.
+
+- `scripts/check.sh`: passes. `doctor: 108 artifact(s) checked, no
+  problems found` — 107 in CI at `f66a94e` plus idea 34, added since.
+  Cross-checked against per-collection counts: 4 + 34 + 16 + 8 + 46 = 108.
+- Clean-tree paradox resolved as tasks 43 and 46 did: 172 paths copied
+  from the working tree into a disposable directory outside the checkout,
+  every one verified `git hash-object` byte-identical on both sides,
+  committed locally, and packaged from there.
+- **36 files, 561.8 KiB (123.9 KiB compressed)** — 1.21% of the 10 MiB
+  limit. The file *set* is `diff`-identical to task 46's, as predicted:
+  this task edited already-packaged files and added none. Size rose from
+  556.2 KiB because the README grew.
+- Unpacked outside the checkout; built, **385 tests across 19 binaries all
+  pass**, `cargo doc --no-deps` succeeds with the same three pre-existing
+  private-intra-doc-link warnings.
+- Installed with a fresh `CARGO_HOME`, `CARGO_TARGET_DIR`, and `--root`,
+  all three verified empty beforehand; `command -v scarp` resolved to the
+  temporary root, and no `scarp` exists in `~/.cargo/bin`.
+- Every README link inspected from **both** surfaces: six absolute URLs
+  returned HTTP 200; the three relative targets (`assets/logo.svg`,
+  `LICENSE-APACHE`, `LICENSE-MIT`) are tracked in Git *and* present in the
+  unpacked crate; the `#quickstart` anchor matches a real heading. The
+  split is deliberate and correct — `archaeology/`, `CLAUDE.md`, and
+  `scripts/check.sh` are absent from the crate and are linked absolutely.
+- The documented quickstart was executed **verbatim** against the binary
+  installed from the unpacked package. Post-install time: **0.043 s**,
+  against the ~60-second criterion. The README's `console` block was then
+  compared mechanically to the captured stream: identical line for line
+  once the `$ ` prompts and their blank separators are stripped, and after
+  normalising the temporary path and the ULID, **identical** — the exact
+  fields the README tells the reader will differ. No output was reflowed,
+  trimmed, or reconstructed.
+- `cargo publish --dry-run --locked` from the disposable clean snapshot:
+  `Packaged 36 files, 561.8KiB (123.9KiB compressed)`, `Verifying scarp
+  v0.1.0`, `warning: aborting upload due to dry run`.
+
+### Task 46's CI evidence
+
+Run `30321601486` was inspected at log level rather than trusted from its
+badge, and every claim confirmed: commit `f66a94e`, manifest `1.88`,
+toolchain **name** `1.88` installed by rustup, that toolchain reporting
+cargo and rustc `1.88.0`, cargo-hack pinned at exactly `0.6.45`,
+`rustup run 1.88 cargo check --all-targets --locked`, `toolchain list
+unchanged across the gate`, and 385 tests plus `doctor: 107 artifact(s)
+checked, no problems found`. The full evidence is recorded as a dated
+post-close addendum on
+[[tsk_01KYK608A5Q5CAEPYYKW4YFQSH|task 46]] rather than duplicated here;
+its original Result and Limitations were left standing as written.
+
+### Human-owned GitHub changes, as dated provenance
+
+Performed by Henry on 2026-07-27; not executed by this task. Verified
+read-only afterwards.
+
+```sh
+# 1. private vulnerability reporting — was {"enabled":false}
+gh api --method PUT \
+  repos/henry-filgueiras/scarp/private-vulnerability-reporting
+# 204 No Content; gh pipes output through $PAGER, so an empty vim buffer
+# is the success case, not a prompt. Verify rather than read the screen:
+gh api repos/henry-filgueiras/scarp/private-vulnerability-reporting \
+  --jq .enabled            # -> true
+
+# 2. the idea label
+gh label create idea --repo henry-filgueiras/scarp \
+  --color 7057FF --description "Uncommitted proposals to explore"
+gh api repos/henry-filgueiras/scarp/labels/idea \
+  --jq '{name, color, description}'
+# -> {"color":"7057FF","description":"Uncommitted proposals to explore",
+#     "name":"idea"}
+
+# 3. removing the agent-memory topic — performed in the GitHub web UI
+gh api repos/henry-filgueiras/scarp --jq '.topics'
+# -> ["adr","ai-agents","architecture-decision-records","cli",
+#     "decision-records","developer-tools","documentation","git",
+#     "knowledge-management","markdown","rust"]
+```
+
+One interface note worth keeping, since it cost a round trip: the topics
+REST endpoint replaces the whole set, and the obvious `gh api --method PUT
+… -f names[]=adr` form **fails in zsh** with `zsh: no matches found:
+names[]=adr`, because `[]` is a glob. The arguments need quoting
+(`-f 'names[]=adr'`). This is dated provenance for the interface as it
+behaved on 2026-07-27, not a script.
+
+### Anything real but out of scope
+
+Nothing was found that warranted a new dragon or idea. The two boundary
+findings carried into this task were public-claim defects, fixed here; the
+zsh Ctrl-C behaviour is a documented shell property, not a Scarp risk; and
+`gh`'s pager and zsh's globbing are recorded above as provenance rather
+than as artifacts. Task 45's inherited obligation — repeat the CI check on
+the eventual release-source commit — is recorded on task 46's addendum,
+where its precondition already lives.

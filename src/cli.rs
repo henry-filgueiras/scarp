@@ -9,7 +9,8 @@ use std::str::FromStr;
 
 use clap::{Parser, Subcommand};
 
-/// Git-friendly project archaeology and repository-local memory.
+/// Git-native, reviewable project archaeology: what changed, why, and what
+/// remains unsettled.
 #[derive(Debug, Parser)]
 #[command(name = "scarp", version, propagate_version = true)]
 pub struct Cli {

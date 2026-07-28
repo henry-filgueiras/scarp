@@ -427,3 +427,85 @@ and `--no-verify` were not used.
 - Task 44's suspects are untouched. The stale `See it work` showcase
   and its `jq` dependency remain that task's, and the new quickstart
   is the deterministic fixture it can be rebuilt from.
+
+### Addendum (2026-07-27): the repaired gate observed in CI
+
+Appended after this task closed, during
+[[tsk_01KYJG0S7SYMYY1FEG7H4QQX8G|task 44]]. The Result and the
+Limitations above are **not rewritten**: every limitation was true when
+this task closed, because the workflow genuinely had not run on GitHub
+and could not until Henry pushed. This addendum records that he did, and
+what the run showed.
+
+Henry pushed the repair, and run `30321601486` (workflow `CI`) executed
+against commit `f66a94ee7de917bca435fa5d65b78396d8cf74d8` — this task's
+own commit. Both jobs succeeded. The logs were read in full rather than
+trusted from the green badge, because a passing job containing its own
+refutation is exactly the failure this task exists to close:
+
+```sh
+gh run view 30321601486 --repo henry-filgueiras/scarp \
+  --job 90158451436 --log    # MSRV
+gh run view 30321601486 --repo henry-filgueiras/scarp \
+  --job 90158451472 --log    # check
+```
+
+Verified in the MSRV job log (`90158451436`), quoted verbatim:
+
+```text
+Read the declared MSRV…   declared rust-version: 1.88 -> rustup toolchain: 1.88
+Install the MSRV…         rustup toolchain install "$TOOLCHAIN" --profile minimal --no-self-update
+Install the MSRV…         1.88-x86_64-unknown-linux-gnu installed - rustc 1.88.0 (6b00bc388 2025-06-23)
+Install cargo-hack…       tool: cargo-hack@0.6.45
+Install cargo-hack…       info: installing cargo-hack@0.6.45
+Record which toolchain…   stable-x86_64-unknown-linux-gnu (active, default)
+Record which toolchain…   1.88-x86_64-unknown-linux-gnu
+Record which toolchain…   /home/runner/.rustup/toolchains/1.88-x86_64-unknown-linux-gnu/bin/cargo
+Record which toolchain…   cargo 1.88.0 (873a06493 2025-05-10)
+Record which toolchain…   rustc 1.88.0 (6b00bc388 2025-06-23)
+Record which toolchain…   cargo-hack 0.6.45
+cargo hack check…         running `rustup run 1.88 cargo check --all-targets --locked` on scarp (1/1)
+cargo hack check…         Finished `dev` profile … in 13.18s
+Fail if cargo-hack…       toolchain list unchanged across the gate
+```
+
+Point by point against the defect this task repaired:
+
+- The manifest declared `1.88`, and the job derived the rustup toolchain
+  **name** `1.88` from it rather than hard-coding either spelling.
+- `rustup toolchain install` installed that name. The list printed by the
+  evidence step contains `1.88-x86_64-unknown-linux-gnu` and **no**
+  `1.88.0` — the exact inversion of run `30319275441`, where the list
+  contained `1.88.0` and no `1.88`.
+- That toolchain reported cargo `1.88.0` and rustc `1.88.0`, showing the
+  name-versus-version distinction rather than asserting it.
+- cargo-hack was `0.6.45` exactly, pinned by `tool: cargo-hack@0.6.45`
+  and confirmed by both `installing cargo-hack@0.6.45` and
+  `cargo hack --version`. It no longer resolves `@latest` by luck of
+  timing.
+- cargo-hack invoked `rustup run 1.88 cargo check --all-targets
+  --locked` — the toolchain the job installed, not one it fetched for
+  itself. No `rustup toolchain add` line appears anywhere in the log.
+- The before/after snapshot compared clean: `toolchain list unchanged
+  across the gate`. The guard whose logic was proven here only against
+  reconstructed input has now run for real and stayed silent for the
+  right reason.
+
+The `check` job (`90158451472`) passed **385 tests across 19 binaries**,
+matching the local count exactly, and finished with `doctor: 107
+artifact(s) checked, no problems found`.
+
+This resolves the first limitation above: "the MSRV gate now runs on the
+toolchain it installs" is no longer *designed and locally supported* but
+**observed in CI**. The second limitation is narrowed rather than
+resolved — the materialisation guard was exercised end-to-end and
+reported no change, which proves it runs and parses, but a runner that
+already lacked `1.88` was not available to make it fire in anger; its
+firing behaviour still rests on the reconstructed-input proof above.
+
+This does not discharge [[tsk_01KYK0PTQV9PGZTHRDAPG6YGYM|task 45]]'s
+inherited check. Run `30321601486` verifies commit `f66a94e`, which is
+not the commit `0.1.0` will be published from — task 44 changed
+`README.md`, which is part of the crate payload, and further commits may
+follow. Task 45 must repeat this verification against whatever commit
+becomes the release source.

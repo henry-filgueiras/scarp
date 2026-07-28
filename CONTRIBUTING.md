@@ -13,12 +13,13 @@ is written by a person, an agent, or both.
 
 ## Building and testing
 
-Stable Rust toolchain, then:
+Stable Rust, 1.88 or newer — the crate declares that as its `rust-version`,
+and CI checks it against exactly that toolchain.
 
 ```sh
 cargo build
 cargo run -- --help
-scripts/check.sh   # rustfmt --check, full test suite, clippy -D warnings
+scripts/check.sh   # rustfmt --check, tests, clippy -D warnings, scarp doctor
 ```
 
 `scripts/check.sh` must pass before any pull request. Filesystem mutation is
@@ -34,8 +35,12 @@ never touch the working repository.
    tasks. Work that belongs to no sprint and serves no recorded idea or
    dragon is likely to be declined regardless of quality — open an issue
    first.
-3. Check open dragons (`archaeology/dragons/open/`) and recorded decisions so
-   you don't reopen a settled tradeoff without new evidence.
+3. Check open dragons and recorded decisions so you don't reopen a settled
+   tradeoff without new evidence. `scarp list dragons` and
+   `scarp list decisions` are the quickest route; the files themselves are in
+   `archaeology/dragons/` and `archaeology/decisions/`. Lifecycle state lives
+   in front matter, so there are no `open/` or `closed/` subdirectories to
+   look in.
 
 ## Making changes
 

@@ -2,8 +2,9 @@
 
 ## Supported versions
 
-Scarp is pre-1.0 and has no releases yet. Security fixes land on `main`
-only; there are no maintained release branches.
+Scarp is pre-1.0. Security fixes land on `main` and in the next published
+version; there are no maintained release branches, and older versions are
+not patched in place.
 
 ## Threat model, honestly stated
 
@@ -16,8 +17,10 @@ interesting security surface is therefore narrow:
   resource exhaustion, or logic errors triggered by malformed input;
 - path handling — an artifact or configuration value that could induce reads
   or writes outside the repository root;
-- content-loss bugs in mutation paths (see decision 8 in
-  `archaeology/decisions/` for the failure-class contract).
+- content-loss bugs in mutation paths — see
+  [decision 8](archaeology/decisions/0008-mutation-failure-classes.md) for
+  the failure-class contract, which states plainly which classes are covered
+  and which (power loss, kernel crashes) are deliberately out of scope.
 
 If you find any of these — especially anything that lets a hostile
 repository escape its own directory — please report it.

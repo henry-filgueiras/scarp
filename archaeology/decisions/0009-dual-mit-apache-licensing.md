@@ -58,3 +58,48 @@ License the project MIT OR Apache-2.0, expressed the standard Rust way:
 - The dual-file layout means GitHub reports both licenses rather than
   one SPDX id; this is the ecosystem-standard presentation and how
   serde, clap, and rustc appear.
+
+## Erratum (2026-07-27): GitHub reports one license, not both
+
+The final consequence above is **factually wrong in its first clause**
+and right in its second. Recorded during
+[[tsk_01KYJG0S7SYMYY1FEG7H4QQX8G|task 44]]'s landing-surface audit and
+verified that day against the GitHub REST API:
+
+```text
+gh api repos/henry-filgueiras/scarp/license
+  -> name "Apache License 2.0", spdx_id "Apache-2.0",
+     path "LICENSE-APACHE"
+gh api repos/henry-filgueiras/scarp --jq .license
+  -> {"key":"apache-2.0","name":"Apache License 2.0",
+      "spdx_id":"Apache-2.0"}
+```
+
+GitHub's detector picks exactly one file out of the two and reports a
+single SPDX id. The repository sidebar reads "Apache License 2.0" with
+no mention of MIT.
+
+The second clause survives intact, and in fact explains the first. The
+same query against the three exemplars this decision cited returns the
+same single answer:
+
+| Repository | `license.spdx_id` reported by GitHub |
+|---|---|
+| `serde-rs/serde` | `Apache-2.0` |
+| `rust-lang/rust` | `Apache-2.0` |
+| `clap-rs/clap` | `Apache-2.0` |
+
+So the layout *is* ecosystem-standard and Scarp *does* appear exactly as
+serde, clap, and rustc appear — the error was believing that appearance
+shows both licenses. It never did, for any of them.
+
+Nothing in the Decision changes. The licensing choice, the two root
+files, the manifest's `license = "MIT OR Apache-2.0"`, and the README's
+inbound clause all stand; only the prediction about GitHub's display was
+wrong. No source file is contorted to satisfy the detector, because the
+detector's opinion is not the license. Task 44's remedy is on the
+human-readable surfaces instead: the README hero carries
+`MIT OR Apache-2.0`, and its License section states the dual grant and
+names GitHub's single-license display as a detector artifact — so a
+reader who trusts the sidebar is corrected in the one place they look
+next.
