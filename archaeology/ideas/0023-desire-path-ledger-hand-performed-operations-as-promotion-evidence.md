@@ -64,3 +64,37 @@ sprint 7 proposed managing them; no ledger recorded that count — it
 was reconstructed by listing a directory.
 
 Proposed by Claude during the sprint 7 pitch, 2026-07-23.
+
+### 2026-07-27, task 46: four rows in one task
+
+[[tsk_01KYK608A5Q5CAEPYYKW4YFQSH|Task 46]] hand-performed four
+operations Scarp should conceptually own. They are recorded here as
+the ledger would have recorded them — operation shape, not content —
+because there is no ledger to write them to, which is the gap:
+
+```text
+2026-07-27  append dated erratum to a closed artifact's result
+2026-07-27  amend a sprint's execution order after allocation
+2026-07-27  edit downstream artifacts to recognise a newly inserted dependency
+2026-07-27  snapshot tracked paths into a disposable git repo to satisfy a clean-tree check
+```
+
+The third is the one worth noticing. Inserting task 46 between 43 and
+44 required hand-editing **three** other artifacts — the sprint's
+order, task 44's introductory dependency, task 45's preconditions —
+because ordering and dependency live only in prose. Scarp knows a task
+belongs to a sprint; it does not know a task precedes another, so
+nothing could have found those three sites or verified they were all
+updated. Missing one would have left a task pointing at a superseded
+predecessor with no structural trace.
+
+The fourth is now a **second** performance: task 43 built the same
+disposable-snapshot apparatus for the same reason (`cargo publish`
+requires clean VCS state, implementing the task dirties the tree), and
+task 46 rebuilt it from scratch the same day. By the project's rule of
+three, one more performance makes it a candidate.
+
+This entry is itself the hand-performance the idea describes: written
+into an idea's Evidence section because the aggregating artifact does
+not exist. Absent this note, the four rows would be recoverable only
+by re-reading a diff — exactly the failure the Problem section names.

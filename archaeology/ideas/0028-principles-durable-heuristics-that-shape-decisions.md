@@ -95,3 +95,70 @@ architectural principles registries (e.g. government/enterprise
 "architecture principles" catalogs), Amazon-style tenets ("unless you
 know better ones"), and ADR practice, which distinguishes decisions
 from the forces acting on them; the forces are the principles.
+
+### 2026-07-27, sprint 8: a candidate principle with four instances
+
+The Boundaries section holds that no collection work is justified
+until the corpus demonstrates need. Sprint 8 supplied a candidate that
+recurred **four times in one sprint**, drafted below in the schema the
+Sketch proposes — partly as evidence, partly to test whether that
+schema survives contact with real material.
+
+> **Statement.** A verification is blind to any defect whose
+> precondition was established by the work being verified. Check in an
+> environment the work did not touch, or the check proves only that
+> the environment is already in the shape the work put it in.
+>
+> **Rationale.** Doing the work leaves residue — installed toolchains,
+> warm caches, files present in the tree, a directory created by the
+> first run. That residue is indistinguishable, to a local check, from
+> a property of the artifact under test.
+>
+> **Application ordering.** Prefer a genuinely fresh environment
+> (fresh `CARGO_HOME`, unpacked tarball, clean container). Failing
+> that, snapshot the contaminating state and assert it did not change.
+> Failing that, record explicitly which precondition the check assumed
+> rather than claiming the check was clean.
+>
+> **Counterpressure.** Fresh environments cost wall-clock time and can
+> themselves be wrong (a container that omits a dependency the real
+> user has). A local check that *names its assumption* beats a slow
+> one that gets skipped. The principle argues for stating the
+> contamination, not for maximal isolation.
+>
+> **Failure signals.** A check that passes on the development machine
+> and has never run anywhere else; a verification step positioned
+> after the step that creates its precondition; the phrase "it works
+> here" standing in for evidence; a green result whose mechanism was
+> never distinguished from a plausible alternative.
+
+The four instances, all in [[tsk_01KYJG0S7GY51W8M1WYFMEV7MQ|task 43]]
+and [[tsk_01KYK608A5Q5CAEPYYKW4YFQSH|task 46]]:
+
+1. The working tree contained `archaeology/`, so the test suite passed
+   while the *packaged* crate's suite would have failed. Caught only
+   by testing the unpacked tarball.
+2. A warm cargo cache or a `target/debug/scarp` would have satisfied
+   the install test; task 43 pre-empted this with a fresh
+   `CARGO_HOME`, `CARGO_TARGET_DIR`, and install root.
+3. The machine that determined MSRV = 1.88 had thereby installed the
+   toolchain named `1.88`, so the local MSRV-gate check could not
+   observe cargo-hack fetching it. The defect surfaced only on a clean
+   GitHub runner — and surfaced there in a job that **passed**.
+4. Running the quickstart once created `/tmp/scarp-demo`, so the
+   documented `mkdir` could only fail on a *reader's* machine, never
+   on the author's.
+
+Instance 3 also yields a narrower companion candidate: **a passing
+check is not evidence that its documented mechanism ran.** Job
+90151540325 was green while its own log contradicted the workflow
+comment above it. The repair was to make the mechanism falsifiable —
+snapshot the toolchain list before and after and fail on any change —
+rather than to trust the exit status.
+
+That repair is the reason this belongs in a principle rather than a
+retrospective: the heuristic is only useful if the *next* decision can
+cite it while choosing between "verify locally and move on" and "build
+a check that can fail". Sprint 8 answered that question four times
+and, absent a principle artifact, left the reasoning recoverable only
+by reading two task Results end to end.

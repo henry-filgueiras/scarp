@@ -52,3 +52,48 @@ highest stakes — correcting an incident's own output. Each was
 hand-typed with no scaffold and no structural trace.
 
 Proposed by Claude during the sprint 7 pitch, 2026-07-23.
+
+### 2026-07-27, task 46: the grammar diverged again, mid-session
+
+The Problem section counts two divergent heading grammars.
+[[tsk_01KYK608A5Q5CAEPYYKW4YFQSH|Task 46]] added a third and a fourth
+in a single sitting, without anyone deciding to:
+
+| Heading written | File |
+|---|---|
+| `## Amendment (2026-07-27): two planning assumptions were wrong` | task 43 |
+| `## Amendment (2026-07-27): release topology` | sprint 8 |
+| `### Amendment (2026-07-27): task 46 sits between 43 and 44` | sprint 8 |
+| `## Erratum (2026-07-27, post-close)` | task 43 |
+
+The third differs only in **heading level** — `###` because it nests
+under an existing `##` amendment, which is a defensible local choice
+and also exactly how free-form grammars drift. The fourth introduces a
+new **noun**.
+
+That noun is the finding, not the accident. "Erratum" was reached for
+because the operation genuinely differs from the amendments above it:
+an amendment revises a *live* artifact's guidance going forward, while
+this correction targets the Result of a **closed** artifact whose
+conclusions were already relied on downstream. The distinction is real
+— one changes what to do next, the other changes what you should
+believe about work already finished — and free-form prose is where it
+had to be expressed, since nothing structural carries it.
+
+So the sketch may be under-specified. A single `scarp amend` assumes
+one operation; this session found two that want different words,
+different scaffolds, and possibly different front-matter treatment.
+An amendment to an `accepted` decision leaves it accepted; an erratum
+against a `closed` task's Result arguably wants to be discoverable
+from `list` without reading the body, because its whole purpose is to
+stop a reader from trusting a conclusion at face value. Deciding
+whether "amend" and "correct" are one operation or two belongs to the
+first slice, not after the command exists.
+
+Also relevant to boundaries: the erratum was written under an explicit
+instruction *not* to rewrite the original Result. Preserving the
+falsified text alongside the correction is what made the record
+useful — the original local evidence was sound and its insufficiency
+is the lesson. Any managed form must make append-without-rewrite the
+easy path, since the tempting edit is always to fix the sentence in
+place.
