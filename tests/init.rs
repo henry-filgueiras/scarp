@@ -67,13 +67,25 @@ fn shipped_policy_exists_only_at_the_nested_archaeology_path() {
     // This repository ships the same policy `scarp init` writes, only
     // inside archaeology/ (decision 14 as amended); the task 26 root
     // file is gone.
-    let nested = concat!(env!("CARGO_MANIFEST_DIR"), "/archaeology/.gitattributes");
-    assert_eq!(fs::read_to_string(nested).unwrap(), GITATTRIBUTES_POLICY);
+    //
+    // This asserts a property of the *host Scarp repository*, not of the
+    // crate. The published package excludes both `.scarp.toml` and
+    // `archaeology/`, so an unpacked crate is not a Scarp repository and
+    // has nothing to assert; the marker distinguishes the two cases.
+    // Every development checkout and CI job carries the marker, so the
+    // assertion is never skipped where it is meaningful.
     let root = concat!(env!("CARGO_MANIFEST_DIR"), "/.gitattributes");
     assert!(
         !std::path::Path::new(root).exists(),
         "root .gitattributes belongs to the host repository"
     );
+
+    let marker = concat!(env!("CARGO_MANIFEST_DIR"), "/.scarp.toml");
+    if !std::path::Path::new(marker).exists() {
+        return;
+    }
+    let nested = concat!(env!("CARGO_MANIFEST_DIR"), "/archaeology/.gitattributes");
+    assert_eq!(fs::read_to_string(nested).unwrap(), GITATTRIBUTES_POLICY);
 }
 
 #[test]

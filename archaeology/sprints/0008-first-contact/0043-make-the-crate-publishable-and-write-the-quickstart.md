@@ -2,9 +2,10 @@
 id: tsk_01KYJG0S7GY51W8M1WYFMEV7MQ
 sequence: 43
 kind: task
-status: pending
+status: closed
 sprint: spr_01KYFRWF0B8QKN89NHVKQG2TQT
 created: 2026-07-27
+closed: 2026-07-27
 ---
 
 # Make the crate publishable and write the quickstart
@@ -225,4 +226,372 @@ resulting `rustup toolchain list` — as dated provenance per
 - `scripts/check.sh` passes, and the work is committed per the commit
   policy in `CLAUDE.md`.
 
+## Amendment (2026-07-27): two planning assumptions were wrong
+
+Both were checked against current primary sources at implementation
+time rather than trusted, and both failed. The criteria above stand
+except where corrected here.
+
+### crates.io renders Mermaid, and it does rewrite relative media
+
+The criterion above asserts that "crates.io renders the README as
+Markdown and does not render Mermaid, and a relative
+`assets/logo.svg` reference does not resolve on the crate page".
+That was already false when written. Verified against
+`rust-lang/crates.io` at `HEAD` on 2026-07-27:
+
+- `crates/crates_io_markdown/src/lib.rs` lists `language-mermaid`
+  among the sanitizer's allowed `code` classes, with a unit test
+  asserting the class survives;
+  `svelte/src/lib/attachments/mermaid.ts` runs
+  `mermaid.run({ nodes })` over `.language-mermaid` with
+  `securityLevel: 'strict'`; and
+  `e2e/acceptance/readme-rendering.spec.ts` asserts
+  `pre > code.language-mermaid svg.flowchart` becomes **visible**.
+  Mermaid is rendered client-side, so the diagrams are **retained**.
+- Relative URLs are rewritten to `<repository>/raw/HEAD/<dir>/<path>`
+  for media and `blob/HEAD` otherwise, with `?sanitize=true` appended
+  for `.svg`. This applies to raw-HTML `<img src>` as well as Markdown
+  image syntax. **The rewritten URL follows repository `HEAD` and is
+  therefore mutable**: the crate page for a frozen version will track
+  whatever the default branch later contains.
+
+The consequence is the opposite of the plan: relative paths are the
+*correct* choice for `<img src>`, and are kept.
+
+### `<source srcset>` is the real defect, and it was not in the plan
+
+crates.io allows `srcset` on `<source>`, but ammonia rewrites only the
+attributes in its `is_url_attr` list — `href`, `xlink:href`, `src`,
+`form/action`, `object/data`, `formaction`, `a/ping`, `video/poster`.
+`srcset` is absent, so a relative dark-mode `srcset` is emitted
+verbatim and resolves against `https://crates.io/crates/scarp`.
+crates.io's own `pictures_and_sources` test uses absolute URLs only
+and does not cover this. Because `<picture>` does **not** fall back to
+`<img>` when the selected `<source>` fails to load, every dark-mode
+visitor would have seen a broken logo. Fixed by making that one
+attribute an absolute `raw.githubusercontent.com/.../HEAD/...` URL —
+mutable for the same reason, and recorded as such.
+
+### `cargo hack --rust-version` does install toolchains
+
+The criterion above records, as the gate's "one non-obvious
+requirement", that `cargo hack --rust-version` does not install
+toolchains. That is no longer true of cargo-hack 0.6.45. Its
+`rustup::install_toolchain` runs
+`rustup toolchain add <toolchain> --no-self-update` whenever
+`rustup run <toolchain> cargo --version` fails, and this was observed
+locally: the first gate run emitted
+`info: running 'rustup toolchain add 1.88 --no-self-update'`.
+
+What remains true is the part that matters: **rustup itself must be
+present**, because cargo-hack shells out to `rustup run` (deliberately,
+not `cargo +toolchain`, per rustup bug #3036).
+
+A second, sharper detail replaces it: cargo-hack derives the toolchain
+name as `format!("1.{minor}")`, **stripping the patch component**. A
+`rust-version` of `1.88.0` gates on the toolchain named `1.88`, not
+`1.88.0`. Installing `1.88.0` in CI would therefore leave the gate to
+silently fetch a different toolchain than the one the job pinned —
+defeating the purpose of installing it explicitly. `rust-version` is
+declared as `1.88` so the manifest, the CI toolchain, and the toolchain
+that actually executes are the same string.
+
 ## Result
+
+All work performed 2026-07-27 from a clean checkout equal to
+`origin/main` at `5c7900d151b95cc5f90597774599fbbbeb013117`.
+
+### Toolchain migration
+
+The prerequisite was performed by Henry, not by the agent: `brew
+uninstall rust` (which also autoremoved `llvm`, `pkgconf`, and `z3`;
+`brew uses --installed rust` was empty beforehand, and `~/.cargo/bin`
+did not exist, so no `cargo install`ed binary was lost), followed by
+the rustup installer. rustup 1.29.0 now owns the toolchain and
+`/opt/homebrew/bin/{cargo,rustc}` are gone.
+
+Every toolchain claim below is backed by `rustup which` rather than
+PATH appearance, because PATH shadowing was the hazard the migration
+existed to remove:
+
+```text
+rustup which cargo                    /Users/henry/.rustup/toolchains/stable-aarch64-apple-darwin/bin/cargo
+cargo --version                       cargo 1.97.1 (c980f4866 2026-06-30)
+rustc -Vv                             rustc 1.97.1 (8bab26f4f 2026-07-14), host aarch64-apple-darwin
+rustup which --toolchain 1.88.0 cargo /Users/henry/.rustup/toolchains/1.88.0-aarch64-apple-darwin/bin/cargo
+cargo +1.88.0 --version               cargo 1.88.0 (873a06493 2025-05-10)
+```
+
+One wrinkle worth recording: rustup wires itself into `~/.zshenv` and
+`~/.profile`, but an already-running shell keeps the old PATH. Agent
+sessions must `. "$HOME/.cargo/env"` explicitly rather than assume a
+fresh login shell.
+
+### MSRV: 1.88
+
+Determined by testing, not declared. Edition 2024 sets 1.85.0 as the
+theoretical floor, so 1.85.0 was tested first and the search moved
+upward only on concrete failures:
+
+| Toolchain | Result |
+|---|---|
+| 1.85.0 | **fails** — `error[E0658]: 'let' expressions in this position are unstable` (issue #53667), exactly 5 sites, all in `src/main.rs` (lines 136, 151, 176, 191, 456) |
+| 1.87.0 | **fails** — same error, same sites |
+| 1.88.0 | **passes** — `let` chains stabilised in 1.88.0 |
+
+Those failures were observed *before* `rust-version` was declared. With
+the contract in place, Cargo now refuses earlier and more usefully —
+`error: rustc 1.85.0 is not supported by the following packages: scarp@0.1.0
+requires rustc 1.88` — which is Cargo erroring rather than warning, as its
+documentation promises. Re-deriving the compile-level evidence afterwards
+requires `--ignore-rust-version` to get past the manifest gate.
+
+The floor is a language feature, not a dependency: no dependency was
+downgraded, and nothing was changed to advertise a lower number. With
+1.88.0, all three of `cargo +1.88.0 build --locked`,
+`cargo +1.88.0 test --locked`, and `cargo +1.88.0 doc --no-deps
+--locked` succeed, and `cargo +1.88 check --all-targets --locked` also
+succeeds against the *packaged* artifact.
+
+`rust-version = "1.88"` rather than `"1.88.0"` for the reason in the
+amendment above: cargo-hack strips the patch, so `1.88` is the string
+the gate actually resolves and installs.
+
+### Manifest metadata
+
+```toml
+rust-version = "1.88"
+description  = "Git-native, reviewable project archaeology: what changed, why, and what remains unsettled"
+readme       = "README.md"
+keywords     = ["archaeology", "decision-records", "adr", "project-memory", "documentation"]
+categories   = ["command-line-utilities", "development-tools"]
+```
+
+The description was reconciled minimally with
+[[dec_01KYJE2K3VRASS8A1X1E847S1B|decision 16]] and
+[[tsk_01KYFYKAZRGEJPJYKAWV8W9BB4|task 41]]: the previous wording ended
+"for humans and coding agents", which is close to the headline claim
+task 41 retired because it promises capture and injection Scarp does
+not ship. It now uses task 41's endorsed positive framing. The
+comprehensive claim audit remains
+[[tsk_01KYJG0S7SYMYY1FEG7H4QQX8G|task 44]]'s.
+
+Both category slugs were re-verified against the live
+`crates.io/api/v1/categories` list on 2026-07-27 (58 top-level
+categories). Three of the plan's five candidates were **dropped on
+inspection rather than kept to fill the cap**: `command-line-interface`
+is for crates that help *build* CLIs, and `filesystem` and
+`text-processing` describe libraries rather than this tool. Two
+accurate categories beat five padded ones.
+
+`homepage` and `documentation` are both unset, as planned; no new
+evidence emerged to justify either. `cargo doc --no-deps` builds, so
+the docs.rs page crates.io will link is known to compile. It emits
+three pre-existing warnings — public docs in `artifact.rs`, `edges.rs`,
+and `read.rs` link to private items — which are warnings, not failures,
+and were left alone as out of scope.
+
+### Package contents
+
+A positive `include` allowlist, as planned; no reason to prefer
+`exclude` was found. **36 files, 554.5 KiB uncompressed, 121.2 KiB
+compressed — 1.18% of crates.io's 10 MiB limit.** Down from 171 files
+on the starting commit.
+
+Verified by listing the actual packaged files and by unpacking the
+`.crate`, never by reading the manifest:
+
+- `src/` (11), `tests/` (16), `README.md`, `LICENSE-APACHE`,
+  `LICENSE-MIT`, `assets/logo.svg`, `assets/logo-dark.svg`;
+- plus Cargo's automatic four: `Cargo.toml`, `Cargo.toml.orig`, a
+  minimized `Cargo.lock` (93 packages), and `.cargo_vcs_info.json`.
+
+Confirmed absent: `archaeology/` (118 files), `CLAUDE.md`, `.claude/`,
+`.github/`, `scripts/`, `rustfmt.toml`, `.scarp.toml`, `.gitignore`,
+`CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`. Since `license`
+is set rather than `license-file`, both license files are listed
+explicitly, and both are present in the artifact.
+
+**One genuine packaging bug was caught by this, and only by this.**
+`tests/init.rs::shipped_policy_exists_only_at_the_nested_archaeology_path`
+read `$CARGO_MANIFEST_DIR/archaeology/.gitattributes` at runtime, so
+excluding the archaeology broke the test suite *inside the packaged
+crate* while the working tree stayed green. It asserts a property of
+the host repository, not of the crate, so it is now gated on the
+presence of `.scarp.toml` — which the package also excludes. Every
+development checkout and CI job carries the marker, so the assertion is
+never skipped where it means anything; an unpacked crate is simply not
+a Scarp repository and has nothing to assert.
+
+### README: links, logo, Mermaid
+
+Every link was audited in both contexts — an unpacked crate, and
+crates.io's current rewriting rules. All eight resolve:
+
+| Link | On crates.io | In an unpacked crate |
+|---|---|---|
+| `assets/logo.svg` (`<img src>`) | rewritten to `raw/HEAD/assets/logo.svg?sanitize=true` | packaged |
+| `…/HEAD/assets/logo-dark.svg` (`<source srcset>`) | absolute, passed through | absolute |
+| `LICENSE-APACHE`, `LICENSE-MIT` | rewritten to `blob/HEAD/…` | packaged |
+| `CLAUDE.md`, `archaeology/` | absolute repository URLs | absolute |
+| two license autolinks | absolute | absolute |
+
+`CLAUDE.md` and `archaeology/` were relative links to excluded
+material. They would have worked on crates.io by accident of the
+rewrite while 404ing in an unpacked crate, so both were converted to
+absolute repository URLs with a sentence stating they are not part of
+the crate. The two `http://` license autolinks were examined and left:
+they resolve.
+
+The `Development` section gained a lead-in stating it assumes a
+repository checkout, since it invokes `scripts/check.sh`, which is
+deliberately not packaged.
+
+**Mermaid rendering check.** crates.io pins mermaid `11.16.0`
+(`svelte/package.json`); both diagrams were extracted from the shipped
+README and run through that exact version with
+`initialize({ startOnLoad: false, securityLevel: 'strict' })` — the
+same configuration `mermaid.ts` uses. Both `parse` and `render`
+succeeded, producing flowchart-classed SVGs (13.9 KB and 360.6 KB), and
+all `<br/>`-separated labels survived strict-mode sanitisation as six
+`<br>` elements. **Documented limitation:** this ran under jsdom, which
+has no layout engine, so `getBBox` and `getComputedTextLength` were
+stubbed. It establishes syntax validity, strict-mode acceptance, and
+that a flowchart SVG is produced — *not* pixel-accurate appearance,
+font metrics, or final geometry. No local tool reproduces the crate
+page. Inspection of the rendered page remains
+[[tsk_01KYK0PTQV9PGZTHRDAPG6YGYM|task 45]]'s.
+
+### Install and quickstart
+
+The README gained an `Install` section (`cargo install scarp --locked`,
+Rust 1.88+) and a `Quickstart` operating in `/tmp/scarp-demo`, an
+explicitly disposable directory, with its filesystem effects stated and
+a cleanup command. It depends on no helper beyond a shell — no `jq`.
+
+Every command was executed exactly as documented against a binary
+installed from the unpacked package, and its real output is preserved
+in the README unedited. Three fields are marked as varying: the ULID,
+the date, and the absolute path macOS prints (`/private/tmp/…`).
+
+**Timings, measured separately as the sprint amendment requires:**
+
+- **Install: 5.72 s real, 43.00 s user** — genuinely cold (fresh
+  `CARGO_HOME`; 65 crates downloaded, 179 dependencies built) on an
+  18-core Apple M5 Pro. This is a fast machine and the README says so
+  without promising the number.
+- **Post-install quickstart: 0.04 s** of machine time, against the
+  ~60-second criterion. The budget is comfortably met; the sixty
+  seconds is human reading time, not compute.
+
+### Verification against the packaged artifact
+
+The `.crate` was treated as the product under test throughout. Unpacked
+outside the development checkout, it builds, its **385 tests across 19
+binaries all pass**, and `cargo doc --no-deps` succeeds. Installation
+used a fresh `CARGO_HOME`, a fresh `CARGO_TARGET_DIR`, and a temporary
+`--root`, all three verified empty beforehand, so no warm cache, no
+`target/debug/scarp`, and no development binary could satisfy the test.
+`command -v scarp` resolved to the temporary install root, and no
+`scarp` exists in `~/.cargo/bin`.
+
+### Resolving the clean-tree paradox
+
+`cargo publish` requires clean VCS state; implementing the task dirties
+the checkout. Neither `--allow-dirty` nor `--no-verify` was used, and
+no WIP commit was made in the real repository. Instead:
+
+1. every tracked path was copied from the **working tree** (carrying
+   the uncommitted edits) into a temporary directory, excluding the
+   original `.git` and all build products;
+2. representation was proven rather than assumed —
+   `git ls-files --others --exclude-standard` confirmed **zero**
+   untracked non-ignored files to account for, file counts matched at
+   169, and `git hash-object` over all 169 tracked paths was
+   **byte-identical** on both sides;
+3. a disposable Git repository was initialised there and the snapshot
+   committed locally;
+4. `cargo package --locked` and `cargo publish --dry-run --locked` ran
+   from that clean snapshot.
+
+`--locked` deliberately, so this task exercises the same lockfile
+contract task 45 will.
+
+**Two consequences to carry forward.** The snapshot's
+`.cargo_vcs_info.json` records the *snapshot's* commit SHA, not this
+repository's — an artifact of the method; the real publication will
+embed the real release SHA, which is task 45's to record. And the
+later Result, status, and closure edits in this file touch
+`archaeology/` only, which the allowlist excludes, so **they cannot
+alter the packaged payload**; the final dry run from the real clean
+commit confirms this rather than assuming it.
+
+### MSRV CI gate
+
+One job, `msrv`, added to `.github/workflows/ci.yml`: Ubuntu, the
+`1.88` toolchain explicitly installed via
+`dtolnay/rust-toolchain@1.88`, prebuilt cargo-hack via
+`taiki-e/install-action@cargo-hack`, a step printing `rustup toolchain
+list`, `rustup which cargo`, `cargo --version`, `rustc --version`, and
+`cargo hack --version` so the log shows what actually ran, then:
+
+```sh
+cargo hack check --rust-version --all-targets --locked
+```
+
+`--workspace` and `--ignore-private` from Cargo's example invocation
+are **omitted**: Scarp is a single published package with no private
+members, so both are inert here, and copying them would be
+cargo-culting. The gate stays check-only on one platform — a drift
+guard, not a compatibility matrix — with a comment saying it must not
+grow into one without a recorded reason. No repository-wide
+`rust-toolchain.toml` was introduced; `rust-version` plus this gate is
+the whole contract.
+
+The exact invocation was also run locally against cargo-hack 0.6.45:
+`running 'rustup run 1.88 cargo check --all-targets --locked' on scarp
+(1/1)` … `Finished`.
+
+### Outcome
+
+`cargo publish --dry-run --locked` from the clean snapshot: `Packaged
+36 files, 554.4KiB (121.2KiB compressed)`, `Verifying scarp v0.1.0`,
+then `warning: aborting upload due to dry run`.
+
+It was then repeated from the **real repository at the clean commit**,
+after `scripts/check.sh` passed (doctor: 106 artifacts, no problems)
+and the work was committed: `Packaged 36 files, 554.5KiB (121.2KiB
+compressed)` and the same clean abort. The small delta from the
+snapshot figure is a `Cargo.toml` comment edited after the snapshot was
+taken, not a change in what ships.
+
+That run also confirms the two predictions above rather than leaving
+them asserted: the packaged file list is unchanged at 36 despite this
+Result being written in between — because `archaeology/` is excluded,
+editing it cannot move the payload — and `.cargo_vcs_info.json` now
+carries this repository's commit rather than the disposable snapshot's.
+The precise release SHA belongs to
+[[tsk_01KYK0PTQV9PGZTHRDAPG6YGYM|task 45]] and is deliberately not
+quoted here, since a task cannot name the commit that contains it.
+
+Nothing was published, tagged, or released; no tag was created, no
+GitHub release made, and no repository setting mutated.
+
+### For task 44
+
+- The README hero still reads "structured repository memory for humans
+  and coding agents", and `src/cli.rs` still describes the binary as
+  "Git-friendly project archaeology and repository-local memory". The
+  Cargo description no longer matches either. Reconciling all three is
+  task 44's, and `--help` output is now part of that surface.
+- The `See it work` showcase remains stale as task 44 already records,
+  and still depends on `jq`. The quickstart added here is the
+  deterministic fixture that section can be rebuilt from.
+- Both logo URLs and crates.io's own rewrite follow `HEAD`, so the
+  crate page for a frozen `0.1.0` tracks whatever the default branch
+  later contains. Moving assets or renaming the default branch breaks a
+  published page retroactively.
+- `SECURITY.md`, `CONTRIBUTING.md`, and `CODE_OF_CONDUCT.md` are not
+  packaged, so they are GitHub-only surfaces; the
+  private-vulnerability-reporting blocker is unaffected by packaging.

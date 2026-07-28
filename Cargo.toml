@@ -2,9 +2,32 @@
 name = "scarp"
 version = "0.1.0"
 edition = "2024"
-description = "Git-friendly project archaeology and structured repository memory for humans and coding agents"
+# 1.87.0 rejects this crate's `let` chains (E0658); 1.88.0 stabilised them and
+# is the first release that builds, tests, and documents the locked graph.
+# Declared as `1.88` because the CI gate resolves this to a `1.<minor>`
+# toolchain name, dropping any patch component.
+rust-version = "1.88"
+description = "Git-native, reviewable project archaeology: what changed, why, and what remains unsettled"
 repository = "https://github.com/henry-filgueiras/scarp"
 license = "MIT OR Apache-2.0"
+readme = "README.md"
+keywords = ["archaeology", "decision-records", "adr", "project-memory", "documentation"]
+categories = ["command-line-utilities", "development-tools"]
+# Positive allowlist. The archaeology corpus, agent configuration, CI,
+# contributor scripts, and the repository marker serve no consumer of the
+# crate and would make an unpacked crate a Scarp repository in its own
+# right. Cargo always adds Cargo.toml, Cargo.toml.orig, and a minimized
+# Cargo.lock; `license` (not `license-file`) is used, so both license
+# files must be listed explicitly.
+include = [
+    "/src/**",
+    "/tests/**",
+    "/README.md",
+    "/LICENSE-APACHE",
+    "/LICENSE-MIT",
+    "/assets/logo.svg",
+    "/assets/logo-dark.svg",
+]
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }

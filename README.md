@@ -1,6 +1,6 @@
 <div align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/henry-filgueiras/scarp/HEAD/assets/logo-dark.svg">
     <img src="assets/logo.svg" alt="Scarp" width="420">
   </picture>
 
@@ -76,6 +76,107 @@ $ scarp list dragons --json | jq '.[-1]'
 > here be dragons. A dragon is a known risk nobody has resolved yet. Keeping it
 > as a first-class, listable artifact means it stays on the map instead of in
 > someone's memory.
+
+## Install
+
+Scarp is a single binary with no runtime dependencies. Building it needs Rust
+1.88 or newer.
+
+```sh
+cargo install scarp --locked
+```
+
+This compiles Scarp and its dependencies and places the `scarp` binary in
+Cargo's install root — `~/.cargo/bin` unless you have configured otherwise.
+`--locked` builds against the dependency versions the release was tested with.
+
+Compiling the dependency tree dominates the wait, and how long it takes depends
+on your machine and cargo cache — measured cold on an 18-core laptop it was
+under ten seconds, but a smaller machine will take considerably longer. The
+quickstart below is separate from that, and near-instant.
+
+## Quickstart
+
+This creates a throwaway directory, turns it into a Scarp repository, records
+two artifacts, closes one, and validates the result — then deletes everything.
+It needs no Git repository and no helper programs beyond a shell. Every write
+lands **inside `/tmp/scarp-demo`**; no repository you already have is touched.
+
+```sh
+mkdir /tmp/scarp-demo && cd /tmp/scarp-demo
+scarp init
+scarp new dragon "Sequence collisions on concurrent branches"
+scarp new decision "Keep canonical records as ordinary files"
+scarp list dragons
+scarp show dragon:1
+scarp close dragon:1
+scarp doctor
+```
+
+What you should see — this is real output, unedited:
+
+```console
+$ scarp init
+initialized Scarp repository at `/private/tmp/scarp-demo`
+  created archaeology
+  created archaeology/dragons
+  created archaeology/.gitattributes
+  created .scarp.toml
+
+$ scarp new dragon "Sequence collisions on concurrent branches"
+created dragon:1 at archaeology/dragons/0001-sequence-collisions-on-concurrent-branches.md
+
+$ scarp new decision "Keep canonical records as ordinary files"
+created decision:1 at archaeology/decisions/0001-keep-canonical-records-as-ordinary-files.md
+
+$ scarp list dragons
+dragon:1  open  Sequence collisions on concurrent branches  (archaeology/dragons/0001-sequence-collisions-on-concurrent-branches.md)
+
+$ scarp show dragon:1
+---
+id: drg_01KYK39DH3BCQ9T5QQFWHKMQXA
+sequence: 1
+kind: dragon
+status: open
+created: 2026-07-27
+---
+
+# Sequence collisions on concurrent branches
+
+## Context
+
+## Question
+
+## Constraints
+
+## Candidate direction
+
+## Resolution criteria
+
+$ scarp close dragon:1
+closed dragon:1 (open -> closed) at archaeology/dragons/0001-sequence-collisions-on-concurrent-branches.md
+
+$ scarp doctor
+doctor: 2 artifact(s) checked, no problems found
+```
+
+Three things differ on your machine: the stable id is a freshly generated ULID,
+`created` is today's date, and `init` echoes the absolute path — on macOS
+`/tmp/scarp-demo` resolves to `/private/tmp/scarp-demo`, as above.
+
+`scarp init` creates `.scarp.toml`, `archaeology/`, `archaeology/dragons/`, and
+`archaeology/.gitattributes`. Each `scarp new` adds one Markdown file. Nothing
+else on your filesystem changes.
+
+Open `archaeology/dragons/0001-sequence-collisions-on-concurrent-branches.md` in
+any editor: it is an ordinary Markdown file, and Scarp is not required to read,
+edit, or keep it.
+
+When you are done:
+
+```sh
+cd .. && rm -rf /tmp/scarp-demo
+```
 
 ## How it fits
 
@@ -174,6 +275,9 @@ that the layer beneath it is useful.
 
 ## Development
 
+From a checkout of the repository — the published crate carries `src/` and
+`tests/` but not the contributor scripts:
+
 ```sh
 cargo build
 cargo test
@@ -194,9 +298,12 @@ scarp completions zsh > ~/.zfunc/_scarp
 ```
 
 Scarp is also a case study in human–AI collaboration on long-lived projects.
-[`CLAUDE.md`](CLAUDE.md) holds the project invariants and agent workflow, and
-[`archaeology/`](archaeology/) is the living record — the decisions, dragons,
-and sprints behind every change in this repository.
+[`CLAUDE.md`](https://github.com/henry-filgueiras/scarp/blob/HEAD/CLAUDE.md)
+holds the project invariants and agent workflow, and
+[`archaeology/`](https://github.com/henry-filgueiras/scarp/tree/HEAD/archaeology)
+is the living record — the decisions, dragons, and sprints behind every change
+in this repository. Neither is part of the published crate; both links point at
+the repository.
 
 ## License
 

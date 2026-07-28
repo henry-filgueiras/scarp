@@ -19,3 +19,41 @@ jobs:
 
       - name: Run checks
         run: scripts/check.sh
+
+  # Guards the `rust-version` in Cargo.toml against silent drift. This is a
+  # drift guard, not a compatibility matrix: one platform, check only, because
+  # MSRV breakage is almost always API availability rather than behaviour. It
+  # must not grow into a matrix without a recorded reason.
+  msrv:
+    name: MSRV
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      # `cargo hack --rust-version` runs `rustup run <toolchain> cargo`, and
+      # cargo-hack strips the patch component: `rust-version = "1.88"` resolves
+      # to the toolchain named `1.88`. cargo-hack 0.6.45 would `rustup toolchain
+      # add` it silently if absent, so it is installed explicitly here to keep
+      # the gate deterministic and to make what ran visible in the log. The name
+      # must stay in step with `rust-version` in Cargo.toml.
+      - name: Install Rust 1.88, the declared MSRV
+        uses: dtolnay/rust-toolchain@1.88
+
+      - name: Install cargo-hack (prebuilt)
+        uses: taiki-e/install-action@cargo-hack
+
+      - name: Record which toolchain actually runs
+        run: |
+          rustup toolchain list
+          rustup which cargo
+          cargo --version
+          rustc --version
+          cargo hack --version
+
+      # Cargo's example invocation adds `--workspace --ignore-private`. Scarp is
+      # a single published package with no private members, so both are inert
+      # here and are omitted rather than copied.
+      - name: cargo hack check --rust-version
+        run: cargo hack check --rust-version --all-targets --locked
