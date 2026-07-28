@@ -36,32 +36,94 @@ distinguishing property is *continuability* — records that can be
 directly edited, reviewed, branched, and merged — rather than mere
 readability.
 
-Two specific suspicions motivated this task and should be resolved
-either way, not assumed:
+This is the **pre-publication** audit. It covers the final package
+and README source and every surface that can be checked before a live
+page exists. Inspection of the rendered crates.io page and the
+docs.rs build belongs to [[tsk_01KYK0PTQV9PGZTHRDAPG6YGYM|task 45]],
+because neither exists until publication has happened.
 
-- the README's hero line reads "structured repository memory for
-  humans and coding agents", which sits close to the headline claim
-  task 41 retired;
-- the README describes "safe writes" while
-  [[drg-bootstrap-branch-collisions|dragon 1]] (branch sequence
-  collisions) and dragon 4 (power-loss durability of mutations)
-  are both open, and task 41 explicitly retired "safe for concurrent
-  agents".
+### Suspects to resolve, verdicts not assumed
 
-Neither suspicion is a finding yet. The audit may conclude the
-existing wording is defensible; what it may not do is leave the
-question unexamined.
+Each was observed on 2026-07-27 and is recorded here so the audit
+starts from evidence rather than from scratch. None is a finding yet:
+the audit may conclude a given wording is defensible. What it may not
+do is leave one unexamined.
+
+- **The README's "real output" is stale.** It shows `list dragons`
+  with dragons 1, 2, and 3 all `open`; dragons 2 and 3 are now
+  `closed`, and dragon 4 (power-loss durability) is absent entirely.
+  The `jq '.[-1]'` example claims to show dragon 3, but the last
+  element is now dragon 4. Prefer replacing corpus-dependent
+  showcase output with output from the deterministic quickstart
+  fixture: another snapshot of the live corpus would be accurate on
+  the day it was pasted and wrong again within a sprint. Note also
+  that the example depends on `jq`, which task 43 bars from the
+  quickstart for the same reason it is questionable here.
+- **The README presents Markdown, JSON, and JSONL as current payload
+  formats**, though only Markdown CRUD ships.
+  [[dec-bootstrap-payload-separation|Decision 3]] makes the multi-format
+  architecture real as a design boundary, but the README's framing
+  should not read as shipped capability.
+- **"Safe writes", the hero's coding-agent framing, and the Cargo
+  description** must be reconciled with task 41's retired claims and
+  with open [[drg-bootstrap-branch-collisions|dragon 1]] (branch
+  sequence collisions) and
+  [[drg_01KY3C0S3JQKEMEB9BH6NVJ35F|dragon 4]] (power-loss durability
+  of mutations). The hero currently reads "structured repository
+  memory for humans and coding agents", close to the headline claim
+  task 41 retired.
+- **`CONTRIBUTING.md` names `archaeology/dragons/open/`**, a
+  directory that does not exist — placement has been flat since
+  decision 11 as amended. Confirmed 2026-07-27: `archaeology/dragons/`
+  contains four files and no subdirectories.
+- **`SECURITY.md` promises GitHub private vulnerability reporting,
+  which is disabled.** `gh api
+  repos/henry-filgueiras/scarp/private-vulnerability-reporting`
+  returned `{"enabled":false}` on 2026-07-27. A security policy that
+  directs people to a reporting channel that does not exist is a
+  **release blocker**: it fails exactly when it matters, and
+  publication is what brings strangers who might use it. Resolve it
+  either by preparing the exact human-owned enablement command — the
+  REST surface is `PUT
+  /repos/{owner}/{repo}/private-vulnerability-reporting`, requiring
+  repository admin and returning 204 on success — or by rewriting
+  `SECURITY.md` to a reporting path that is actually open. **Do not
+  silently execute the repository-setting mutation**; it is an
+  external GitHub change and therefore Henry's.
+- **`.github/ISSUE_TEMPLATE/idea.md` requests a nonexistent `idea`
+  label.** `gh label list` on 2026-07-27 returned only the nine
+  GitHub defaults: `bug`, `documentation`, `duplicate`,
+  `enhancement`, `good first issue`, `help wanted`, `invalid`,
+  `question`, `wontfix`. Either plan a human-owned label creation or
+  deliberately use an existing label; a template referencing a label
+  that does not exist applies no label at all.
+- **GitHub detects a single license.** `gh api repos/…/license`
+  reports Apache-2.0 from `LICENSE-APACHE`, and the repository's
+  license badge says "Apache License 2.0", while
+  [[dec-dual-mit-apache-licensing|decision 9]] establishes dual
+  MIT/Apache-2.0. Confirm the README, the manifest's `license`
+  field, the packaged files, and the repository's first screen make
+  the actual dual contract unmistakable to a human reader. Do not
+  contort source files merely to satisfy GitHub's detector — the
+  detector's opinion is not the license.
+- **GitHub About metadata** is inspected read-only: description,
+  homepage, and topics. As of 2026-07-27 the description is decision
+  16's positioning line, homepage is empty, and twelve topics carry
+  no stale product name. Any change required is an external mutation
+  and gets an exact operator runbook plus subsequent verification,
+  not a silent edit.
 
 ## Acceptance criteria
 
 - The audited surface list is explicit and complete, covering at
   least: `README.md` including the hero, positioning line, feature
-  claims, status scoreboard, and the new quickstart; the rendered
-  crates.io page; the GitHub About panel — description, homepage,
-  topics; `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, and
-  the issue and pull-request templates; the light and dark wordmarks;
-  and the repository's own first screen. Any surface deliberately
-  excluded is named with its reason.
+  claims, status scoreboard, and the new quickstart; the packaged
+  README source as it will be shipped; the GitHub About panel —
+  description, homepage, topics — read only; `CONTRIBUTING.md`,
+  `SECURITY.md`, `CODE_OF_CONDUCT.md`, and the issue and
+  pull-request templates; the light and dark wordmarks; and the
+  repository's own first screen. Any surface deliberately excluded is
+  named with its reason.
 - Every claim made on those surfaces is checked against what ships
   today, and each is classified as supported, overstated, retired by
   task 41, or aspirational-stated-as-present. Corrections are applied
@@ -77,9 +139,19 @@ question unexamined.
   story. Contradictions between GitHub metadata, the crate page, and
   the README are resolved rather than tolerated because they live in
   different places.
-- Rendering is verified where it actually renders, not only where it
-  is authored: the crates.io view of the README is inspected as a
-  reader sees it.
+- Every suspect listed above reaches a recorded verdict, including
+  the ones the audit decides are fine. "Examined and defensible" is a
+  finding; silence is not.
+- The two external blockers — private vulnerability reporting and the
+  missing `idea` label — leave this task either resolved in prose or
+  carrying an exact human-owned runbook for Henry. Neither is
+  executed here, and publication does not proceed with a security
+  policy pointing at a closed channel.
+- Live-surface verification is explicitly **out of scope** and
+  deferred to [[tsk_01KYK0PTQV9PGZTHRDAPG6YGYM|task 45]]: the
+  rendered crates.io page, the docs.rs build, and the installed
+  package do not exist yet, and asserting anything about them here
+  would be prediction rather than verification.
 - Anything found that is real but out of scope becomes an idea or a
   dragon rather than an unrecorded observation or an opportunistic
   fix.
