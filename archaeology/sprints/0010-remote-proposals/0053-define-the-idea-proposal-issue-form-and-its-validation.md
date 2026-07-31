@@ -1,0 +1,88 @@
+---
+id: tsk_01KYX1WJ03MD2WRNQBS3KGMXXA
+sequence: 53
+kind: task
+status: pending
+sprint: spr_01KYX1WAD7CC0RHVZY0V7VE4X1
+created: 2026-07-31
+---
+
+# Define the idea proposal issue form and its validation
+
+## Objective
+
+Define the payload an idea proposal carries, as a GitHub Issue Form,
+and build the half of the workflow that reads it: authorize the
+requester, parse and validate the payload, and report a useful
+diagnostic — stopping short of any mutation.
+
+This is a complete vertical slice on its own. At the end of it, filing
+a proposal issue produces either "this would be accepted" or a specific
+refusal, and nothing is ever written. The mutation half is
+[[tsk_01KYX1WJ1XA2W1SWJYV96R3Y8H|task 54]]. Splitting there means the
+authorization and parsing logic can be exercised against real hostile
+input before anything can commit.
+
+## The form
+
+An Issue Form, not a Markdown template, because the fields must be
+machine-readable and individually required rather than parsed out of
+free prose a filer can restructure.
+
+**This repository already has `.github/ISSUE_TEMPLATE/idea.md`**, a
+Markdown template shaped like an idea artifact and aimed at any
+visitor proposing a direction for discussion. That one is a
+conversation starter; this one is an ingestion payload. They must not
+be confused by someone browsing the new-issue chooser. Decide and
+record whether both survive, how each is named and described so the
+distinction is obvious at the moment of choosing, and whether the
+existing template needs a line pointing at the other.
+
+The form's fields should map onto what Scarp actually needs to create
+an idea — a title and the template's sections — and nothing more. A
+field whose value would become a command, a flag, a path, a collection
+name, or a target artifact is out of scope by the sprint's non-goals;
+the payload expresses one operation, and which operation it is, is
+fixed by the form itself.
+
+## Validation
+
+Structural validation belongs here; canonical validation belongs to
+Scarp and is checked by `scarp doctor` in task 54. The split matters:
+this step should reject what Scarp should never be asked to process,
+not re-implement Scarp's judgment about artifacts.
+
+At minimum, refusals for: an unauthorized requester, a missing required
+field, a title that is empty or unusable, and a payload that trips one
+of [[tsk_01KYX1WHPS3R7FDCKG23YTGHHY|task 48]]'s injection surfaces.
+
+## Acceptance criteria
+
+- The Issue Form exists, renders in the new-issue chooser, and its
+  relationship to the existing `idea.md` template is decided and
+  recorded — including whichever is renamed or re-described.
+- The workflow half built here authorizes the requester by task 48's
+  recommended model, and refuses an unauthorized requester before
+  parsing anything.
+- The payload is parsed into structured values without any
+  `${{ }}` interpolation of issue-authored text into a shell context,
+  per task 48's mitigations.
+- Each refusal class produces a distinct, specific diagnostic that
+  reaches the filer through the channel task 48 recommended — naming
+  what was wrong and what to do about it, not "validation failed".
+- Refusals are verified against real issues filed for the purpose, at
+  minimum: an unauthorized user, a missing field, and one deliberately
+  hostile payload drawn from task 48's inventory. The test issues and
+  their outcomes are recorded, and the issues are closed afterwards.
+- A valid proposal reaches the end of this half and reports what it
+  would create, writing nothing: no branch, no commit, no pull request,
+  no file.
+- The workflow declares the exact `permissions:` block task 48
+  recommended, per job.
+- Nothing in the form or the validation is idea-specific in a way that
+  would have to be torn out to add a second collection later, and
+  nothing generalizes speculatively to collections this sprint does not
+  support.
+- `scripts/check.sh` passes.
+
+## Result
