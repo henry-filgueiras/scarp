@@ -33,6 +33,22 @@ nothing about the mechanism is idea-specific. But this sprint only
 requires and only verifies the idea path, and no other collection gets
 special handling.
 
+Note the deliberate asymmetry with the sprint's governance. The CLI
+mechanism is collection-general; the *permission* granted to automation
+by [[tsk_01KYX1WHTGXMBCBA7NE27RM9CF|task 50]] is ideas-only. Those are
+different layers and must not be conflated: Scarp does not enforce the
+grant, and nothing in this task should try to. A local human running
+`scarp new dragon --body-file` is doing something ordinary and
+permitted.
+
+**This flag is the whole consumer story.** Once it exists, a proposal
+workflow in anyone's repository is a short YAML file, because Scarp
+does the canonical work. That makes this the highest-leverage change in
+the sprint, and it is the reason the surface must be pleasant to invoke
+from a shell script that is not ours: predictable exit codes, no
+interactive prompt, no dependence on a terminal, no reliance on
+anything in this repository.
+
 **Scarp owns the canonical form.** The caller supplies section content;
 Scarp decides which sections exist, in what order, and how the file is
 laid out. A body that names a section the collection's template does
@@ -108,8 +124,15 @@ template reserves, control characters, and non-UTF-8 input.
 - The human-readable failures explain the operation, the artifact or
   path, the invariant, and the next step.
 - `scripts/check.sh` passes.
+- The surface is invocable from a non-interactive shell with no TTY,
+  and its exit codes are documented, since the proposal workflow and
+  every consumer's workflow will branch on them.
 - No `$EDITOR` integration, no editing of existing artifacts, no new
   collection, and no new edge kind is added.
+- The Result notes that this ships in the release
+  [[tsk_01KYX31ACH05NGA3GYH0TJA870|task 56]] cuts. The channel installs
+  a published `scarp`, so an unreleased flag is an unusable one, and
+  this task is not done in any practical sense until it is published.
 - The Result records the chosen spelling and the rejected alternatives,
   and states where provenance lives and why.
 

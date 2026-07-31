@@ -24,27 +24,32 @@ Then prove it by actually doing it, from a phone.
         ↓
     checkout
         ↓
-    build the pinned Scarp
+    install pinned published scarp
         ↓
     scarp new idea --body-input
         ↓
-    scarp doctor
+    scarp doctor + scripts/check.sh
         ↓
     branch + commit
         ↓
     pull request
         ↓
-    checks
-        ↓
-    merge
+    Henry taps merge
 
-**Which Scarp runs is a question this repository makes strange.** The
-tool that mutates the archaeology is built from the repository being
-mutated, so "pinned" has to mean something specific. Decide and record
-whether the workflow builds from the checked-out commit, from a tag, or
-installs a published version, and what happens the day a proposal
-arrives while `main` is mid-change. A proposal must not be realized by
-a Scarp whose behaviour nobody has verified.
+**The workflow installs a published `scarp`; it does not build the
+checkout.** This repository makes the question strange — the tool that
+mutates the archaeology is built from the repository being mutated —
+and installing a pinned release settles it: the binary that realizes a
+proposal is one that was released, tested, and verified, not whatever
+`main` happened to contain when the issue arrived. It also makes this
+channel byte-identical to the one a consumer copies, which is the only
+way the consumer story gets exercised rather than merely written down.
+
+The version is pinned explicitly, and the pin is the release
+[[tsk_01KYX31ACH05NGA3GYH0TJA870|task 56]] cuts. Record what happens
+when a proposal arrives while `main` contains an unreleased CLI change:
+the honest answer is that the channel keeps using the pinned release
+and is unaffected, and that is a feature.
 
 **`scarp doctor` is a gate, not a report.** It runs after creation and
 before the pull request opens, and a non-green result aborts without
@@ -52,6 +57,25 @@ opening one. A repository that was already unhealthy before the
 proposal arrived must fail loudly and distinguishably from a proposal
 that broke something, so the filer is not blamed for a pre-existing
 fault.
+
+**The checks run inline.** A pull request opened with `GITHUB_TOKEN` is
+expected not to trigger `ci.yml` at all, so the pull request would
+otherwise carry no checks and a human would be tapping merge on an
+unverified diff. The workflow therefore runs the repository's own
+checks itself before opening the pull request, and the pull request
+body carries their result. Confirm against
+[[tsk_01KYX1WHPS3R7FDCKG23YTGHHY|task 48]]'s finding whether `ci.yml`
+subsequently runs on the `push` to `main` after the human merge; if it
+does, post-merge coverage is intact and should be stated, and if it
+does not, that gap is recorded rather than assumed away.
+
+**Concurrent proposals collide.** Two proposals in flight each allocate
+a display sequence against whatever `main` they saw, which is
+[[drg_01KY169X7W0YXJ5QFV4D1MK4FB|dragon 1]] arriving in production
+rather than a hypothetical. The workflow serializes — a `concurrency:`
+group — and creates against a freshly fetched `main` rather than a
+stale checkout. This must be tested by firing two proposals at once,
+not reasoned about.
 
 **Failure surfacing.** Every abort — build failure, Scarp refusal,
 doctor finding, pull request creation failure, merge failure — reaches
@@ -79,14 +103,14 @@ follows the project's `area: what changed` convention.
   the abort is recorded.
 - A pre-existing unhealthy repository produces a distinguishable
   failure from a proposal-induced one, verified.
-- No path in the workflow pushes to `main`. The mutation lands through
-  a pull request that ran the repository's normal checks; the run
-  showing those checks reporting on the proposal pull request is
-  recorded, since a pull request opened by the wrong identity may
-  trigger nothing at all.
-- Whichever merge behaviour [[tsk_01KYX1WHRPEXG8Z8EBPQJRHHFH|task 49]]
-  recommended — auto-merge or the fallback — is implemented and
-  demonstrated end to end.
+- No path in the workflow pushes to `main`, and no path merges. The
+  branch is pushed, the pull request is opened, and a human merges it.
+- The pull request carries the result of the repository's own checks,
+  run inline before it opened, and whether `ci.yml` additionally runs
+  post-merge is recorded as fact rather than assumed.
+- Two proposals filed simultaneously do not collide on display
+  sequence, verified by firing them concurrently rather than by
+  inspecting the workflow.
 - Every abort stage is verified to reach the issue with a stage-naming
   diagnostic. At minimum, Scarp refusal and doctor failure are induced
   deliberately.
@@ -105,6 +129,17 @@ follows the project's `area: what changed` convention.
 - The workflow invokes exactly one Scarp operation with fixed
   arguments. No field of the payload reaches an argument position that
   could select a different command, collection, flag, or path.
+- The diff of a conforming proposal pull request is exactly one added
+  file under `archaeology/ideas/`. This is the checkable form of
+  [[tsk_01KYX1WHTGXMBCBA7NE27RM9CF|task 50]]'s creation-only grant, and
+  the workflow enforces it rather than trusting it: a proposal whose
+  diff modifies or deletes anything aborts before opening a pull
+  request. Verified by inducing one.
+- The workflow contains nothing specific to this repository beyond its
+  own name — no owner login, no path assumption, no dependence on the
+  Scarp source being present. Confirmed by reading it as though copying
+  it elsewhere, and any residual coupling is named in the Result for
+  [[tsk_01KYX1WJ3P25528P5YTXJAJA4P|task 55]]'s recipe to address.
 - `scripts/check.sh` passes.
 
 ## Result

@@ -11,47 +11,54 @@ created: 2026-07-31
 
 ## Objective
 
-Apply to `henry-filgueiras/scarp` exactly the settings
-[[tsk_01KYX1WHRPEXG8Z8EBPQJRHHFH|task 49]] recommended and
-[[tsk_01KYX1WHTGXMBCBA7NE27RM9CF|task 50]] permitted, so that a
-proposal pull request has something to wait on and something to merge
-after.
+Apply to `henry-filgueiras/scarp` the small settings the one-tap
+proposal channel needs — realistically branch hygiene and nothing else
+— exactly as [[tsk_01KYX1WHRPEXG8Z8EBPQJRHHFH|task 49]] recommended.
+
+The task's title is now larger than its content, and that is left
+uncorrected on purpose. It was created on 2026-07-31 to apply branch
+protection and enable auto-merge; Henry declined auto-merge the same
+day, and the governance change went with it. Renaming the task would
+erase the fact that this sprint deliberately chose the cheaper path,
+which is one of the more useful things about it.
 
 Nothing is designed here. If task 49's recommendation seems wrong at
 execution time, that is a finding to record and route back, not a
-change to improvise. If task 49 recommended the fallback instead of
-auto-merge, this task applies whatever that fallback needs and says so.
+change to improvise.
 
-## Why this is its own task
+## Why this is still its own task
 
-It changes the repository's governance for every contributor including
-Henry, and it is the one task in the sprint whose effect is invisible
-in the working tree — nothing in a `git diff` records that `main`
-became protected. That makes it exactly the kind of work
+It changes repository settings, whose effect is invisible in the
+working tree — nothing in a `git diff` records that
+`delete_branch_on_merge` flipped. That makes it the kind of work
 [[idea-capability-constrained-work|idea 15]] describes: it requires
-GitHub repository-administration access, held by the owner, and it is
-the sort of change task 12's closure showed an agent can partly perform
-through the API while confidently mis-describing the parts it cannot
-see.
+GitHub repository-administration access, and task 12's closure showed
+an agent can perform part of such work through the API while
+confidently mis-describing the parts it cannot see.
+
+It also carries the consumer question. A setting we flip here is a
+setting a consumer must be *told* to flip, and one they will not
+discover from copying the workflow.
 
 ## Acceptance criteria
 
 - The applied settings match task 49's recommendation exactly, or every
-  deviation is recorded with its reason.
+  deviation is recorded with its reason. If the recommendation is that
+  nothing needs changing, this task closes having changed nothing and
+  says so — that is a result, not a failure.
 - The before state is captured before anything changes, so the change
   is reversible and the record shows what was actually true rather than
   what this sprint assumed. The 2026-07-31 snapshot in task 49 is a
   starting point, not the record.
 - Each setting is verified after application by reading it back from
   the API, not by trusting the write.
-- Whether direct pushes to `main` still work for Henry is verified
-  empirically and recorded, because CLAUDE.md's commit policy depends
-  on the answer. If the answer is no, CLAUDE.md's commit policy is
-  updated in the same state rather than left describing a workflow the
-  repository no longer allows.
-- Required status check names are confirmed against a real pull request
-  that reports them, not against the workflow file's job names, since a
-  mismatch blocks every future pull request silently.
+- Any setting applied here is recorded as a consumer prerequisite for
+  [[tsk_01KYX1WJ3P25528P5YTXJAJA4P|task 55]]'s recipe. A channel that
+  silently depends on a repository setting is a channel that breaks on
+  the first repository that copies it.
+- Direct pushes to `main` are confirmed still to work, since CLAUDE.md's
+  commit policy depends on it and this sprint's premise is that nothing
+  about that changes.
 - Per CLAUDE.md's first-performance policy, the exact commands or API
   calls used are recorded in this Result as dated provenance. They are
   not turned into a script.

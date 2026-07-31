@@ -13,8 +13,16 @@ created: 2026-07-31
 
 Establish, against primary sources and against this repository's live
 settings, what it actually takes to let a GitHub issue safely cause a
-repository mutation — and recommend one authentication model and one
-authorization model, each with its rejected alternatives and reasons.
+repository mutation, and specify the exact mechanism the workflow will
+use.
+
+Two answers are already fixed by owner direction (2026-07-31) and are
+not reopened here: **authorization is a live repository-permission
+check**, requiring write access or better, rather than a login
+allowlist; and **a human merges the pull request**, so no auto-merge
+path needs a credential. This task specifies how to implement the
+first correctly and proves it fails closed. The research that remains
+is everything that choice does not settle.
 
 Research and recommendation only. No workflow file, no issue form, no
 settings change, no decision artifact. The recommendation feeds
@@ -44,23 +52,31 @@ personal access token, a deploy key, and a GitHub App installation
 token. For each: what it can do, how it is stored, what happens when it
 leaks, and its blast radius.
 
-One interaction is load-bearing and breaks the whole design if missed.
-Events created using `GITHUB_TOKEN` are reported not to start new
-workflow runs — which would mean a pull request opened by the default
-token never triggers `ci.yml`, no check ever reports, and an auto-merge
-waiting on required checks waits forever. **Verify this against primary
-documentation and state plainly whether it holds.** If it does, name
-the identities that escape it and price each. This constraint, not
-preference, then selects the token model.
+One interaction remains load-bearing even after auto-merge was
+declined. Events created using `GITHUB_TOKEN` are reported not to start
+new workflow runs — which would mean a pull request opened by the
+default token shows **no checks at all**, so a human tapping merge
+merges an unreviewed-by-CI diff. **Verify this against primary
+documentation and state plainly whether it holds.**
 
-**Authorization of the requester.** Compare at least: an explicit
-allowlist of logins in the workflow; a live check against the
-repository collaborators or permission API; `github.event.issue
-.author_association`; and requiring a label only a write-capable user
-can apply. Assess each on whether it can be forged, whether it survives
-the requester's permissions changing, and whether it fails closed. Say
+If it holds, the intended answer is that the proposal workflow runs
+`scripts/check.sh` and `scarp doctor` itself, before opening the pull
+request, so the pull request carries a green record from its own run
+rather than depending on `ci.yml` firing. Confirm that this is sound
+and record what it does *not* cover — in particular whether `ci.yml`
+runs on the `push` to `main` after a human merges, which would restore
+post-merge coverage. If it does not, say so, because that is the
+difference between a gap and a deferred check.
+
+**Authorization mechanics.** The model is fixed; the mechanics are not.
+Determine the exact API call that establishes whether an actor has
+write access, what it returns for an outside contributor, an org
+member with indirect access, and a user who does not exist. Establish
 whether the check must be re-evaluated at mutation time rather than
-only at trigger time.
+only at trigger time, and what happens if permission is revoked between
+the two. Note how the same call behaves in a consumer's repository with
+teams and an organization, since the workflow is meant to be copied
+unchanged.
 
 **Untrusted input.** Enumerate the injection surfaces this design
 creates. At minimum: issue title and body interpolated into a `run:`
@@ -90,13 +106,20 @@ with the permission each needs.
   and judgment distinguished as in
   [[tsk_01KYFRWF1X37N5TBJ139X7ZKA1|task 40]]'s Result.
 - The `GITHUB_TOKEN`-does-not-trigger-workflows question is answered
-  definitively, with its citation, and its consequence for auto-merge
-  is stated. If it holds, the recommended escape is named and priced.
-- One authentication model and one authorization model are recommended,
-  each with at least two rejected alternatives and the reason for each
-  rejection.
-- The recommended model fails closed: the Result states what happens
-  when the token is missing, the permission API errors, and the actor
+  definitively, with its citation. Whether the pull request will carry
+  checks is stated as a fact, and if it will not, the inline-check
+  answer is confirmed sound and its residual gap named.
+- One authentication model is recommended, with at least two rejected
+  alternatives and the reason for each rejection. The default
+  `GITHUB_TOKEN` is expected to suffice now that auto-merge is out of
+  scope; if it does not, say so, because that reopens a fork Henry
+  already closed.
+- The exact permission-check call is specified, with its behaviour for
+  an outside contributor, an indirect org member, and a nonexistent
+  user recorded from real responses rather than from documentation
+  alone.
+- The model fails closed: the Result states what happens when the token
+  is missing, the permission API errors or rate-limits, and the actor
   cannot be resolved, and confirms that none of those paths mutate
   anything.
 - The injection inventory is concrete rather than a gesture at
@@ -104,6 +127,11 @@ with the permission each needs.
   Mitigations that must live in Scarp are handed to
   [[tsk_01KYX1WHWDG6DBCXBQH2J7YJWN|task 51]] as requirements.
 - The exact `permissions:` block is written out.
+- Every recommendation is checked for whether it survives being copied
+  into a repository that is not this one. Anything that depends on this
+  repository having a single maintainer, or on the workflow living
+  beside the Scarp source, is flagged as a portability defect rather
+  than left implicit.
 - Live repository facts are re-verified at research time rather than
   taken from this task's text.
 - No workflow, form, settings change, or decision artifact is produced.

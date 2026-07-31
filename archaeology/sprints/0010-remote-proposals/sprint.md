@@ -17,7 +17,15 @@ and without any conversational agent holding write access.
 The vertical slice is deliberately one collection wide: a structured
 GitHub issue is realized as a canonical idea artifact by Scarp itself,
 validated by `scarp doctor`, and landed through a branch and a pull
-request. Ideas only. No generic mutation endpoint.
+request that Henry merges with one tap. Ideas only. No generic mutation
+endpoint.
+
+The channel is built to be a *recipe*, not a fixture. Scarp is a tool
+other people's repositories will use, and a proposal channel that only
+works here would be a demo. The workflow therefore installs a pinned
+published `scarp` rather than building the checkout, so this
+repository's channel is byte-identical to the one a consumer would
+copy — the same binary, the same commands, the same failure modes.
 
 ## Rationale
 
@@ -50,25 +58,49 @@ idea 22's envelope; idea 22 stays parked and unamended.
 why this is a real gap: the constraint is the invoking session's
 affordances — a phone with no checkout — not who is asking.
 
-Two obstacles were identified before the sprint opened, and the task
-order exists to confront them rather than discover them halfway:
+**The project currently forbids what this sprint proposes**, in four
+places. [[dec-bootstrap-interaction-surfaces|Decision 7]] says in
+terms: "No save hooks, no CI commits". CLAUDE.md lists both "automatic
+commits" and "GitHub Issues synchronization" as explicit bootstrap
+non-goals, and its commit policy says "Never push. Pushing is always a
+human decision" — which the workflow's proposal branch violates
+literally. Under the project's own change discipline that is an
+adoption gate requiring a new recorded decision, which is why
+[[tsk_01KYX1WHTGXMBCBA7NE27RM9CF|task 50]] blocks all implementation.
+If the adjudication goes the other way, the sprint stops there having
+produced the research and a recorded refusal.
 
-- **The project currently forbids what this sprint proposes.**
-  [[dec-bootstrap-interaction-surfaces|Decision 7]] says in terms: "No
-  save hooks, no CI commits", and CLAUDE.md lists automatic commits as
-  an explicit bootstrap non-goal. Under the project's own change
-  discipline that is an adoption gate requiring a new decision, which
-  is why [[tsk_01KYX1WHTGXMBCBA7NE27RM9CF|task 50]] blocks all
-  implementation. If the adjudication goes the other way, the sprint
-  stops there having produced the research and a recorded refusal.
-- **The desired end state is not currently reachable.** Observed
-  2026-07-31 against the live repository: `allow_auto_merge` is
-  `false`, `main` has no branch protection, and the repository has no
-  rulesets. Auto-merge is reported to require a blocking requirement to
-  wait on, so success criterion 8 likely cannot exist until `main` is
-  governed — a change that also touches how Henry commits today.
-  [[tsk_01KYX1WHRPEXG8Z8EBPQJRHHFH|Task 49]] verifies that and prices
-  it.
+## Shape fixed by owner direction (2026-07-31)
+
+Four choices were adjudicated before implementation planning, and the
+tasks are written against them rather than re-deriving them:
+
+- **The leniency is creation-only and ideas-only.** Automation may
+  cause Scarp to create a new artifact, in collections that are never
+  load-bearing, and may never modify or delete an existing one. The
+  broader creation-only rule was available and was deliberately not
+  taken: extending the channel to any further collection costs an
+  amendment, on purpose.
+- **Henry taps merge.** Auto-merge was declined for now. This keeps
+  [[dec-bootstrap-interaction-surfaces|decision 7]]'s "diff the user
+  can review" clause satisfied literally rather than argued around, and
+  it removes the branch-protection change, the `allow_auto_merge` flip,
+  and the second credential the auto-merge path would have needed. One
+  tap is not transcription, so the motivating use case survives intact.
+- **The workflow runs a pinned published `scarp`.** This makes the
+  channel identical to a consumer's and retires the question of which
+  binary realized an artifact. It costs a sequencing constraint:
+  `--body-file` must ship in a release before the channel can go live,
+  which is [[tsk_01KYX31ACH05NGA3GYH0TJA870|task 56]].
+- **Authorization is a live repository-permission check**, not a login
+  allowlist. Today that resolves to Henry alone; in a consumer's
+  repository it works unchanged for a team, and it cannot go stale the
+  way a hardcoded list does.
+
+Observed against the live repository on 2026-07-31, and preserved
+because the one-tap choice depends on it: `allow_auto_merge` is
+`false`, `main` has no branch protection, and there are no rulesets.
+The one-tap model needs none of that to change.
 
 ## Success criteria
 
@@ -83,11 +115,15 @@ order exists to confront them rather than discover them halfway:
   branch, no commit, and no pull request.
 - A malformed payload is refused the same way, and the diagnostic
   reaches the person who filed the proposal.
-- Canonical state lands through a branch and a pull request that runs
-  the repository's normal checks. No path in this sprint pushes
-  directly to `main`.
+- Canonical state lands through a branch and a pull request carrying a
+  green check run, merged by a human. No path in this sprint pushes to
+  `main`, and no path merges without a person.
 - The proposal remains linked to the artifact it produced, so the
   provenance of a remotely-created idea is recoverable later.
+- The channel is reproducible in a repository that is not this one: the
+  workflow runs a published `scarp`, and a consumer can copy the form,
+  the workflow, and the permissions block without editing anything but
+  their own repository name.
 - The trust boundary — proposal authority versus mutation authority,
   and why canonical state stays repository-owned — is documented for a
   reader who arrives without this sprint's conversation.
@@ -110,5 +146,15 @@ order exists to confront them rather than discover them halfway:
   finding for pending proposals. Idea 22's boundaries hold: doctor
   remains structural validation, and an issue is not an artifact.
 - Retrofitting existing hand-transcribed ideas.
+- Auto-merge, branch protection, and rulesets. Declined by owner
+  direction above, priced by
+  [[tsk_01KYX1WHRPEXG8Z8EBPQJRHHFH|task 49]] so a later sprint can
+  reconsider with real usage as evidence, and not built here.
+- Shipping a reusable GitHub Action, a published composite action, or
+  prebuilt binaries. The consumer story this sprint owes is a working
+  recipe someone can copy; packaging it is
+  [[ide_01KYX31AG163NY0EQPCTXAQ066|idea 36]], and the install cost that
+  makes packaging attractive is
+  [[ide_01KYX31AE8WX1HMBFNRZ3XQK4V|idea 35]]. Both stay parked.
 - The standing bootstrap non-goals: daemon, watcher, index, embeddings,
   semantic search, GraphQL, TUI.

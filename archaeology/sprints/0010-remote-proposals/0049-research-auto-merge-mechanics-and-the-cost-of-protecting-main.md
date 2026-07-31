@@ -11,21 +11,23 @@ created: 2026-07-31
 
 ## Objective
 
-Determine what this repository would have to become for a proposal pull
-request to merge itself after its checks pass, and what that costs the
-way Henry works today. Recommend the minimum governance change that
-makes the sprint's last success criterion reachable — or report that it
-is not worth its price and recommend the fallback.
+Confirm that the one-tap merge model needs no repository governance
+change, and price the auto-merge upgrade well enough that a later
+sprint can reconsider it from a record rather than from scratch.
 
-Research and recommendation only. No settings are changed here;
-applying whatever is recommended is
-[[tsk_01KYX1WHY82P2WNW9RG5KWVGYA|task 52]], after
-[[tsk_01KYX1WHTGXMBCBA7NE27RM9CF|task 50]] adjudicates.
+This task was originally the sprint's governance research. Henry
+declined auto-merge on 2026-07-31, which removed most of it: no branch
+protection, no ruleset, no `allow_auto_merge` flip, and no second
+credential are needed for the channel to work. What survives is a
+confirmation and a priced option.
+
+Research only, and deliberately bounded — this is not an invitation to
+build the auto-merge path speculatively.
 
 ## Starting facts
 
-Observed against the live repository on 2026-07-31, and to be
-re-verified rather than trusted:
+Observed against the live repository on 2026-07-31, to be re-verified
+rather than trusted:
 
 - `allow_auto_merge` is `false`.
 - `main` has no branch protection (`/branches/main/protection` returns
@@ -37,74 +39,62 @@ re-verified rather than trusted:
 
 ## Questions to settle
 
-**Does auto-merge require something to wait on?** Auto-merge is
-reported to be enablable only on a pull request that is currently
-blocked by a branch protection or ruleset requirement — meaning that on
-an unprotected `main`, there is nothing to auto-merge *after*, and the
-API call fails. Verify this against primary documentation and, if
-practical, against a real pull request in this repository. If it holds,
-protecting `main` is a precondition, not a preference.
+**Does the one-tap model need anything changed?** Confirm that a
+workflow can create a branch, open a pull request, and have a human
+merge it with the repository exactly as it is today. This is the load-
+bearing confirmation: if it is wrong, the sprint's shape is wrong.
 
-**What is the minimum blocking requirement?** If a requirement is
-needed, find the smallest one that is honest: required status checks
-naming the existing `ci.yml` jobs, a required review, or something
-else. Record the exact check names GitHub matches on and how they are
-discovered, since a required check whose name does not match anything
-that reports blocks every pull request forever — including Henry's.
+**Branch hygiene.** `delete_branch_on_merge` is `false` and this
+channel creates a branch per proposal. Recommend whether to flip the
+repository setting, delete the branch from the workflow, or leave
+branches to accumulate, and note which choice a consumer inherits by
+copying the workflow versus by changing their own settings. Whatever is
+recommended is applied by
+[[tsk_01KYX1WHY82P2WNW9RG5KWVGYA|task 52]].
 
-**Rulesets or classic branch protection?** Compare the two on
-expressiveness, bypass actors, API ergonomics, and what a public
-repository on a free plan actually supports. Note which of the two the
-repository can use for a private-plan-gated feature, if that applies.
+**Merge method.** Recommend squash or merge commit for proposal pull
+requests, given that the branch carries one commit and the archaeology
+values legible history.
 
-**What does protecting `main` cost the human workflow?** This is the
-part that must not be waved through. CLAUDE.md's commit policy has
-sessions commit completed slices directly, and every commit in this
-repository's history landed on `main` without a pull request. State
-concretely what changes: whether Henry (as owner) can still push
-directly, whether a bypass actor entry preserves that, whether agent
-sessions can, and whether preserving direct push undermines the
-protection that makes auto-merge possible in the first place. If the
-honest answer is that the repository must move to a pull-request
-workflow, say so and price it rather than proposing a bypass that
-quietly voids the guarantee.
+**The priced auto-merge option.** Record, without building it: whether
+auto-merge requires a blocking branch-protection or ruleset requirement
+to wait on; what the minimum honest requirement would be; the exact
+required-check names and how they are discovered; whether rulesets or
+classic protection is the right vehicle; and what protecting `main`
+would cost the direct-to-`main` commit workflow CLAUDE.md describes,
+including whether an owner bypass preserves it and whether such a
+bypass voids the guarantee it bypasses. One page is enough — this is a
+priced option, not a design.
 
-**Merge method and branch hygiene.** Recommend the merge method for
-proposal pull requests and whether `delete_branch_on_merge` should be
-enabled, given that this channel creates a branch per proposal and
-nothing currently cleans them up.
-
-**Interaction with task 48's token finding.** If the default token
-cannot trigger `ci.yml`, then required checks and auto-merge interact
-directly: state the combined design that works end to end, rather than
-two findings that each work alone.
-
-**The fallback.** If auto-merge proves unreachable or its governance
-price is judged too high, recommend the best alternative that still
-honours the sprint's "no direct push to `main`" criterion — for example
-a pull request left open for one human click. Say what is lost.
+**What one tap actually costs.** The honest counter-case for the
+record: what the tap costs in practice, and whether anything makes it
+worse than it sounds — notably whether two proposals in flight can
+collide, since each allocates a display sequence against whatever
+`main` it saw. That is [[drg_01KY169X7W0YXJ5QFV4D1MK4FB|dragon 1]]'s
+branch-sequence collision arriving in production, and its mitigation
+belongs to [[tsk_01KYX1WJ1XA2W1SWJYV96R3Y8H|task 54]], but the
+frequency and severity estimate belongs here.
 
 ## Acceptance criteria
 
 - Every claim is dated and attributed to a primary source or a live
   observation, with verified fact, inference, and judgment
   distinguished.
-- The "does auto-merge need a blocking requirement" question is
-  answered definitively, with its citation and, where practical,
-  a live confirmation.
-- A single minimum governance change is recommended, written out as the
-  exact settings and, where applicable, the exact API payload that
-  [[tsk_01KYX1WHY82P2WNW9RG5KWVGYA|task 52]] would apply.
-- The cost to the existing direct-to-`main` workflow is stated
-  explicitly, including whether it survives, and any proposed bypass is
-  evaluated for whether it voids the guarantee it bypasses.
-- The exact required-check names are recorded, along with how they were
-  discovered and what happens if one is renamed later.
-- The combined design with [[tsk_01KYX1WHPS3R7FDCKG23YTGHHY|task 48]]'s
-  token finding is stated as one working end-to-end path, not two
-  independent recommendations.
-- A fallback is recommended for the case where auto-merge is rejected,
-  and what it loses is named.
+- The confirmation that the one-tap model needs no governance change is
+  definitive. If it turns out to need one, that is escalated
+  immediately rather than absorbed, because it contradicts the choice
+  the sprint is built on.
+- Branch hygiene and merge method are each recommended, written out as
+  the exact setting or workflow step for
+  [[tsk_01KYX1WHY82P2WNW9RG5KWVGYA|task 52]] to apply, and each notes
+  what a consumer inherits.
+- The auto-merge option is priced in about a page: what it requires,
+  what it costs the human workflow, and what would count as evidence
+  for revisiting it. It is not designed, and no settings are changed to
+  explore it.
+- The concurrent-proposal sequence-collision risk is estimated, and
+  handed to [[tsk_01KYX1WJ1XA2W1SWJYV96R3Y8H|task 54]] as a
+  requirement rather than a note.
 - No repository setting is changed by this task. If a temporary pull
   request or branch is created to observe behaviour, it is removed and
   the Result says so.

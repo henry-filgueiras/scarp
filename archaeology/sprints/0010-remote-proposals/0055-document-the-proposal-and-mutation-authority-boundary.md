@@ -11,15 +11,21 @@ created: 2026-07-31
 
 ## Objective
 
-Write the durable explanation of what this channel is and what it
-deliberately is not, for a reader who arrives with none of this
-sprint's conversation — a future contributor, an agent reading the
-repository to form an operational model, or Henry in a year.
+Write two things: the durable explanation of what this channel is and
+what it deliberately is not, and the recipe that lets someone build the
+same channel in a repository that is not this one.
 
 The audience is not the person filing a proposal. Their instructions
-belong in the Issue Form itself. This is the architectural account:
+belong in the Issue Form itself. This is the architectural account —
 where the trust boundary sits, why canonical state is repository-owned,
-and what an extension would have to satisfy.
+what an extension would have to satisfy — and, because Scarp is a tool
+other people's repositories will use, the copyable artifact that makes
+the account actionable.
+
+The two halves are one task because they fail together. A recipe
+without the boundary account is a snippet someone will modify into
+something unsafe; the account without the recipe is a design note about
+a feature only this repository has.
 
 ## What it must convey
 
@@ -58,12 +64,40 @@ for the new collection.
 **Extension points, named and unbuilt.** Dragons, evidence, decisions,
 typed edges, task closure, capability manifests, external proposal
 APIs, and MCP. For each, one line on what it would have to settle
-first. This section's job is to be honest about what is deliberately
-absent, not to design any of it. Where the ceiling of this approach
-sits — and where [[ide_01KY7R7CA8FNBRH3DFKFZW8V6J|idea 22]]'s
-transport-neutral envelope would take over — should be stated, since
-this sprint is evidence for or against that idea rather than an
-implementation of it.
+first — and note that the grant is ideas-only, so each of these costs
+an amendment to [[tsk_01KYX1WHTGXMBCBA7NE27RM9CF|task 50]]'s decision
+rather than a workflow edit. That cost is deliberate and should read as
+deliberate. Where the ceiling of this approach sits — and where
+[[ide_01KY7R7CA8FNBRH3DFKFZW8V6J|idea 22]]'s transport-neutral envelope
+would take over — should be stated, since this sprint is evidence for
+or against that idea rather than an implementation of it.
+
+## The recipe
+
+A reader with their own Scarp repository should be able to stand up
+this channel by copying, not by re-deriving. What that needs:
+
+- the Issue Form and the workflow, presented as files to copy, with
+  every place that must change called out — realistically only the
+  repository name and the pinned Scarp version;
+- the `permissions:` block, with what each grant is for, since a reader
+  who does not understand it will over-grant;
+- any repository setting the channel depends on, from
+  [[tsk_01KYX1WHY82P2WNW9RG5KWVGYA|task 52]]. A dependency that lives
+  in settings rather than in a file is one a copier will not discover;
+- the pinned-version story: why a published release rather than a build
+  from source, and what a reader should do when they want a newer
+  Scarp;
+- what this costs them. `cargo install scarp --locked` is currently the
+  only install path, so a consumer's proposal run pays a Rust build. Be
+  honest about it and point at
+  [[ide_01KYX31AE8WX1HMBFNRZ3XQK4V|idea 35]] rather than pretending it
+  is fine.
+
+The recipe is prose and copyable files, not a package. Packaging it as
+a reusable action is [[ide_01KYX31AG163NY0EQPCTXAQ066|idea 36]] and
+stays parked; extracting one from a workflow that demonstrably works is
+much easier than designing one first.
 
 ## Acceptance criteria
 
@@ -80,7 +114,15 @@ implementation of it.
 - The trust boundary is stated as an enumeration of what is and is not
   trusted, not as prose that gestures at security.
 - Extension points are listed with their unresolved question each, and
-  none is designed.
+  none is designed. The ideas-only grant is stated as the reason each
+  costs an amendment.
+- The recipe is verified by someone following it into a repository that
+  is not this one — a scratch repository is enough — rather than by
+  being read. Every step that turned out to be missing, ambiguous, or
+  wrong is fixed, and the exercise is recorded. A recipe nobody has
+  run is a draft.
+- The recipe names the install cost honestly and points at
+  [[ide_01KYX31AE8WX1HMBFNRZ3XQK4V|idea 35]] rather than glossing it.
 - Nothing in the document is aspirational. Every capability it
   describes exists and was demonstrated in
   [[tsk_01KYX1WJ1XA2W1SWJYV96R3Y8H|task 54]]; anything that was

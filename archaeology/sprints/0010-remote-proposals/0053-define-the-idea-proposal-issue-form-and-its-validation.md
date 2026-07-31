@@ -61,9 +61,12 @@ of [[tsk_01KYX1WHPS3R7FDCKG23YTGHHY|task 48]]'s injection surfaces.
 - The Issue Form exists, renders in the new-issue chooser, and its
   relationship to the existing `idea.md` template is decided and
   recorded — including whichever is renamed or re-described.
-- The workflow half built here authorizes the requester by task 48's
-  recommended model, and refuses an unauthorized requester before
-  parsing anything.
+- The workflow half built here authorizes the requester by a live
+  repository-permission check requiring write access or better, per
+  task 48's specified mechanics, and refuses an unauthorized requester
+  before parsing anything. No login is hardcoded: the same workflow
+  must authorize correctly in a repository whose maintainers are not
+  Henry.
 - The payload is parsed into structured values without any
   `${{ }}` interpolation of issue-authored text into a shell context,
   per task 48's mitigations.
@@ -82,7 +85,13 @@ of [[tsk_01KYX1WHPS3R7FDCKG23YTGHHY|task 48]]'s injection surfaces.
 - Nothing in the form or the validation is idea-specific in a way that
   would have to be torn out to add a second collection later, and
   nothing generalizes speculatively to collections this sprint does not
-  support.
+  support. Note that the grant
+  [[tsk_01KYX1WHTGXMBCBA7NE27RM9CF|task 50]] records is ideas-only, so
+  adding a collection costs an amendment; the code should not make it
+  *harder* than that, and must not make it look easier.
+- Nothing in the form or the workflow half hardcodes this repository:
+  no owner login, no absolute path, no assumption that the archaeology
+  lives where it lives here rather than wherever `.scarp.toml` says.
 - `scripts/check.sh` passes.
 
 ## Result
