@@ -2,8 +2,9 @@
 id: spr_01KYFRWF0B8QKN89NHVKQG2TQT
 sequence: 8
 kind: sprint
-status: active
+status: closed
 created: 2026-07-26
+closed: 2026-07-30
 ---
 
 # First Contact
@@ -124,3 +125,123 @@ Install time is still measured and reported, because a stranger
 experiences it; it is simply not what the sixty seconds is
 budgeting. Any timing claim published anywhere must make the same
 distinction rather than quietly folding install into the number.
+
+## Retrospective (2026-07-30)
+
+All five success criteria are met. `scarp 0.1.0` is on crates.io,
+installable from a machine that has never seen this repository, with a
+quickstart that runs in 5 ms against a ~60-second budget and a set of
+landing surfaces that tell one story. `0.1.0` also shipped one cosmetic
+defect, held by [[tsk_01KYTS3BZDRHEFVG0H5FBK4RW5|task 47]].
+
+### What First Contact actually cost
+
+Seven tasks, where the plan had four. Two of the three extra tasks were
+not scope creep but consequences: task 42 existed because identity had
+to be migrated once it was settled, and task 46 existed because task 43's
+output was wrong in two ways that only became visible after it closed.
+
+The shape worth noting is that **the irreversible act was the cheapest
+part of the sprint.** Publication itself was one command and about
+twenty seconds. Everything else — determining the MSRV by bisecting
+toolchains, building a positive `include` allowlist and discovering the
+packaging bug it exposed, resolving the clean-tree paradox three times,
+auditing every claim on every landing surface, repairing a quickstart
+that could initialise a stranger's own repository — was the work of
+earning the right to run it.
+
+That ratio is the sprint's central lesson and it is not a complaint.
+Nothing later in this project will be as unamendable as `0.1.0`, so the
+ratio should be expected to fall, not to repeat.
+
+### What the identity detour taught
+
+Retaining `strata` was never adjudicated as viable and could not have
+been: crates.io `strata` squatted, `strata-rs` occupying both the binary
+name and the library namespace, `strata-mcp` shipping a `strata` CLI at
+this project's exact audience. Four collisions, discovered only because
+[[tsk_01KYFRWF1X37N5TBJ139X7ZKA1|task 40]] treated "do nothing" as a
+candidate that had to survive research rather than a default.
+
+The transferable part is not the name. It is that **the control arm has
+to be examined too.** A tournament that only scores alternatives against
+an unexamined incumbent will keep the incumbent, because it never
+priced it.
+
+The rename was also the cheapest it will ever be, and taking it at the
+last free moment is why [[dec_01KYJE2K3VRASS8A1X1E847S1B|decision 16]]
+could make a hard marker cut with no dual-discovery path, no migration
+command, and no compatibility shim. One week later there would have been
+an installed base and all three would have been permanent.
+
+### A small mechanism inside a large evidence shell
+
+crates.io's actual contract is remarkably small: a tarball under 10 MiB,
+a manifest, a version that can never be reused, and a token. Publishing
+is one command. Nothing in the registry asks whether the thing you
+uploaded is the thing you reviewed.
+
+This project spent far more on the evidence shell around that mechanism
+than on the mechanism — a clean-tree proof, a checksum triangulated
+across the download, the sparse index, and the pre-publication package,
+`.cargo_vcs_info.json` read out of the *registry* copy, a container that
+had never seen the repository. That asymmetry was deliberate and it paid
+once, concretely: the published artifact turned out **byte-identical**
+to the package verified beforehand, which converted "the upload probably
+matches the review" from an assumption into a fact.
+
+The honest caveat is that byte-identity is an observation, not a
+guarantee Cargo offers, and it held only because the `include` allowlist
+means archaeology edits cannot move the payload. The general principle
+survives the caveat: **the registry does not verify provenance, so if
+provenance matters it has to be established outside the registry.**
+
+### The verification blind spots
+
+[[log_01KYK8RC0YEY51YP37RGV7M7N4|Log 3]] named the shape mid-sprint — a
+verification is blind to any defect whose precondition was established
+by the work being verified — and then the sprint produced one more
+instance after the log was written.
+
+Task 44 checked the `#quickstart` anchor and was **right**: it matched a
+real heading, in the source and on GitHub. It was also structurally
+incapable of catching the defect, because crates.io rewrites heading ids
+and no crates.io page existed yet. The log's companion heuristic covers
+it exactly: a passing check is not evidence that the mechanism it
+documents will hold on a surface the check never ran against.
+
+Two things follow. The log's claim was already appropriately modest —
+that the shape is now named and cheap to recognise, not eliminated — and
+this sprint is evidence for the modesty rather than against the log.
+And [[ide_01KYK895PPE90CY8RAAFBV8B4P|idea 34]] would **not** have caught
+this one; it tests that the quickstart's commands run, not that the
+prose renders. Recording that keeps the idea from being credited with
+coverage it does not have.
+
+### What is worth mechanizing next
+
+One thing, narrowly.
+
+The quickstart's extract-and-compare — pull the fenced block out of
+`README.md`, run it verbatim, diff the captured output against the
+documented `console` block modulo the three fields the prose declares as
+varying — was hand-performed **three times** in this sprint, in tasks
+46, 44, and 45. Three performances by three different pieces of work is
+real recurrence evidence rather than an anticipated need, which is
+exactly the promotion signal
+[[ide_01KY7S6GG3NAA35KBJTC6CA1TM|idea 23]]'s desire-path ledger is
+about. It is already specified as [[ide_01KYK895PPE90CY8RAAFBV8B4P|idea
+34]], and it belongs as a **test** — `README.md` is crate payload, so a
+test can gate it — not as a release script.
+
+Explicitly **not** worth mechanizing yet, despite being performed once
+each and feeling scriptable: the checksum triangulation, the unpack-and-
+diff, the CI log assertions, the container smoke run. Each was a first
+performance. `CLAUDE.md`'s stance holds and was tested here rather than
+merely quoted: a checked-in script makes an undated promise about an
+external interface that can drift silently, while a dated command block
+in a Result cannot lie about when it worked. The recurring form is a
+chore ledger ([[idea-chore-artifacts|idea 7]]), one row per performance.
+
+Sprint 8's non-goal — no release-automation cathedral — survives its own
+release. The right next step is one test, not a pipeline.

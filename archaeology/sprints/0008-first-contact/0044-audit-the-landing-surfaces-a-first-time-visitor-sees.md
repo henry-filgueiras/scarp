@@ -506,3 +506,60 @@ zsh Ctrl-C behaviour is a documented shell property, not a Scarp risk; and
 than as artifacts. Task 45's inherited obligation — repeat the CI check on
 the eventual release-source commit — is recorded on task 46's addendum,
 where its precondition already lives.
+
+## Addendum (2026-07-30, post-close): two counts stated too strongly
+
+Appended during [[tsk_01KYK0PTQV9PGZTHRDAPG6YGYM|task 45]]. The Result
+above is **not** rewritten. Neither correction changes a public surface,
+and neither blocked publication; both are recorded because the Result
+will outlive the memory of what was meant.
+
+### The subcommand count was wrong; the table was not
+
+The Result says the command surface was taken from `scarp --help` "plus
+`--help` on all eleven subcommands", and later that the scoreboard "now
+carries all eleven subcommands with their real flags".
+
+**Scarp ships twelve subcommands.** Verified against the running binary
+on 2026-07-30, and again from the registry install inside a clean
+container: `init`, `new`, `list`, `show`, `doctor`, `close`, `reopen`,
+`adopt`, `reject`, `fortune`, `resolve`, `completions` — twelve, not
+counting clap's built-in `help`.
+
+The **table is correct** and always was. It has eleven rows because
+`adopt` and `reject` share one row, which is the right editorial call:
+they are the two terminal transitions of a single lifecycle and reading
+them on one line is how the lifecycle is understood. Eleven rows
+covering twelve subcommands is not an omission.
+
+What went wrong is only that the row count was read back as a
+subcommand count and then repeated as one. No surface changes.
+
+### "Word for word" and "the same sentence" overstate the agreement
+
+The Result says the README hero "now reads **Git-native, reviewable
+project archaeology**, matching the manifest `description` and decision
+16's positioning line word for word", and that the surfaces "tell one
+story". The second claim holds. The first does not.
+
+Three distinct wordings ship, and they are deliberately different
+lengths for different slots. The positioning line below is
+[[dec_01KYJE2K3VRASS8A1X1E847S1B|decision 16]]'s, quoted exactly:
+
+| Wording | Where |
+|---|---|
+| Scarp exposes the strata of a repository: what changed, why, and what remains unsettled. | decision 16, the README italic line, GitHub About |
+| Git-native, reviewable project archaeology. | the README hero |
+| Git-native, reviewable project archaeology: what changed, why, and what remains unsettled | `Cargo.toml`, `scarp --help`, the crate-level doc |
+
+The hero is the short form; the manifest and CLI carry the expanded
+form; the positioning line is its own sentence. They are consistent —
+same framing, same retired claims stayed retired, no surface promising
+what another denies — but no single sentence appears identically on all
+of them, and the audit should have said "consistent" rather than "word
+for word".
+
+**No public wording change is required**, and none was made. A registry
+description, a CLI one-liner, and a README hero have different length
+budgets; forcing one string through all three would make at least one of
+them read badly. The claim was too strong; the surfaces were fine.
