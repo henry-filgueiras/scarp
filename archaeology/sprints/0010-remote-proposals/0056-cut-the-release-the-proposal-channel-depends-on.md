@@ -73,4 +73,63 @@ since after is a version number too late.
   dependency, so a later reader does not infer that Option B needed a
   publication.
 
+## Prepared, awaiting the version decision (2026-08-01)
+
+Everything an agent may do is done; publication and the version number
+are Henry's, per [[tsk_01KYK0PTQV9PGZTHRDAPG6YGYM|task 45]]'s boundary.
+
+**Verified today:** `cargo publish --dry-run --locked` succeeds with
+neither `--allow-dirty` nor `--no-verify`, packaging 38 files
+(616.6 KiB, 138.0 KiB compressed) from a clean worktree.
+
+**What has accumulated since `0.1.0`:**
+
+| Change | Surface |
+|---|---|
+| `scarp new --body-file` | new CLI flag on every narrative collection |
+| fenced-code-block awareness in the body parser | fixes a refusal of legitimate input |
+| `proposal:` managed front-matter field | new artifact-model vocabulary |
+| `duplicate-proposal` doctor finding | new validation |
+| `scarp proposal list` / `realize` | new command surface |
+| `integration-unavailable`, exit 11 | new entry in the error contract |
+| README status table, `docs/remote-proposals.md` | packaged README changes |
+
+**The version question.** This is additive — nothing removed, no
+behaviour changed for an existing caller — so semver permits a patch.
+Against that: it adds a command surface, an artifact-model field, and an
+exit code, which is more than "0.1.0 with a fix" communicates to someone
+reading the changelog. Recorded as a judgment rather than defaulted.
+
+**Task 47's batching question**, which its own notes ask to be put
+before publication: the crates.io quickstart anchor defect is still
+unrepaired, and this is the release it was waiting for. Repairing it
+first is cheap; shipping without it means it waits for another version
+number.
+
+Note that this release re-runs task 47's risk in a new place: the README
+gained a link into `docs/`, which is **not** in the crate's `include`
+list. It was written absolutely (`https://github.com/.../blob/HEAD/...`)
+rather than relatively for exactly that reason, matching the three
+`archaeology/` links already in the file. Whoever ships this should
+click it on the published crate page, per task 47's acceptance criteria.
+
+**The exact commands**, to be run by a human:
+
+```sh
+# 1. set the version in Cargo.toml, then:
+cargo update -p scarp            # refresh Cargo.lock to match
+scripts/check.sh
+cargo publish --dry-run --locked # must pass with no extra flags
+cargo publish --locked
+git tag -a vX.Y.Z -m "scarp vX.Y.Z"
+```
+
+Post-publication verification, per
+[[tsk_01KYK608A5Q5CAEPYYKW4YFQSH|task 46]] and
+[[tsk_01KYJG0S7SYMYY1FEG7H4QQX8G|task 44]]: install from crates.io into a
+clean container, run `scarp new idea --body-file` to confirm the shipped
+binary carries the surface, time the cold install for
+[[ide_01KYX31AE8WX1HMBFNRZ3XQK4V|idea 35]], and click the README's
+`docs/` link on the live crate page.
+
 ## Result
