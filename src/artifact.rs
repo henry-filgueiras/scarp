@@ -199,7 +199,7 @@ pub fn create_idea_from(
     body: Option<&str>,
     proposal: Option<&str>,
 ) -> Result<NewArtifact, Error> {
-    const SECTIONS: &[&str] = &["Problem", "Sketch", "Boundaries", "Evidence"];
+    let sections = crate::read::IDEA_SECTIONS;
     let proposal = proposal
         .map(|raw| {
             crate::read::validated_proposal(raw)
@@ -210,7 +210,7 @@ pub fn create_idea_from(
         Some(url) => vec![("proposal", url)],
         None => Vec::new(),
     };
-    create_with(root, &IDEA, IDEA_ID_PREFIX, SECTIONS, title, body, &extra)
+    create_with(root, &IDEA, IDEA_ID_PREFIX, sections, title, body, &extra)
 }
 
 /// Create a new accepted decision in the repository at `root`.

@@ -213,6 +213,11 @@ pub static DRAGON: Collection = Collection {
     stamp_closed: false,
 };
 
+/// The idea template's sections, in template order. Shared so a caller
+/// mapping an external payload onto an idea names the same sections the
+/// artifact will actually have.
+pub const IDEA_SECTIONS: &[&str] = &["Problem", "Sketch", "Boundaries", "Evidence"];
+
 /// The idea collection: uncommitted proposals, `parked -> adopted | rejected`.
 /// Terminal states are permanent; there is no reopen analog.
 pub static IDEA: Collection = Collection {

@@ -78,6 +78,25 @@ pub enum Error {
         candidates: Vec<String>,
     },
 
+    /// An optional integration this operation needs is unavailable here.
+    ///
+    /// Distinct from an invalid invocation on purpose: the command was
+    /// spelled correctly and the repository is fine, but the environment
+    /// does not offer the integration — no GitHub remote, no `gh`, or `gh`
+    /// unauthenticated. Automated callers can tell "not set up" from
+    /// "typed it wrong", and ordinary Scarp operations are unaffected.
+    #[error("{operation} needs {requirement}, which is unavailable: {reason}; {remedy}")]
+    IntegrationUnavailable {
+        /// The operation that could not run, e.g. `scarp proposal list`.
+        operation: String,
+        /// What it needs, e.g. `an authenticated `gh``.
+        requirement: String,
+        /// What was observed.
+        reason: String,
+        /// The concrete next step.
+        remedy: String,
+    },
+
     /// `scarp doctor` completed its scan and the repository has validation
     /// findings. The findings themselves are the stdout payload; this error
     /// is the machine-readable summary on stderr.
@@ -127,6 +146,7 @@ impl Error {
             Error::Filesystem { .. } => "filesystem-failure",
             Error::ArtifactNotFound { .. } => "artifact-not-found",
             Error::AmbiguousReference { .. } => "ambiguous-reference",
+            Error::IntegrationUnavailable { .. } => "integration-unavailable",
             Error::UnhealthyRepository { .. } => "unhealthy-repository",
         }
     }
@@ -144,6 +164,9 @@ impl Error {
     /// - 7: artifact not found
     /// - 8: ambiguous reference
     /// - 9: unhealthy repository (`doctor` found validation problems)
+    /// - 11: integration unavailable (an optional integration the
+    ///   operation needs is absent or unauthenticated; ordinary
+    ///   operations are unaffected)
     /// - 10: retired with decision 11 (was `transition-interrupted`, the
     ///   doubly-failed two-step transition; transitions no longer move
     ///   files, so the state cannot arise; not reused)
@@ -157,6 +180,7 @@ impl Error {
             Error::ArtifactNotFound { .. } => 7,
             Error::AmbiguousReference { .. } => 8,
             Error::UnhealthyRepository { .. } => 9,
+            Error::IntegrationUnavailable { .. } => 11,
         }
     }
 
@@ -186,6 +210,12 @@ mod tests {
             Error::MalformedArtifact {
                 path: PathBuf::from("archaeology/dragons/0001-y.md"),
                 reason: "missing `id` in front matter".into(),
+            },
+            Error::IntegrationUnavailable {
+                operation: "`scarp proposal list`".into(),
+                requirement: "an authenticated `gh`".into(),
+                reason: "`gh` is not on PATH".into(),
+                remedy: "install the GitHub CLI, or use `scarp new idea` directly".into(),
             },
             Error::Filesystem {
                 operation: "rename".into(),
@@ -230,6 +260,7 @@ mod tests {
             ("artifact-not-found", 7),
             ("ambiguous-reference", 8),
             ("unhealthy-repository", 9),
+            ("integration-unavailable", 11),
         ];
         for error in one_of_each() {
             let want = expected
@@ -282,6 +313,14 @@ mod tests {
                             "message must name every candidate `{candidate}`: {message}"
                         );
                     }
+                }
+                // An unavailable integration names an environment, not a
+                // path, but it must still say what to do about it.
+                Error::IntegrationUnavailable { remedy, .. } => {
+                    assert!(
+                        message.contains(remedy),
+                        "message must name the remedy `{remedy}`: {message}"
+                    );
                 }
                 Error::InvalidInvocation { .. }
                 | Error::ArtifactNotFound { .. }

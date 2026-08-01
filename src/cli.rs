@@ -19,6 +19,30 @@ pub struct Cli {
     pub command: Command,
 }
 
+/// Operator-driven realization of remote proposals.
+///
+/// A proposal is mutation intent, not canonical state: these commands
+/// read GitHub through the installed `gh` and create artifacts locally.
+/// Nothing here commits, pushes, or runs unattended.
+#[derive(Debug, Subcommand)]
+pub enum ProposalCommand {
+    /// List open proposals, noting any already realized
+    List {
+        /// Emit a deterministic JSON array instead of human-readable lines
+        #[arg(long)]
+        json: bool,
+    },
+    /// Create the canonical artifact one proposal asks for
+    Realize {
+        /// The proposal's issue number
+        number: u64,
+        /// Emit a deterministic JSON object describing the created
+        /// artifact instead of the human-readable line
+        #[arg(long)]
+        json: bool,
+    },
+}
+
 /// The bootstrap command surface.
 #[derive(Debug, Subcommand)]
 pub enum Command {
@@ -46,6 +70,9 @@ pub enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Work with remote proposals (GitHub only; optional everywhere else)
+    #[command(subcommand)]
+    Proposal(ProposalCommand),
     /// List the artifacts in a collection
     List {
         /// Collection to list (`dragons`, `ideas`, `decisions`, `sprints`,

@@ -11,6 +11,7 @@ pub mod doctor;
 pub mod edges;
 pub mod error;
 pub mod fortune;
+pub mod proposal;
 pub mod read;
 pub mod repo;
 pub mod transition;

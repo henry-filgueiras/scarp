@@ -3,10 +3,10 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::Parser;
-use scarp::cli::{ArtifactTarget, Cli, Collection, Command};
+use scarp::cli::{ArtifactTarget, Cli, Collection, Command, ProposalCommand};
 use scarp::error::Error;
 use scarp::read::Status;
-use scarp::{artifact, doctor, fortune, read, repo, transition};
+use scarp::{artifact, doctor, fortune, proposal, read, repo, transition};
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
@@ -36,6 +36,7 @@ fn run(command: &Command) -> Result<(), Error> {
             body_file.as_deref(),
             *json,
         ),
+        Command::Proposal(command) => proposal_command(command),
         Command::List {
             collection,
             json,
@@ -494,6 +495,50 @@ fn cwd() -> Result<PathBuf, Error> {
 /// degraded creation stays exit 0 — the write happened — with the stable
 /// `warning[degraded-repository]:` line on stderr, leaving stdout (human
 /// line or JSON object) unpolluted.
+/// `scarp proposal`: list or realize remote proposals.
+///
+/// Realization creates a file and stops. It never commits and never
+/// pushes: the operator reviews the artifact and commits it through the
+/// ordinary workflow, which is the whole point of the design.
+fn proposal_command(command: &ProposalCommand) -> Result<(), Error> {
+    let root = repo::discover(&cwd()?)?;
+    match command {
+        ProposalCommand::List { json } => {
+            let proposals = proposal::list(&root)?;
+            if *json {
+                println!("{}", to_json(&proposals));
+            } else if proposals.is_empty() {
+                println!("no open proposals");
+            } else {
+                for p in &proposals {
+                    match &p.realized_as {
+                        Some(path) => {
+                            println!("#{}  realized  {}  ({path})", p.number, p.title);
+                        }
+                        None => println!("#{}  open      {}", p.number, p.title),
+                    }
+                }
+            }
+            Ok(())
+        }
+        ProposalCommand::Realize { number, json } => {
+            let created = proposal::realize(&root, *number)?;
+            if *json {
+                println!("{}", to_json(&created.record()));
+            } else {
+                println!(
+                    "created {} {} at {}",
+                    created.kind,
+                    created.reference(),
+                    created.relative_path.display()
+                );
+                println!("review it, then commit; Scarp does not commit or push");
+            }
+            Ok(())
+        }
+    }
+}
+
 /// Read a `--body-file` payload as UTF-8.
 ///
 /// Non-UTF-8 input is a read failure rather than a parse failure: Scarp's
