@@ -81,3 +81,75 @@ archaeology. A consumer should be able to take the file unchanged.
   either do not exist under Option B or belong to Scarp.
 
 ## Result
+
+Delivered 2026-08-01 as `.github/ISSUE_TEMPLATE/idea.yml`, replacing
+`.github/ISSUE_TEMPLATE/idea.md`. Parsed with a real YAML parser to
+confirm structure; `scripts/check.sh` passes.
+
+### The form, and why it replaced rather than joined the old one
+
+The task asked whether both templates survive. **They should not.** The
+old `idea.md` was aimed at "any visitor proposing a direction for
+discussion" and the new form at "a proposal a maintainer realizes" —
+but under Option B those are the same act. Realization is
+operator-driven: a visitor files a proposal, and the operator realizes
+it if they want it. There is no second class of idea, so a second
+template would have been an invented distinction that the design does
+not have, sitting in the new-issue chooser inviting people to guess.
+
+The old template's genuinely useful guidance survives in the form's
+opening markdown block: ideas are never load-bearing, browse
+`archaeology/ideas/` first, and rejecting one invalidates nothing.
+`bug-report.md` is untouched. No surface referenced `idea.md`, so
+nothing else needed updating.
+
+### Shape
+
+Four textareas whose labels are **exactly** the idea template's
+sections — `Problem`, `Sketch`, `Boundaries`, `Evidence` — in template
+order. Only `Problem` is required; an idea with a real problem and
+nothing else is still worth filing, and the remaining sections render
+empty exactly as `scarp new idea` leaves them.
+
+The **issue title is the idea title**, stated in the form so a filer
+writes it as a heading rather than as a subject line. No separate title
+field: duplicating it would create two sources of truth for one string.
+
+`labels: ["idea"]` uses the label this repository already has
+("Uncommitted proposals to explore"), so **no new repository state was
+created**. That matters for the consumer story — `gh label list`
+confirmed it exists here, and a consumer needs the same label or a
+one-line `gh label create`, which is the only repository-side
+prerequisite this channel has.
+
+### Two findings handed to task 54
+
+**GitHub renders form fields as `### Label`, not `## Label`.** Scarp's
+`--body-file` grammar expects `## `. Task 54 must map the transport
+format to the artifact grammar, and the safe way is to split only on
+lines matching `### ` plus one of the four *known* section names —
+never a general `###` → `##` rewrite, which would promote a filer's own
+`### Subsection` into a forged section heading. This is transport
+parsing, not canonicalization, and it stays outside Scarp's artifact
+model.
+
+**Empty optional textareas render as `_No response_`.** Task 54 must
+treat that literal as an empty section, or every unfilled section
+arrives carrying GitHub's placeholder as prose.
+
+### Not verified, and why
+
+Two acceptance criteria are **not met** and cannot be met from here:
+that the form renders in the new-issue chooser, and that a real proposal
+is filed through it from a phone.
+
+GitHub reads issue templates from the default branch, so the form does
+nothing until `main` is pushed — and pushing is a human decision under
+CLAUDE.md's commit policy. This is the ordinary human boundary rather
+than a defect, but the task is honestly incomplete until Henry pushes
+and files one. Recorded rather than quietly dropped, because "the form
+exists" and "the form works" are different claims, and the second is the
+one [[tsk_01KYX1WJ1XA2W1SWJYV96R3Y8H|task 54]] depends on. Filing that
+first proposal from a phone also produces the real payload task 54 needs
+to parse against, so doing it before task 54 starts is worth more than
+doing it after.

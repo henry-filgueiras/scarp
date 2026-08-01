@@ -1,0 +1,58 @@
+name: Idea
+description: Propose a feature or direction, shaped so Scarp can realize it verbatim
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas are never load-bearing. An idea is an uncommitted proposal:
+        parking one records a possibility, not a roadmap promise, and
+        rejecting one invalidates nothing. Browse `archaeology/ideas/`
+        first — yours may already be parked, adopted, or rejected with
+        reasoning attached.
+
+        **The sections below are the idea artifact's own sections.** A
+        maintainer realizes an accepted proposal with Scarp, which
+        creates the canonical file and assigns its sequence, stable
+        identity, slug, and path. Nothing you write here becomes
+        canonical on its own, and editing this issue afterwards does not
+        change an artifact that was already created.
+
+        **This issue's title becomes the idea's title**, so write it as
+        you would want the artifact headed.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: >-
+        The concrete problem this solves. What goes wrong today, for
+        whom? A real motivating instance beats a hypothetical.
+    validations:
+      required: true
+  - type: textarea
+    id: sketch
+    attributes:
+      label: Sketch
+      description: >-
+        The smallest version that helps. How does it honor the project
+        invariants — files canonical, no hostage-taking, Git optional?
+    validations:
+      required: false
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Boundaries
+      description: >-
+        What this deliberately is not, and what it must not grow into.
+        Adjacent ideas it should not absorb.
+    validations:
+      required: false
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: >-
+        Prior art, related dragons/decisions/ideas in the archaeology,
+        anything suggesting this is worth its complexity.
+    validations:
+      required: false
