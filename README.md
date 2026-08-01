@@ -347,7 +347,7 @@ Scarp is bootstrapping its smallest useful vertical slice. Honest scoreboard:
 | `scarp adopt idea:N [--adopted-by …]` / `scarp reject idea:N` | move a parked idea to a terminal state | ✅ |
 | `scarp resolve idea:15 … [--json]` | resolve references to stable ids, one per line, in input order | ✅ |
 | `scarp fortune` | resurface one open dragon or parked idea, favoring stale artifacts | ✅ |
-| `scarp proposal list` / `realize N` | realize a GitHub issue as a canonical idea, from your machine ([how and why](docs/remote-proposals.md)) | ✅ |
+| `scarp proposal list` / `realize N` | realize a GitHub issue as a canonical idea, from your machine ([how and why](https://github.com/henry-filgueiras/scarp/blob/HEAD/docs/remote-proposals.md)) | ✅ |
 | `scarp completions <shell>` | emit a completion script for bash, zsh, fish, elvish, or powershell | ✅ |
 
 Dragons, ideas, decisions, sprints, and tasks are managed collections: `new`,
