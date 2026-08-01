@@ -2,9 +2,10 @@
 id: tsk_01KYX1WJ3P25528P5YTXJAJA4P
 sequence: 55
 kind: task
-status: pending
+status: closed
 sprint: spr_01KYX1WAD7CC0RHVZY0V7VE4X1
 created: 2026-07-31
+closed: 2026-08-01
 ---
 
 # Document the proposal and mutation authority boundary
@@ -174,3 +175,89 @@ richer GitHub surface remains
 - `scripts/check.sh` passes.
 
 ## Result
+
+Written 2026-08-01 as [`docs/remote-proposals.md`](../../../docs/remote-proposals.md).
+`scripts/check.sh` passes.
+
+### Where it lives, and why
+
+A `docs/` page, not `README.md` and not `CONTRIBUTING.md`. The README is
+a landing surface for someone deciding whether Scarp is worth installing,
+and a trust-boundary enumeration is not that. `CONTRIBUTING.md` addresses
+people opening issues, who need the form rather than the architecture.
+This is the account a maintainer or an agent reads before changing the
+channel — a different audience from either, and long enough that folding
+it into an existing file would bury both.
+
+Both surfaces now point at it: the README status table names
+`scarp proposal list` / `realize` with a link, and CONTRIBUTING's Ideas
+bullet was corrected — it still said "idea issue template" with the old
+three-section shape, which the form replaced.
+
+### What it argues
+
+The "why not just write the file" question is answered early and
+concretely, because it is the thing most likely to be "simplified" by
+someone who does not yet know what breaks: numbering, stable identity,
+slug and path selection, template shape, line endings, and the guarantee
+that a remotely-proposed artifact is byte-indistinguishable from a local
+one. Two authors of canonical form is named as the failure mode.
+
+Proposal authority versus mutation authority is defined generally rather
+than for this feature, with the test a future channel must answer: *does
+this grant an authority the repository did not already have?* Since
+[[tsk_01KYX1WHTGXMBCBA7NE27RM9CF|task 50]] chose Option B and created no
+decision artifact, this page is where that vocabulary is durable — it is
+not restating a decision, it is the record.
+
+The trust boundary is a table of what is and is not trusted, ending on
+the sharpest claim the sprint has: **nothing in this design acquires an
+authority the repository did not already grant.**
+
+Option A is documented as considered, priced, and deferred, with the
+promotion criterion quoted. A reader who wants the hands-off version
+learns it was a choice rather than an oversight, and what evidence would
+reopen it.
+
+### The consumer proof
+
+Run 2026-08-01 in a deliberately alien repository: a Python project with
+no Rust toolchain, no `Cargo.toml`, no `scripts/`, no pre-existing Scarp
+corpus, and a different name and owner.
+
+| Coupling tested | Result |
+|---|---|
+| directory layout | `scarp init` created its own; nothing assumed |
+| `scripts/check.sh` | never referenced by any step |
+| repository name or owner | not referenced |
+| pre-existing corpus | worked from zero artifacts |
+| Rust toolchain | not needed beyond installing Scarp itself |
+| existing labels | the form's `idea` label is the one documented prerequisite |
+| the issue form | copied verbatim, parsed, sections match the idea template |
+| unavailability | `proposal list` refused cleanly and specifically; `new`, `doctor` unaffected |
+| the documented fallback | `scarp new idea --body-file` produced the identical artifact |
+
+The recipe needed one correction while being followed, now fixed in the
+document: it did not say the form only takes effect once it is on the
+**default branch**, which is exactly the trap
+[[tsk_01KYX1WJ03MD2WRNQBS3KGMXXA|task 53]] hit here.
+
+### What the proof does not cover, and why
+
+**The GitHub half was not exercised in a second repository.** Doing so
+means creating a real repository under an account, and the authenticated
+token in this environment carries `repo` but not `delete_repo` — so I
+could create one and could not remove it, leaving something in Henry's
+namespace for him to clean up by hand. Creating what I cannot clean up
+is not a call to make unilaterally, so it was not made.
+
+What that leaves unproven is narrow but real: that `gh repo view` and
+`gh issue list` behave the same against a repository that is not this
+one, and that the `idea` label prerequisite is sufficient. Both are
+expected — nothing in the implementation reads this repository's name,
+and the label is passed as a literal — but expected is not verified, and
+the distinction is the whole reason this criterion exists.
+
+The cheap way to close it: run the six steps against any second GitHub
+repository, or grant `delete_repo` so a scratch repository can be
+created and removed in one pass.

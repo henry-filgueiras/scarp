@@ -60,10 +60,13 @@ never touch the working repository.
 
 - **Bug reports**: use the bug-report issue template. Include the command
   run, the repository state, and `scarp doctor` output where relevant.
-- **Ideas**: use the idea issue template, shaped like the project's idea
-  artifacts (Problem / Sketch / Evidence). Ideas are never load-bearing: an
-  accepted proposal becomes a parked idea artifact in the archaeology, not a
-  roadmap promise.
+- **Ideas**: use the idea issue form, shaped like the project's idea
+  artifacts (Problem / Sketch / Boundaries / Evidence). Ideas are never
+  load-bearing: an accepted proposal becomes a parked idea artifact in the
+  archaeology, not a roadmap promise. A maintainer realizes an accepted
+  proposal with `scarp proposal realize`, which creates the canonical file —
+  see [`docs/remote-proposals.md`](docs/remote-proposals.md) for what the
+  issue is and is not.
 - **Security issues**: do not open a public issue — see
   [`SECURITY.md`](SECURITY.md).
 
