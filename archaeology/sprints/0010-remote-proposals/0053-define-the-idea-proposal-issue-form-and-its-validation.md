@@ -56,6 +56,27 @@ At minimum, refusals for: an unauthorized requester, a missing required
 field, a title that is empty or unusable, and a payload that trips one
 of [[tsk_01KYX1WHPS3R7FDCKG23YTGHHY|task 48]]'s injection surfaces.
 
+## What the realization event is
+
+This half decides the thing the mutation half depends on: **which
+event means "realize this now"**. Filing an issue and asking for it to
+become canonical may or may not be the same act, and the choice has
+consequences [[tsk_01KYX1WJ1XA2W1SWJYV96R3Y8H|task 54]] inherits
+directly.
+
+The choice determines when proposal prose stops being editable input.
+The intended semantics, unless the design produces something stronger:
+creating or editing an issue does not by itself mutate canon; an
+explicit authorized realization event snapshots the title, body, and
+parsed fields; later edits do not regenerate an already-realized
+artifact. A trigger that fires on every edit makes that harder to
+honour than one that fires on a deliberate act, and that is a reason to
+prefer the latter, not merely a note.
+
+The event must also carry a stable proposal identity — repository plus
+issue number — because task 54's replay guard is built on it, and an
+identity derived from anything mutable is not an identity.
+
 ## Acceptance criteria
 
 - The Issue Form exists, renders in the new-issue chooser, and its
@@ -80,6 +101,17 @@ of [[tsk_01KYX1WHPS3R7FDCKG23YTGHHY|task 48]]'s injection surfaces.
 - A valid proposal reaches the end of this half and reports what it
   would create, writing nothing: no branch, no commit, no pull request,
   no file.
+- The realization event is chosen and recorded, with what it means for
+  when prose becomes immutable input. If the chosen trigger gives
+  stronger snapshot guarantees than task 54 assumes, that is documented
+  so task 54 implements the stronger thing rather than the weaker.
+- The payload is captured as a snapshot the mutation half can consume
+  later, keyed by a proposal identity derived from repository and issue
+  number. Nothing downstream is required to re-read the live issue to
+  learn what was proposed.
+- Authorization is established here and re-established late in task 54.
+  This half's check is not treated as sufficient on its own, and the
+  Result says so, so nobody later mistakes it for the gate.
 - The workflow declares the exact `permissions:` block task 48
   recommended, per job.
 - Nothing in the form or the validation is idea-specific in a way that

@@ -61,12 +61,42 @@ documentation and state plainly whether it holds.**
 
 If it holds, the intended answer is that the proposal workflow runs
 `scripts/check.sh` and `scarp doctor` itself, before opening the pull
-request, so the pull request carries a green record from its own run
-rather than depending on `ci.yml` firing. Confirm that this is sound
-and record what it does *not* cover — in particular whether `ci.yml`
-runs on the `push` to `main` after a human merges, which would restore
-post-merge coverage. If it does not, say so, because that is the
-difference between a gap and a deferred check.
+request. Three questions then have to be answered separately rather
+than collapsed, because the sprint's language depends on the
+distinction:
+
+1. **Did validation run against the exact resulting state?** This is
+   the invariant that matters and it is satisfied by ordering alone.
+2. **Does GitHub expose a check run on the pull request's head SHA?**
+   Determine this as observed fact — what a human actually sees on the
+   pull request page — not as an inference from having run checks. If
+   the answer is no, the sprint must stop saying the pull request
+   "carries a green check" and say instead that the realization run is
+   durably linked from it.
+3. **Does `ci.yml` run on the `push` to `main` after a human merges?**
+   The merge is performed by a human, not by `GITHUB_TOKEN`, so the
+   suppression may not apply — but that is a hypothesis to verify, not
+   a deduction to rely on. Record the answer as fact, since it is the
+   difference between a deferred check and a permanent gap in coverage.
+
+Also establish, without designing anything: whether the Check Runs API
+would let the workflow publish a real check against the head SHA, what
+permission that needs, and roughly what it would cost. This is
+reconnaissance so
+[[tsk_01KYX1WJ1XA2W1SWJYV96R3Y8H|task 54]] can take it only if it falls
+naturally out of work already there. It is explicitly not a
+recommendation to build it, and the sprint must not widen to make a
+sentence true.
+
+**Delivery guarantees.** Establish what GitHub actually promises about
+workflow invocation: whether an event can be delivered more than once,
+what a re-run does to `github.event`, whether re-running a failed job
+replays the original payload or a fresh one, and what happens to an
+in-flight run when the triggering issue is edited. The replay model in
+task 54 is built on these answers, so guesses are not acceptable
+substitutes. Note especially anything that makes exactly-once
+invocation *not* guaranteed, since that is the assumption the
+idempotency work exists to avoid.
 
 **Authorization mechanics.** The model is fixed; the mechanics are not.
 Determine the exact API call that establishes whether an actor has
@@ -106,9 +136,21 @@ with the permission each needs.
   and judgment distinguished as in
   [[tsk_01KYFRWF1X37N5TBJ139X7ZKA1|task 40]]'s Result.
 - The `GITHUB_TOKEN`-does-not-trigger-workflows question is answered
-  definitively, with its citation. Whether the pull request will carry
-  checks is stated as a fact, and if it will not, the inline-check
-  answer is confirmed sound and its residual gap named.
+  definitively, with its citation.
+- The three check-visibility questions are answered separately and each
+  labelled as observed fact or inference: validation ran against the
+  resulting state; GitHub does or does not expose a check run on the
+  head SHA; `ci.yml` does or does not run on the post-merge push.
+  Where practical the second and third are confirmed by observation
+  against a real pull request rather than from documentation.
+- The Check Runs API option is described with its permission and rough
+  cost, explicitly as reconnaissance rather than a recommendation.
+- GitHub's delivery guarantees are established: whether an event may be
+  delivered more than once, what a job re-run replays, and what happens
+  to an in-flight run when the issue is edited. Anything that makes
+  exactly-once invocation unguaranteed is stated plainly, since
+  [[tsk_01KYX1WJ1XA2W1SWJYV96R3Y8H|task 54]]'s replay model depends on
+  it.
 - One authentication model is recommended, with at least two rejected
   alternatives and the reason for each rejection. The default
   `GITHUB_TOKEN` is expected to suffice now that auto-merge is out of

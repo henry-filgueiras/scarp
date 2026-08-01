@@ -102,6 +102,40 @@ because the one-tap choice depends on it: `allow_auto_merge` is
 `false`, `main` has no branch protection, and there are no rulesets.
 The one-tap model needs none of that to change.
 
+## Review amendments (2026-08-01)
+
+Sprint review before implementation raised two findings, incorporated
+into the tasks rather than left as commentary. Neither reopens the
+adjudications above.
+
+**Validation semantics were imprecise.** The sprint said the pull
+request would carry a green check run, while the design creates that
+pull request with `GITHUB_TOKEN` — which is expected to mean GitHub
+displays no check at all. Running validation and *showing* a check are
+different claims, and only the first was ever guaranteed. The invariant
+is now stated as ordering — nothing is published until the exact
+resulting state has passed validation — and the wording about what a
+reader sees is required to match observed behaviour. A Check Runs API
+integration is permitted only if it falls out of existing work; the
+sprint does not widen to make a sentence true.
+
+**Replay was unaccounted for.** Serialization protects two different
+proposals from racing on sequence allocation, but says nothing about
+the same proposal arriving twice — through a re-run, a repeated event,
+or a transient failure after partial side effects. One issue must
+realize at most one idea, which needs a durable proposal identity, a
+deterministic branch name, a machine-readable realization receipt, and
+documented behaviour for each recoverable partial state.
+
+Three clarifications of the existing trust boundary came with them, and
+are treated as sharpening rather than new scope: authorization is
+re-checked immediately before publication rather than trusted from
+trigger time; the creation-only, ideas-only grant is proved from actual
+repository state rather than inferred from the command invoked, as
+defence against this project's own bugs as much as hostile input; and
+proposal prose is snapshotted at an explicit realization event so later
+issue edits cannot silently diverge from what was realized.
+
 ## Success criteria
 
 - An authorized user creates a structured proposal issue and a
@@ -115,11 +149,22 @@ The one-tap model needs none of that to change.
   branch, no commit, and no pull request.
 - A malformed payload is refused the same way, and the diagnostic
   reaches the person who filed the proposal.
-- Canonical state lands through a branch and a pull request carrying a
-  green check run, merged by a human. No path in this sprint pushes to
-  `main`, and no path merges without a person.
-- The proposal remains linked to the artifact it produced, so the
-  provenance of a remotely-created idea is recoverable later.
+- No proposal branch or pull request is published until the exact
+  resulting repository state has passed the required validation.
+  Canonical state then lands through that pull request, merged by a
+  human. No path in this sprint pushes to `main`, and no path merges
+  without a person.
+- What the pull request shows a reader is described accurately. If
+  GitHub exposes no check run on a workflow-created pull request's head
+  SHA, the realization run is durably linked from the pull request and
+  the repository's prose says that, rather than claiming a check that
+  does not exist.
+- One proposal issue realizes at most one canonical idea, unless a
+  human explicitly performs a recovery operation. Duplicate deliveries,
+  re-runs, and partial failures do not produce a second artifact.
+- The proposal remains linked to the artifact it produced by a durable,
+  machine-readable receipt, so the provenance of a remotely-created
+  idea — and the state of a half-finished one — is recoverable later.
 - The channel is reproducible in a repository that is not this one: the
   workflow runs a published `scarp`, and a consumer can copy the form,
   the workflow, and the permissions block without editing anything but

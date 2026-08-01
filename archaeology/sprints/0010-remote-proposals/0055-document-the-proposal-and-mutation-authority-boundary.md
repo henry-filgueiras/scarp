@@ -116,11 +116,29 @@ much easier than designing one first.
 - Extension points are listed with their unresolved question each, and
   none is designed. The ideas-only grant is stated as the reason each
   costs an amendment.
-- The recipe is verified by someone following it into a repository that
-  is not this one — a scratch repository is enough — rather than by
-  being read. Every step that turned out to be missing, ambiguous, or
-  wrong is fixed, and the exercise is recorded. A recipe nobody has
-  run is a draft.
+- The recipe is verified by following it into a **genuinely separate
+  repository** — a real second repository, not a branch, a directory,
+  or alternate configuration inside this one. Alternate configuration
+  here cannot expose the couplings that matter, because everything the
+  recipe might accidentally depend on is still present.
+- That repository is deliberately minimal and makes no Rust-project
+  assumptions, since the consumers most likely to want this channel are
+  not writing Rust. The exercise is designed to expose accidental
+  dependence on at least: this repository's directory layout; existing
+  labels; scripts that exist only here, `scripts/check.sh` above all;
+  the repository name or owner; branch conventions; a pre-existing
+  Scarp corpus, including whether the channel works when the target has
+  zero ideas; a Rust toolchain beyond what the documented recipe
+  installs on purpose; and repository settings or permissions the
+  recipe never mentions.
+- The end state of that exercise is a working idea-proposal channel in
+  the second repository, demonstrated by filing a proposal there and
+  getting an idea. Every step that turned out to be missing, ambiguous,
+  or wrong is fixed in the recipe, and the exercise is recorded. A
+  recipe nobody has run is a draft.
+- Anything discovered to be irreducibly specific to this repository is
+  named in the recipe as a prerequisite the reader must supply, rather
+  than quietly patched over in the test repository.
 - The recipe names the install cost honestly and points at
   [[ide_01KYX31AE8WX1HMBFNRZ3XQK4V|idea 35]] rather than glossing it.
 - Nothing in the document is aspirational. Every capability it
