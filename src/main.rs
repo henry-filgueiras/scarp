@@ -1,4 +1,5 @@
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::Parser;
@@ -26,8 +27,15 @@ fn run(command: &Command) -> Result<(), Error> {
             collection,
             title,
             sprint,
+            body_file,
             json,
-        } => new_artifact(*collection, title, sprint.as_deref(), *json),
+        } => new_artifact(
+            *collection,
+            title,
+            sprint.as_deref(),
+            body_file.as_deref(),
+            *json,
+        ),
         Command::List {
             collection,
             json,
@@ -486,10 +494,26 @@ fn cwd() -> Result<PathBuf, Error> {
 /// degraded creation stays exit 0 — the write happened — with the stable
 /// `warning[degraded-repository]:` line on stderr, leaving stdout (human
 /// line or JSON object) unpolluted.
+/// Read a `--body-file` payload as UTF-8.
+///
+/// Non-UTF-8 input is a read failure rather than a parse failure: Scarp's
+/// narrative payloads are UTF-8 text, and a caller that hands over bytes
+/// which are not text has made a filesystem-level mistake. Reported through
+/// the same typed filesystem error every other read uses, so automated
+/// callers need no special case.
+fn read_body_file(path: &Path) -> Result<String, Error> {
+    fs::read_to_string(path).map_err(|source| Error::Filesystem {
+        operation: "read".to_string(),
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
 fn new_artifact(
     collection: Collection,
     title: &str,
     sprint: Option<&str>,
+    body_file: Option<&Path>,
     json: bool,
 ) -> Result<(), Error> {
     // `--sprint` chooses a task's owning sprint (decision 15) and belongs
@@ -504,18 +528,23 @@ fn new_artifact(
         });
     }
     let selection = sprint.map(parse_sprint_selector).transpose()?;
+    // Read before the repository is touched: an unreadable or non-UTF-8
+    // body must fail with a filesystem error, not a half-created artifact.
+    let body = body_file.map(read_body_file).transpose()?;
+    let body = body.as_deref();
     let root = repo::discover(&cwd()?)?;
     let created = match collection {
-        Collection::Dragon => artifact::create_dragon(&root, title)?,
-        Collection::Idea => artifact::create_idea(&root, title)?,
-        Collection::Decision => artifact::create_decision(&root, title)?,
-        Collection::Sprint => artifact::create_sprint(&root, title)?,
+        Collection::Dragon => artifact::create_dragon(&root, title, body)?,
+        Collection::Idea => artifact::create_idea(&root, title, body)?,
+        Collection::Decision => artifact::create_decision(&root, title, body)?,
+        Collection::Sprint => artifact::create_sprint(&root, title, body)?,
         Collection::Task => artifact::create_task(
             &root,
             title,
             selection
                 .as_ref()
                 .map(|(target, display)| (selector(target), display.as_str())),
+            body,
         )?,
     };
     let reachability = match collection {

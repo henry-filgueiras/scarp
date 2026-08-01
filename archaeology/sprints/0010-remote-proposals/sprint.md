@@ -66,7 +66,17 @@ non-goals, and its commit policy says "Never push. Pushing is always a
 human decision" — which the workflow's proposal branch violates
 literally. Under the project's own change discipline that is an
 adoption gate requiring a new recorded decision, which is why
-[[tsk_01KYX1WHTGXMBCBA7NE27RM9CF|task 50]] blocks all implementation.
+[[tsk_01KYX1WHTGXMBCBA7NE27RM9CF|task 50]] gates the automation work.
+
+*Narrowed 2026-08-01 by Henry's direction.* The gate covers
+[[tsk_01KYX1WJ03MD2WRNQBS3KGMXXA|task 53]] and
+[[tsk_01KYX1WJ1XA2W1SWJYV96R3Y8H|task 54]] — the workflow that commits —
+not [[tsk_01KYX1WHWDG6DBCXBQH2J7YJWN|task 51]]. The gate exists because
+*CI authoring commits* is forbidden; a CLI flag a human invokes locally
+is not automation and needs no new permission. Task 51 is also the one
+deliverable on the critical path of every version of this channel,
+including ones that never grow a workflow, so building it first commits
+the sprint to nothing.
 If the adjudication goes the other way, the sprint stops there having
 produced the research and a recorded refusal.
 

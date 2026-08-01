@@ -2,9 +2,10 @@
 id: tsk_01KYX1WHWDG6DBCXBQH2J7YJWN
 sequence: 51
 kind: task
-status: pending
+status: closed
 sprint: spr_01KYX1WAD7CC0RHVZY0V7VE4X1
 created: 2026-07-31
+closed: 2026-08-01
 ---
 
 # Give scarp new a non-interactive body input surface
@@ -137,3 +138,145 @@ template reserves, control characters, and non-UTF-8 input.
   and states where provenance lives and why.
 
 ## Result
+
+Implemented 2026-08-01 as `--body-file <PATH>` on `scarp new`, available
+for every narrative collection. `scripts/check.sh` passes; the suite
+went from 219 to 227 tests.
+
+### The chosen spelling
+
+```console
+$ scarp new idea "Remote proposal ingestion" --body-file body.md --json
+{"kind":"idea","id":"ide_01KYZQEA91BH8ZC8JFENP9CR1R","sequence":1,...}
+```
+
+The body is Markdown whose `## ` headings name the collection's own
+template sections:
+
+```markdown
+## Problem
+
+Ideas arrive on a phone and die there.
+
+## Evidence
+
+Sprint 10.
+```
+
+Sections may be supplied in any order, omitted entirely, or left empty;
+Scarp renders them in **template** order, and an unsupplied section is
+byte-identical to the bare template's. Deeper headings (`### …`) are
+ordinary prose, because the corpus already uses them inside sections.
+
+### Rejected alternatives
+
+- **Stdin (`--body-file -` or a bare `--body`).** Convenient for a
+  workflow, but it interacts awkwardly with `--json` on the same stream,
+  and a file is auditable after the fact — a workflow can keep the exact
+  bytes it fed to Scarp. A caller that has prose in a variable writes one
+  temporary file. Not implemented rather than implemented-and-unused.
+- **Per-section flags (`--section Problem=…`).** Unreadable at more than
+  two sections, forces shell quoting of prose, and invents a second
+  syntax for something Markdown already expresses.
+- **JSON body.** Would make the input format disagree with the output
+  format for no gain, and puts a parser between the author's prose and
+  the file.
+- **Refusing sprints and tasks.** Considered per the task's open
+  question and rejected: supporting all five uniformly is *less*
+  special-casing than excluding two, and nothing about the mechanism is
+  collection-specific.
+
+### Where provenance lives — and what was declined
+
+Confirmed both constraints the task flagged, and both hold:
+
+- `EDGE_KINDS` is a closed allowlist whose targets must be managed
+  artifacts, so a GitHub issue URL cannot be a typed edge. Minting one
+  would also violate [[drg_01KY169X7W0YXJ5QFV4D1MK4FB|dragon 3]]'s rule
+  against edge vocabulary without a first consumer.
+- Doctor treats unknown front-matter keys as inert, so a `proposed-by:`
+  key would validate while being invisible to every Scarp surface —
+  worse than useless, because it would look managed.
+
+**Provenance therefore lives in authored prose** — the proposal's own
+`Evidence` section, which the workflow composes — plus the commit
+message and pull request. No new front-matter field and no new edge
+kind. This is recorded so a later collection does not relitigate it:
+the reason is not that provenance does not matter, but that Scarp has
+no managed representation for a reference to something outside the
+repository, and inventing an unmanaged one is a worse lie than prose.
+
+### Refusals
+
+Every refusal happens before a sequence is allocated or a path is
+touched. `a_rejected_body_writes_nothing_and_burns_no_sequence` proves
+it the only way that really counts: after six distinct refusals the
+collection is still empty *and* the next creation still gets sequence 1.
+A burned sequence would have been a silent leak — no error, no file,
+just a gap the next artifact inherits.
+
+Refused, each with a test: an unknown section (naming the offender and
+the template's real sections); a duplicate section; content before any
+heading; a level-1 heading; a control character; and an oversized body
+(64 KiB cap).
+
+### Task 48's injection rows, verified against the built binary
+
+| Row | Input | Result |
+|---|---|---|
+| 4 | title `../../etc/passwd` | slug neutralized to `0002-etc-passwd.md`, inside the collection; nothing escaped |
+| 5 | body opening `---\nid: forged\n---` | refused — content before any heading |
+| 6 | body with `## Consequences` on an idea | refused, naming the four real sections |
+| 7 | NUL and other control characters | refused with the codepoint |
+| 7 | non-UTF-8 file | typed filesystem error, exit 6, nothing created |
+| 9 | title colliding with an existing slug | existing no-clobber path, unchanged |
+
+**Row 3 has an operational consequence for
+[[tsk_01KYX1WJ1XA2W1SWJYV96R3Y8H|task 54]].** A title beginning with
+`-` needs `--` to separate it, and clap treats *everything* after `--`
+as positional — so `scarp new idea -- "-rf x" --body-file b.md` fails
+with "unexpected argument". The flags must precede the separator:
+
+```console
+$ scarp new idea --body-file body.md --json -- "-rf dangerous"
+```
+
+This is correct clap behaviour, not a defect, but it is exactly the
+kind of thing a workflow gets wrong once and then only for hostile
+titles. Recorded here so task 54 writes it correctly the first time.
+
+### Non-interactive contract
+
+Verified with stdin closed (`< /dev/null`): no prompt, no TTY
+dependency. Exit codes are the existing typed contract — `0` success,
+`2` invalid invocation (every body parse refusal), `6` filesystem
+failure (unreadable or non-UTF-8 body file). Automated callers branch
+on these without parsing prose.
+
+### Line endings
+
+CRLF input is normalized at parse time, so the artifact never carries
+the caller's line endings regardless of what platform authored the
+proposal ([[dec-lf-line-ending-policy|decision 14]]).
+
+### Not done, deliberately
+
+No `$EDITOR` integration — [[idea-strata-edit|idea 3]] stays parked, and
+this is creation-time input only, not an edit-through-projection flow.
+No editing of existing artifacts, no new collection, no new edge kind,
+no lifecycle change.
+
+### Incidental fix
+
+`validate_title` has always said "cannot create **a** idea"; `idea` is
+the only vowel-initial managed kind. Since this task added four more
+messages inheriting the same pattern, an `article()` helper now derives
+it rather than hardcoding, so a future vowel-initial collection does not
+silently reintroduce it.
+
+### Release dependency
+
+This surface is unusable by the proposal channel until it is published:
+the workflow installs a pinned released `scarp`, not this checkout. That
+is [[tsk_01KYX31ACH05NGA3GYH0TJA870|task 56]], and this task is not done
+in any practical sense until it lands.

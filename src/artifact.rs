@@ -170,7 +170,7 @@ pub fn probe_reachability(
 }
 
 /// Create a new open dragon in the repository at `root`.
-pub fn create_dragon(root: &Path, title: &str) -> Result<NewArtifact, Error> {
+pub fn create_dragon(root: &Path, title: &str, body: Option<&str>) -> Result<NewArtifact, Error> {
     const SECTIONS: &[&str] = &[
         "Context",
         "Question",
@@ -178,22 +178,22 @@ pub fn create_dragon(root: &Path, title: &str) -> Result<NewArtifact, Error> {
         "Candidate direction",
         "Resolution criteria",
     ];
-    create(root, &DRAGON, DRAGON_ID_PREFIX, SECTIONS, title)
+    create(root, &DRAGON, DRAGON_ID_PREFIX, SECTIONS, title, body)
 }
 
 /// Create a new parked idea in the repository at `root`.
-pub fn create_idea(root: &Path, title: &str) -> Result<NewArtifact, Error> {
+pub fn create_idea(root: &Path, title: &str, body: Option<&str>) -> Result<NewArtifact, Error> {
     const SECTIONS: &[&str] = &["Problem", "Sketch", "Boundaries", "Evidence"];
-    create(root, &IDEA, IDEA_ID_PREFIX, SECTIONS, title)
+    create(root, &IDEA, IDEA_ID_PREFIX, SECTIONS, title, body)
 }
 
 /// Create a new accepted decision in the repository at `root`.
 ///
 /// Decisions are created directly in their one admitted state: a decision
 /// worth recording is already settled, and drafts are not artifacts.
-pub fn create_decision(root: &Path, title: &str) -> Result<NewArtifact, Error> {
+pub fn create_decision(root: &Path, title: &str, body: Option<&str>) -> Result<NewArtifact, Error> {
     const SECTIONS: &[&str] = &["Context", "Decision", "Consequences"];
-    create(root, &DECISION, DECISION_ID_PREFIX, SECTIONS, title)
+    create(root, &DECISION, DECISION_ID_PREFIX, SECTIONS, title, body)
 }
 
 /// Create a new active sprint in the repository at `root`.
@@ -209,8 +209,8 @@ pub fn create_decision(root: &Path, title: &str) -> Result<NewArtifact, Error> {
 /// step — sequence source, destination materialization, template shape —
 /// so the shared machinery reduces to slugging, identity, and the safe
 /// write.
-pub fn create_sprint(root: &Path, title: &str) -> Result<NewArtifact, Error> {
-    create_sprint_with(root, title, write_new)
+pub fn create_sprint(root: &Path, title: &str, body: Option<&str>) -> Result<NewArtifact, Error> {
+    create_sprint_with(root, title, body, write_new)
 }
 
 /// Implementation seam for [`create_sprint`]: `write` performs the final
@@ -220,10 +220,14 @@ pub fn create_sprint(root: &Path, title: &str) -> Result<NewArtifact, Error> {
 fn create_sprint_with(
     root: &Path,
     title: &str,
+    body: Option<&str>,
     write: impl FnOnce(&Path, &str, &str) -> Result<(), Error>,
 ) -> Result<NewArtifact, Error> {
     const SECTIONS: &[&str] = &["Goal", "Rationale", "Success criteria", "Non-goals"];
     validate_title(SPRINT.kind, title)?;
+    let body = body
+        .map(|raw| Body::parse(SPRINT.kind, SECTIONS, raw))
+        .transpose()?;
     let title = title.trim();
     let slug = slugify(title).ok_or_else(|| Error::InvalidInvocation {
         message: format!(
@@ -259,6 +263,7 @@ fn create_sprint_with(
         created: &created,
         title,
         sections: SECTIONS,
+        body: body.as_ref(),
     });
 
     let dir_rel = format!("{SPRINTS_DIR}/{sequence:04}-{slug}");
@@ -317,11 +322,24 @@ fn rollback_sprint_dirs(root: &Path, created: &[PathBuf], original: Error) -> Er
 /// reader then rejects. Nothing is sanitized or discarded; the invocation
 /// is refused, and the offending character is reported by escaped spelling
 /// and code point, never interpolated raw.
+/// Indefinite article for a collection kind.
+///
+/// `idea` is currently the only managed kind that takes `an`, but deriving
+/// it beats a special case that a future vowel-initial collection would
+/// silently get wrong.
+fn article(kind: &str) -> &'static str {
+    match kind.chars().next() {
+        Some('a' | 'e' | 'i' | 'o' | 'u') => "an",
+        _ => "a",
+    }
+}
+
 fn validate_title(kind: &str, title: &str) -> Result<(), Error> {
+    let article = article(kind);
     if let Some(c) = title.chars().find(|c| c.is_control()) {
         return Err(Error::InvalidInvocation {
             message: format!(
-                "cannot create a {kind}: the title must be a single line \
+                "cannot create {article} {kind}: the title must be a single line \
                  without control characters, but it contains `{}` (U+{:04X}) — \
                  retry with a plain single-line title",
                 c.escape_debug(),
@@ -345,14 +363,21 @@ fn create(
     id_prefix: &str,
     sections: &[&str],
     title: &str,
+    body: Option<&str>,
 ) -> Result<NewArtifact, Error> {
     let kind = collection.kind;
     validate_title(kind, title)?;
+    // Parsed before any sequence is allocated or any path is touched: a
+    // rejected body must leave the repository exactly as it was.
+    let body = body
+        .map(|raw| Body::parse(kind, sections, raw))
+        .transpose()?;
     let title = title.trim();
     let slug = slugify(title).ok_or_else(|| Error::InvalidInvocation {
         message: format!(
-            "cannot create a {kind} titled `{title}`: the title must contain \
-             at least one ASCII letter or digit to derive a filename slug"
+            "cannot create {} {kind} titled `{title}`: the title must contain \
+             at least one ASCII letter or digit to derive a filename slug",
+            article(kind)
         ),
     })?;
 
@@ -369,6 +394,7 @@ fn create(
         created: &created,
         title,
         sections,
+        body: body.as_ref(),
     });
 
     // Git does not round-trip empty directories, so a cloned repository may
@@ -398,9 +424,13 @@ pub fn create_task(
     root: &Path,
     title: &str,
     sprint: Option<(crate::read::Selector<'_>, &str)>,
+    body: Option<&str>,
 ) -> Result<NewArtifact, Error> {
     const SECTIONS: &[&str] = &["Objective", "Acceptance criteria"];
     validate_title(TASK.kind, title)?;
+    let body = body
+        .map(|raw| Body::parse(TASK.kind, SECTIONS, raw))
+        .transpose()?;
     let title = title.trim();
     let slug = slugify(title).ok_or_else(|| Error::InvalidInvocation {
         message: format!(
@@ -495,6 +525,7 @@ pub fn create_task(
         created: &created,
         title,
         sections: SECTIONS,
+        body: body.as_ref(),
     });
 
     let sprint_dir = active
@@ -653,6 +684,150 @@ struct Template<'a> {
     created: &'a str,
     title: &'a str,
     sections: &'a [&'a str],
+    /// Caller-supplied section content, or `None` for the empty template.
+    body: Option<&'a Body>,
+}
+
+/// The largest accepted `--body-file` payload. Narrative artifacts are
+/// prose; anything past this is a sign the caller means to write a file
+/// rather than propose one, and an unbounded body is an unbounded write
+/// driven by whoever authored the input.
+const MAX_BODY_BYTES: usize = 64 * 1024;
+
+/// Section content supplied at creation time through `--body-file`.
+///
+/// Scarp owns canonical form: the caller names sections and supplies their
+/// prose, and Scarp decides which sections exist, in what order, and how
+/// the file is laid out. A body therefore never introduces a section, never
+/// reorders one, and never reaches the front matter. Parsing happens before
+/// any sequence is allocated or any file is opened, so a rejected body
+/// leaves the repository untouched.
+struct Body {
+    /// `(section name, content)` in input order, each name already checked
+    /// against the collection's template.
+    sections: Vec<(String, String)>,
+}
+
+impl Body {
+    /// Parse `raw` as section content for a `kind` artifact whose template
+    /// has `sections`.
+    ///
+    /// The accepted grammar is deliberately the one a human already writes:
+    /// `## Section` headings from the collection's own template, with prose
+    /// beneath each. Deeper headings are ordinary content.
+    fn parse(kind: &str, sections: &[&str], raw: &str) -> Result<Self, Error> {
+        let invalid = |message: String| Error::InvalidInvocation { message };
+        let article = article(kind);
+        let known = || {
+            sections
+                .iter()
+                .map(|s| format!("`{s}`"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+
+        if raw.len() > MAX_BODY_BYTES {
+            return Err(invalid(format!(
+                "cannot create {article} {kind}: the body is {} bytes, over the \
+                 {MAX_BODY_BYTES}-byte limit — shorten it, or create the \
+                 artifact without a body and edit the file directly",
+                raw.len()
+            )));
+        }
+
+        // Decision 14: the corpus is LF. CRLF input is accepted and
+        // normalized here so the written artifact never carries the
+        // caller's line endings.
+        let raw = raw.replace("\r\n", "\n");
+
+        if let Some(c) = raw
+            .chars()
+            .find(|&c| c.is_control() && c != '\n' && c != '\t')
+        {
+            return Err(invalid(format!(
+                "cannot create {article} {kind}: the body contains the control \
+                 character `{}` (U+{:04X}); bodies are plain UTF-8 text \
+                 whose only control characters are tab and newline — strip \
+                 it and retry",
+                c.escape_debug(),
+                c as u32
+            )));
+        }
+
+        let mut parsed: Vec<(String, String)> = Vec::new();
+        let mut current: Option<(String, Vec<&str>)> = None;
+
+        for (index, line) in raw.lines().enumerate() {
+            let number = index + 1;
+
+            if let Some(name) = line.strip_prefix("## ") {
+                let name = name.trim();
+                if !sections.contains(&name) {
+                    return Err(invalid(format!(
+                        "cannot create {article} {kind}: line {number} of the body \
+                         names the section `{name}`, which {article} {kind} \
+                         does not have; the sections are {} — Scarp owns the \
+                         template, \
+                         so a body fills sections but never adds one",
+                        known()
+                    )));
+                }
+                if parsed.iter().any(|(seen, _)| seen == name)
+                    || current.as_ref().is_some_and(|(seen, _)| seen == name)
+                {
+                    return Err(invalid(format!(
+                        "cannot create {article} {kind}: the body gives the section \
+                         `{name}` twice, at line {number} and earlier; \
+                         supply each section at most once"
+                    )));
+                }
+                if let Some((seen, lines)) = current.take() {
+                    parsed.push((seen, lines.join("\n").trim().to_string()));
+                }
+                current = Some((name.to_string(), Vec::new()));
+                continue;
+            }
+
+            if let Some(rest) = line.strip_prefix("# ") {
+                return Err(invalid(format!(
+                    "cannot create {article} {kind}: line {number} of the body is the \
+                     level-1 heading `# {}`; the title is the command's \
+                     argument and the body carries only `## ` sections",
+                    rest.trim()
+                )));
+            }
+
+            match current.as_mut() {
+                Some((_, lines)) => lines.push(line),
+                None if line.trim().is_empty() => {}
+                None => {
+                    return Err(invalid(format!(
+                        "cannot create {article} {kind}: line {number} of the body \
+                         has content before any `## ` section heading; every \
+                         line must belong to one of {} — this also refuses a \
+                         body that opens with its own `---` front matter",
+                        known()
+                    )));
+                }
+            }
+        }
+
+        if let Some((seen, lines)) = current {
+            parsed.push((seen, lines.join("\n").trim().to_string()));
+        }
+
+        Ok(Self { sections: parsed })
+    }
+
+    /// Content for `section`, or `None` when the caller did not supply it.
+    /// An unsupplied section renders exactly as the empty template does.
+    fn content_for(&self, section: &str) -> Option<&str> {
+        self.sections
+            .iter()
+            .find(|(name, _)| name == section)
+            .map(|(_, content)| content.as_str())
+            .filter(|content| !content.is_empty())
+    }
 }
 
 /// Render an artifact Markdown payload.
@@ -666,6 +841,7 @@ fn render_artifact(template: &Template<'_>) -> String {
         created,
         title,
         sections,
+        body,
     } = template;
     let mut content = format!(
         "---\n\
@@ -690,6 +866,13 @@ fn render_artifact(template: &Template<'_>) -> String {
         content.push_str("\n## ");
         content.push_str(section);
         content.push('\n');
+        // A filled section is byte-identical to the same section filled by
+        // hand: blank line, prose, newline. An unsupplied one is untouched.
+        if let Some(text) = body.and_then(|body| body.content_for(section)) {
+            content.push('\n');
+            content.push_str(text);
+            content.push('\n');
+        }
     }
     content
 }
@@ -783,7 +966,7 @@ mod tests {
     fn create_writes_zero_padded_filename_with_front_matter_and_headings() {
         let tmp = temp_repo();
 
-        let dragon = create_dragon(tmp.path(), "Branch sequence collisions").unwrap();
+        let dragon = create_dragon(tmp.path(), "Branch sequence collisions", None).unwrap();
 
         assert_eq!(dragon.sequence, 1);
         assert_eq!(dragon.reference(), "dragon:1");
@@ -820,11 +1003,189 @@ mod tests {
         }
     }
 
+    /// The whole point of `--body-file`: a body-filled artifact must be
+    /// indistinguishable from the same artifact filled in by hand, or the
+    /// channel introduces a second author of canonical form.
+    #[test]
+    fn body_filled_artifact_is_byte_identical_to_the_hand_filled_template() {
+        let tmp = temp_repo();
+        let body = "## Problem\n\nProse decays on a phone.\n\n## Evidence\n\nSprint 10.\n";
+
+        let idea = create_idea(tmp.path(), "Remote proposals", Some(body)).unwrap();
+
+        let content = fs::read_to_string(tmp.path().join(&idea.relative_path)).unwrap();
+        let expected = format!(
+            "---\nid: {}\nsequence: 1\nkind: idea\nstatus: parked\ncreated: {}\n---\n\n\
+             # Remote proposals\n\n## Problem\n\nProse decays on a phone.\n\n\
+             ## Sketch\n\n## Boundaries\n\n## Evidence\n\nSprint 10.\n",
+            idea.id,
+            jiff::Zoned::now().strftime("%Y-%m-%d"),
+        );
+        assert_eq!(content, expected);
+    }
+
+    /// Section order is the template's, never the caller's.
+    #[test]
+    fn body_sections_render_in_template_order_not_input_order() {
+        let tmp = temp_repo();
+        let body = "## Evidence\n\nLast in input.\n\n## Problem\n\nFirst in template.\n";
+
+        let idea = create_idea(tmp.path(), "Ordering", Some(body)).unwrap();
+
+        let content = fs::read_to_string(tmp.path().join(&idea.relative_path)).unwrap();
+        let problem = content.find("## Problem").unwrap();
+        let evidence = content.find("## Evidence").unwrap();
+        assert!(
+            problem < evidence,
+            "template order not preserved:\n{content}"
+        );
+    }
+
+    /// A body may fill some sections; the rest stay exactly as the empty
+    /// template renders them.
+    #[test]
+    fn unsupplied_and_empty_sections_render_as_the_bare_template() {
+        let tmp = temp_repo();
+        let body = "## Problem\n\nOnly this one.\n\n## Sketch\n";
+
+        let idea = create_idea(tmp.path(), "Partial", Some(body)).unwrap();
+
+        let content = fs::read_to_string(tmp.path().join(&idea.relative_path)).unwrap();
+        assert!(
+            content.ends_with("## Sketch\n\n## Boundaries\n\n## Evidence\n"),
+            "{content}"
+        );
+    }
+
+    /// Decision 14: the corpus is LF whatever the caller sent.
+    #[test]
+    fn crlf_body_is_normalized_to_lf() {
+        let tmp = temp_repo();
+        let body = "## Problem\r\n\r\nCarriage returns in.\r\n";
+
+        let idea = create_idea(tmp.path(), "Line endings", Some(body)).unwrap();
+
+        let content = fs::read_to_string(tmp.path().join(&idea.relative_path)).unwrap();
+        assert!(
+            !content.contains('\r'),
+            "CR survived into the artifact:\n{content}"
+        );
+        assert!(
+            content.contains("\n## Problem\n\nCarriage returns in.\n"),
+            "{content}"
+        );
+    }
+
+    /// Every rejection must happen before anything is written. The strongest
+    /// evidence is that the collection is still empty and the next creation
+    /// still gets sequence 1 — a burned sequence would be a silent leak.
+    #[test]
+    fn a_rejected_body_writes_nothing_and_burns_no_sequence() {
+        let tmp = temp_repo();
+        let rejected = [
+            "## Nonexistent\n\nUnknown section.\n",
+            "Content before any heading.\n",
+            "# Forged title\n",
+            "## Problem\n\nOne.\n\n## Problem\n\nTwice.\n",
+            "## Problem\n\nNul\u{0}byte.\n",
+            "---\nid: forged\n---\n\n## Problem\n\nFront matter.\n",
+        ];
+
+        for body in rejected {
+            let err = create_idea(tmp.path(), "Refused", Some(body)).unwrap_err();
+            assert!(
+                matches!(err, Error::InvalidInvocation { .. }),
+                "expected a typed invalid invocation for {body:?}, got {err:?}"
+            );
+        }
+
+        assert!(
+            fs::read_dir(tmp.path().join(IDEAS_DIR))
+                .map(|mut entries| entries.next().is_none())
+                .unwrap_or(true),
+            "a refused body left a file behind"
+        );
+        let ok = create_idea(tmp.path(), "First real idea", None).unwrap();
+        assert_eq!(ok.sequence, 1, "a refused body consumed a display sequence");
+    }
+
+    /// The unknown-section refusal has to name the sections that exist, or
+    /// the caller cannot act on it (decision 4).
+    #[test]
+    fn unknown_section_refusal_names_the_offender_and_the_template() {
+        let tmp = temp_repo();
+
+        let err = create_idea(tmp.path(), "Bad", Some("## Consequences\n\nx\n")).unwrap_err();
+
+        let message = err.to_string();
+        for expected in [
+            "Consequences",
+            "`Problem`",
+            "`Sketch`",
+            "`Boundaries`",
+            "`Evidence`",
+        ] {
+            assert!(
+                message.contains(expected),
+                "missing {expected} in: {message}"
+            );
+        }
+    }
+
+    /// An oversized body is refused rather than written: the input is
+    /// authored by whoever filed the proposal.
+    #[test]
+    fn oversized_body_is_refused() {
+        let tmp = temp_repo();
+        let body = format!("## Problem\n\n{}\n", "x".repeat(MAX_BODY_BYTES));
+
+        let err = create_idea(tmp.path(), "Too big", Some(&body)).unwrap_err();
+
+        assert!(err.to_string().contains("over the"), "{err}");
+    }
+
+    /// Deeper headings are ordinary prose — the corpus uses `###` inside
+    /// sections and a body must be able to as well.
+    #[test]
+    fn deeper_headings_are_content_not_sections() {
+        let tmp = temp_repo();
+        let body = "## Problem\n\n### A subsection\n\nStill inside Problem.\n";
+
+        let idea = create_idea(tmp.path(), "Subsections", Some(body)).unwrap();
+
+        let content = fs::read_to_string(tmp.path().join(&idea.relative_path)).unwrap();
+        assert!(content.contains("### A subsection"), "{content}");
+    }
+
+    /// The body surface is not idea-specific; it is a property of `new`.
+    #[test]
+    fn every_narrative_collection_accepts_a_body() {
+        let tmp = temp_repo();
+
+        let dragon = create_dragon(tmp.path(), "Risk", Some("## Context\n\nD.\n")).unwrap();
+        let decision = create_decision(tmp.path(), "Choice", Some("## Context\n\nX.\n")).unwrap();
+        let sprint = create_sprint(tmp.path(), "Cycle", Some("## Goal\n\nS.\n")).unwrap();
+        let task = create_task(tmp.path(), "Item", None, Some("## Objective\n\nT.\n")).unwrap();
+
+        for (created, needle) in [
+            (&dragon, "\n## Context\n\nD.\n"),
+            (&decision, "\n## Context\n\nX.\n"),
+            (&sprint, "\n## Goal\n\nS.\n"),
+            (&task, "\n## Objective\n\nT.\n"),
+        ] {
+            let content = fs::read_to_string(tmp.path().join(&created.relative_path)).unwrap();
+            assert!(
+                content.contains(needle),
+                "missing {needle:?} in:\n{content}"
+            );
+        }
+    }
+
     #[test]
     fn create_idea_writes_a_parked_artifact_with_idea_template() {
         let tmp = temp_repo();
 
-        let idea = create_idea(tmp.path(), "Declarative specs").unwrap();
+        let idea = create_idea(tmp.path(), "Declarative specs", None).unwrap();
 
         assert_eq!(idea.sequence, 1);
         assert_eq!(idea.reference(), "idea:1");
@@ -859,7 +1220,7 @@ mod tests {
     fn create_decision_writes_an_accepted_artifact_with_decision_template() {
         let tmp = temp_repo();
 
-        let decision = create_decision(tmp.path(), "Adopt the spec engine").unwrap();
+        let decision = create_decision(tmp.path(), "Adopt the spec engine", None).unwrap();
 
         assert_eq!(decision.sequence, 1);
         assert_eq!(decision.reference(), "decision:1");
@@ -903,7 +1264,7 @@ mod tests {
         )
         .unwrap();
 
-        let decision = create_decision(tmp.path(), "Sixteenth").unwrap();
+        let decision = create_decision(tmp.path(), "Sixteenth", None).unwrap();
 
         assert_eq!(decision.sequence, 16, "must continue after the maximum");
     }
@@ -924,7 +1285,7 @@ mod tests {
         )
         .unwrap();
 
-        let idea = create_idea(tmp.path(), "Next idea").unwrap();
+        let idea = create_idea(tmp.path(), "Next idea", None).unwrap();
 
         assert_eq!(idea.sequence, 5, "must continue after the terminal maximum");
     }
@@ -937,7 +1298,7 @@ mod tests {
             "init must not pre-create the ideas directory"
         );
 
-        let idea = create_idea(tmp.path(), "First idea").unwrap();
+        let idea = create_idea(tmp.path(), "First idea", None).unwrap();
 
         assert!(tmp.path().join(&idea.relative_path).is_file());
     }
@@ -946,7 +1307,7 @@ mod tests {
     fn create_stamps_an_iso_date() {
         let tmp = temp_repo();
 
-        let dragon = create_dragon(tmp.path(), "Dated risk").unwrap();
+        let dragon = create_dragon(tmp.path(), "Dated risk", None).unwrap();
 
         let content = fs::read_to_string(tmp.path().join(&dragon.relative_path)).unwrap();
         let created = content
@@ -968,8 +1329,8 @@ mod tests {
     fn generated_ids_are_prefixed_uppercase_ulids_and_unique() {
         let tmp = temp_repo();
 
-        let first = create_dragon(tmp.path(), "First risk").unwrap();
-        let second = create_dragon(tmp.path(), "Second risk").unwrap();
+        let first = create_dragon(tmp.path(), "First risk", None).unwrap();
+        let second = create_dragon(tmp.path(), "Second risk", None).unwrap();
 
         assert_ne!(first.id, second.id);
         for id in [&first.id, &second.id] {
@@ -996,7 +1357,7 @@ mod tests {
         )
         .unwrap();
 
-        let dragon = create_dragon(tmp.path(), "Next risk").unwrap();
+        let dragon = create_dragon(tmp.path(), "Next risk", None).unwrap();
 
         assert_eq!(dragon.sequence, 6, "must continue after the maximum");
         assert!(
@@ -1014,7 +1375,7 @@ mod tests {
         let seeded = "---\nid: drg-bootstrap-branch-collisions\nsequence: 1\n---\n";
         fs::write(&seeded_path, seeded).unwrap();
 
-        let dragon = create_dragon(tmp.path(), "Fresh risk").unwrap();
+        let dragon = create_dragon(tmp.path(), "Fresh risk", None).unwrap();
 
         assert_eq!(dragon.sequence, 2);
         assert_eq!(
@@ -1037,7 +1398,7 @@ mod tests {
             let path = tmp.path().join(DRAGONS_DIR).join(bad);
             fs::write(&path, "junk").unwrap();
 
-            let err = create_dragon(tmp.path(), "Any title").unwrap_err();
+            let err = create_dragon(tmp.path(), "Any title", None).unwrap_err();
 
             match err {
                 Error::MalformedArtifact { path: reported, .. } => {
@@ -1054,7 +1415,7 @@ mod tests {
         let tmp = temp_repo();
         fs::write(tmp.path().join(DRAGONS_DIR).join(".gitkeep"), "").unwrap();
 
-        let dragon = create_dragon(tmp.path(), "Ignores dotfiles").unwrap();
+        let dragon = create_dragon(tmp.path(), "Ignores dotfiles", None).unwrap();
 
         assert_eq!(dragon.sequence, 1);
     }
@@ -1066,7 +1427,7 @@ mod tests {
         let tmp = temp_repo();
         fs::remove_dir_all(tmp.path().join("archaeology")).unwrap();
 
-        let dragon = create_dragon(tmp.path(), "Post-clone risk").unwrap();
+        let dragon = create_dragon(tmp.path(), "Post-clone risk", None).unwrap();
 
         assert_eq!(dragon.sequence, 1);
         assert!(tmp.path().join(&dragon.relative_path).is_file());
@@ -1078,7 +1439,7 @@ mod tests {
         fs::remove_dir(tmp.path().join(DRAGONS_DIR)).unwrap();
         fs::write(tmp.path().join(DRAGONS_DIR), "not a directory").unwrap();
 
-        let err = create_dragon(tmp.path(), "Any title").unwrap_err();
+        let err = create_dragon(tmp.path(), "Any title", None).unwrap_err();
 
         assert!(matches!(err, Error::ArtifactConflict { .. }), "{err:?}");
     }
@@ -1088,7 +1449,7 @@ mod tests {
         let tmp = temp_repo();
         fs::write(tmp.path().join(DRAGONS_DIR).join("9999-last.md"), "seeded").unwrap();
 
-        let err = create_dragon(tmp.path(), "One too many").unwrap_err();
+        let err = create_dragon(tmp.path(), "One too many", None).unwrap_err();
 
         assert!(matches!(err, Error::ArtifactConflict { .. }), "{err:?}");
         assert_eq!(
@@ -1130,7 +1491,7 @@ mod tests {
         let dir = tmp.path().join(DRAGONS_DIR);
         fs::set_permissions(&dir, fs::Permissions::from_mode(0o555)).unwrap();
 
-        let result = create_dragon(tmp.path(), "Cannot be written");
+        let result = create_dragon(tmp.path(), "Cannot be written", None);
 
         fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).unwrap();
         assert!(
@@ -1158,7 +1519,7 @@ mod tests {
             ("\tleading control", "U+0009"),
             ("trailing control\n", "U+000A"),
         ] {
-            let err = create_dragon(tmp.path(), title).unwrap_err();
+            let err = create_dragon(tmp.path(), title, None).unwrap_err();
             match &err {
                 Error::InvalidInvocation { message } => {
                     assert!(message.contains(code), "must name {code}: {message}");
@@ -1187,11 +1548,11 @@ mod tests {
         let bad = "bad\ntitle";
 
         for err in [
-            create_dragon(tmp.path(), bad).unwrap_err(),
-            create_idea(tmp.path(), bad).unwrap_err(),
+            create_dragon(tmp.path(), bad, None).unwrap_err(),
+            create_idea(tmp.path(), bad, None).unwrap_err(),
             // No sprint is active, yet the refusal is about the title:
             // validation precedes the active-sprint scan.
-            create_task(tmp.path(), bad, None).unwrap_err(),
+            create_task(tmp.path(), bad, None, None).unwrap_err(),
         ] {
             assert!(matches!(err, Error::InvalidInvocation { .. }), "{err:?}");
             assert!(err.to_string().contains("U+000A"), "{err}");
@@ -1199,8 +1560,8 @@ mod tests {
 
         // A sprint is active, yet the refusal is about the title: sprint
         // title validation precedes every scan.
-        create_sprint(tmp.path(), "Occupied").unwrap();
-        let err = create_sprint(tmp.path(), bad).unwrap_err();
+        create_sprint(tmp.path(), "Occupied", None).unwrap();
+        let err = create_sprint(tmp.path(), bad, None).unwrap_err();
         assert!(matches!(err, Error::InvalidInvocation { .. }), "{err:?}");
         assert!(
             err.to_string().contains("U+000A") && !err.to_string().contains("active"),
@@ -1212,7 +1573,7 @@ mod tests {
     fn marker_significant_punctuation_remains_legal_title_content() {
         let tmp = temp_repo();
 
-        let dragon = create_dragon(tmp.path(), "Handle ]] and # and | and ] safely").unwrap();
+        let dragon = create_dragon(tmp.path(), "Handle ]] and # and | and ] safely", None).unwrap();
 
         let content = fs::read_to_string(tmp.path().join(&dragon.relative_path)).unwrap();
         assert!(
@@ -1225,7 +1586,7 @@ mod tests {
     fn failed_sprint_write_rolls_back_created_directories_and_returns_the_original_error() {
         let tmp = temp_repo();
 
-        let err = create_sprint_with(tmp.path(), "Doomed", |_, _, _| {
+        let err = create_sprint_with(tmp.path(), "Doomed", None, |_, _, _| {
             Err(Error::Filesystem {
                 operation: "write temporary artifact".into(),
                 path: PathBuf::from("injected"),
@@ -1257,7 +1618,7 @@ mod tests {
         let tmp = temp_repo();
         fs::remove_dir_all(tmp.path().join("archaeology")).unwrap();
 
-        let err = create_sprint_with(tmp.path(), "Doomed", |_, _, _| {
+        let err = create_sprint_with(tmp.path(), "Doomed", None, |_, _, _| {
             Err(Error::Filesystem {
                 operation: "write temporary artifact".into(),
                 path: PathBuf::from("injected"),
@@ -1284,7 +1645,7 @@ mod tests {
         )
         .unwrap();
 
-        let err = create_sprint_with(tmp.path(), "Doomed", |_, _, _| {
+        let err = create_sprint_with(tmp.path(), "Doomed", None, |_, _, _| {
             Err(Error::Filesystem {
                 operation: "write temporary artifact".into(),
                 path: PathBuf::from("injected"),
@@ -1303,7 +1664,7 @@ mod tests {
             "pre-existing directories are never removed"
         );
 
-        let sprint = create_sprint(tmp.path(), "Recovered").unwrap();
+        let sprint = create_sprint(tmp.path(), "Recovered", None).unwrap();
         assert_eq!(sprint.sequence, 5, "the sequence stays available for retry");
         assert!(
             tmp.path()
@@ -1318,7 +1679,7 @@ mod tests {
     fn obstructed_rollback_is_a_filesystem_failure_naming_original_and_leftover() {
         let tmp = temp_repo();
 
-        let err = create_sprint_with(tmp.path(), "Doomed", |dir, _, _| {
+        let err = create_sprint_with(tmp.path(), "Doomed", None, |dir, _, _| {
             // Concurrent content appears in the fresh directory before the
             // write fails; rollback must not delete it.
             fs::write(dir.join("concurrent.md"), "someone else's work").unwrap();
@@ -1357,7 +1718,7 @@ mod tests {
     fn invalid_title_creates_nothing() {
         let tmp = temp_repo();
 
-        let err = create_dragon(tmp.path(), "!!!").unwrap_err();
+        let err = create_dragon(tmp.path(), "!!!", None).unwrap_err();
 
         assert!(matches!(err, Error::InvalidInvocation { .. }), "{err:?}");
         assert_eq!(dragons_dir_entries(tmp.path()), Vec::<String>::new());
@@ -1367,7 +1728,7 @@ mod tests {
     fn create_sprint_writes_template_in_a_fresh_containment_directory() {
         let tmp = temp_repo();
 
-        let sprint = create_sprint(tmp.path(), "Placement and sprints").unwrap();
+        let sprint = create_sprint(tmp.path(), "Placement and sprints", None).unwrap();
 
         assert_eq!(sprint.sequence, 1);
         assert_eq!(sprint.reference(), "sprint:1");
@@ -1396,9 +1757,9 @@ mod tests {
         // `a_second_active_sprint_is_refused_naming_the_first` regression:
         // another active sprint is never a refusal.
         let tmp = temp_repo();
-        create_sprint(tmp.path(), "First").unwrap();
+        create_sprint(tmp.path(), "First", None).unwrap();
 
-        let second = create_sprint(tmp.path(), "Second").unwrap();
+        let second = create_sprint(tmp.path(), "Second", None).unwrap();
 
         assert_eq!(second.sequence, 2);
         assert!(
@@ -1421,7 +1782,7 @@ mod tests {
         )
         .unwrap();
 
-        let sprint = create_sprint(tmp.path(), "Next").unwrap();
+        let sprint = create_sprint(tmp.path(), "Next", None).unwrap();
 
         assert_eq!(sprint.sequence, 5);
     }

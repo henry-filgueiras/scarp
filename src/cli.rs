@@ -5,6 +5,7 @@
 //! operations behind them, not to callers.
 
 use std::fmt;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use clap::{Parser, Subcommand};
@@ -35,6 +36,11 @@ pub enum Command {
         /// stable id; required when more than one sprint is active
         #[arg(long)]
         sprint: Option<String>,
+        /// Fill the new artifact's sections from a UTF-8 Markdown file
+        /// whose `## ` headings name this collection's own sections;
+        /// Scarp still owns the template, order, and layout
+        #[arg(long, value_name = "PATH")]
+        body_file: Option<PathBuf>,
         /// Emit a deterministic JSON object describing the created
         /// artifact instead of the human-readable line
         #[arg(long)]

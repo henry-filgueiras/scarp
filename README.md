@@ -338,7 +338,7 @@ Scarp is bootstrapping its smallest useful vertical slice. Honest scoreboard:
 | Command | What it does | Status |
 | --- | --- | --- |
 | `scarp init` | initialize a repository | ✅ |
-| `scarp new dragon "…" [--json]` | create an artifact; Scarp picks the sequence, slug, and stable ULID | ✅ |
+| `scarp new dragon "…" [--body-file PATH] [--json]` | create an artifact; Scarp picks the sequence, slug, and stable ULID, and fills the template's sections from `--body-file` when given | ✅ |
 | `scarp list dragons [--json]` | discover and list a collection | ✅ |
 | `scarp show dragon:N [--json]` | inspect one artifact | ✅ |
 | `scarp doctor [--json]` | validate repository invariants, report every finding | ✅ |
