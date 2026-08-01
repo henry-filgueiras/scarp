@@ -328,6 +328,17 @@ pub struct Summary {
     /// `sprint:` front-matter field. Absent for every other kind.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sprint: Option<String>,
+    /// Where this artifact was realized from, when it came from a remote
+    /// proposal rather than being authored in place: the proposal's
+    /// canonical URL, from the `proposal:` front-matter field.
+    ///
+    /// One-way provenance, stamped once at creation and never updated.
+    /// It is not a typed edge — edges target managed artifacts, and this
+    /// names something outside the repository — and it is deliberately
+    /// not a synchronization link: the proposal may be edited, closed, or
+    /// deleted without any consequence here.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proposal: Option<String>,
     /// Repository-relative path with `/` separators.
     pub path: String,
 }
@@ -388,6 +399,9 @@ struct FrontMatter {
     created: String,
     /// Required on tasks (the owning sprint's stable id); inert elsewhere.
     sprint: Option<String>,
+    /// Optional provenance for an artifact realized from a remote
+    /// proposal: the canonical URL of the proposal it was created from.
+    proposal: Option<String>,
 }
 
 /// Parse every artifact of one collection in the repository at `root`,
@@ -781,6 +795,15 @@ pub(crate) fn parse_artifact_at(
         None
     };
 
+    // Optional everywhere, but when present it must be usable: a value
+    // nobody can follow is worse than no provenance, because it looks
+    // like provenance. Reachability is deliberately not checked — that
+    // would need a network, and no canonical operation may depend on one.
+    let proposal = match &meta.proposal {
+        Some(url) => Some(validated_proposal(url).map_err(malformed)?),
+        None => None,
+    };
+
     let title = extract_title(body).map_err(malformed)?;
 
     Ok(Artifact {
@@ -792,10 +815,45 @@ pub(crate) fn parse_artifact_at(
             title,
             created: meta.created,
             sprint,
+            proposal,
             path: path_rel.to_string(),
         },
         content,
     })
+}
+
+/// Check a `proposal:` value and return it normalized.
+///
+/// The value is the proposal's canonical URL. A URL rather than a
+/// forge-shorthand like `owner/repo#2` because it survives decision 7's
+/// raw-diff test: a reader with nothing installed sees a link they can
+/// follow, and no forge-specific decoding is needed to understand it.
+///
+/// Only the shape is checked. Whether the proposal still exists, is
+/// open, or ever existed is not Scarp's business: it is a historical
+/// record of where an artifact came from, and it stays true even after
+/// the proposal is closed or deleted.
+pub(crate) fn validated_proposal(raw: &str) -> Result<String, String> {
+    let url = raw.trim();
+    if url.is_empty() {
+        return Err("front-matter `proposal` must not be empty; \
+                    remove the field or give the proposal's URL"
+            .into());
+    }
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err(format!(
+            "front-matter `proposal` must be the proposal's URL, but is \
+             `{url}`; a shorthand cannot be followed by a reader who has \
+             nothing installed"
+        ));
+    }
+    if url.chars().any(char::is_whitespace) {
+        return Err(format!(
+            "front-matter `proposal` must be a single URL, but `{url}` \
+             contains whitespace"
+        ));
+    }
+    Ok(url.to_string())
 }
 
 /// Split `---`-delimited front matter from the Markdown body.
@@ -1564,6 +1622,7 @@ mod tests {
             title: "A title".into(),
             created: "2026-07-20".into(),
             sprint: None,
+            proposal: None,
             path: "archaeology/dragons/0007-a-title.md".into(),
         };
 
@@ -1585,6 +1644,7 @@ mod tests {
             title: "A task".into(),
             created: "2026-07-22".into(),
             sprint: Some("spr-x".into()),
+            proposal: None,
             path: "archaeology/sprints/0005-x/0017-a-task.md".into(),
         };
 

@@ -637,6 +637,34 @@ fn duplicate_findings(artifacts: &[Artifact], catalog: &crate::edges::Catalog) -
             });
         }
     }
+
+    // One proposal realizes at most one artifact. Structural rather than
+    // procedural on purpose: the realizing command checks before writing,
+    // but only this catches a duplicate that arrived by merging two
+    // branches that each realized the same proposal in isolation.
+    let mut by_proposal: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for artifact in artifacts {
+        if let Some(proposal) = artifact.summary.proposal.as_deref() {
+            by_proposal
+                .entry(proposal)
+                .or_default()
+                .push(&artifact.summary.path);
+        }
+    }
+    for (proposal, mut paths) in by_proposal {
+        if paths.len() > 1 {
+            paths.sort_unstable();
+            findings.push(Finding {
+                problem: "duplicate-proposal",
+                path: paths[0].into(),
+                detail: format!(
+                    "proposal `{proposal}` has been realized more than once, by: {}",
+                    paths.join(", ")
+                ),
+                severity: Severity::Error,
+            });
+        }
+    }
     findings
 }
 

@@ -183,8 +183,34 @@ pub fn create_dragon(root: &Path, title: &str, body: Option<&str>) -> Result<New
 
 /// Create a new parked idea in the repository at `root`.
 pub fn create_idea(root: &Path, title: &str, body: Option<&str>) -> Result<NewArtifact, Error> {
+    create_idea_from(root, title, body, None)
+}
+
+/// Create a new parked idea, optionally stamped with the proposal it was
+/// realized from.
+///
+/// `proposal` is the proposal's canonical URL. It is one-way provenance
+/// written once at creation: nothing later updates it, and nothing here
+/// checks that the proposal still exists. Refusing a duplicate belongs to
+/// the caller before it gets here, and to `doctor` afterwards.
+pub fn create_idea_from(
+    root: &Path,
+    title: &str,
+    body: Option<&str>,
+    proposal: Option<&str>,
+) -> Result<NewArtifact, Error> {
     const SECTIONS: &[&str] = &["Problem", "Sketch", "Boundaries", "Evidence"];
-    create(root, &IDEA, IDEA_ID_PREFIX, SECTIONS, title, body)
+    let proposal = proposal
+        .map(|raw| {
+            crate::read::validated_proposal(raw)
+                .map_err(|message| Error::InvalidInvocation { message })
+        })
+        .transpose()?;
+    let extra: Vec<(&str, &str)> = match proposal.as_deref() {
+        Some(url) => vec![("proposal", url)],
+        None => Vec::new(),
+    };
+    create_with(root, &IDEA, IDEA_ID_PREFIX, SECTIONS, title, body, &extra)
 }
 
 /// Create a new accepted decision in the repository at `root`.
@@ -365,6 +391,21 @@ fn create(
     title: &str,
     body: Option<&str>,
 ) -> Result<NewArtifact, Error> {
+    create_with(root, collection, id_prefix, sections, title, body, &[])
+}
+
+/// [`create`] with extra front-matter fields, which land after `status`
+/// and before `created`.
+#[allow(clippy::too_many_arguments)]
+fn create_with(
+    root: &Path,
+    collection: &Collection,
+    id_prefix: &str,
+    sections: &[&str],
+    title: &str,
+    body: Option<&str>,
+    extra_fields: &[(&str, &str)],
+) -> Result<NewArtifact, Error> {
     let kind = collection.kind;
     validate_title(kind, title)?;
     // Parsed before any sequence is allocated or any path is touched: a
@@ -390,7 +431,7 @@ fn create(
         sequence,
         kind,
         status: home_status.name(),
-        extra_fields: &[],
+        extra_fields,
         created: &created,
         title,
         sections,
@@ -1112,6 +1153,72 @@ mod tests {
         assert!(
             content.ends_with("## Sketch\n\n## Boundaries\n\n## Evidence\n"),
             "{content}"
+        );
+    }
+
+    /// The proposal stamp is a managed front-matter field: written by
+    /// Scarp, parsed back by the read model, and checked by doctor. That
+    /// is what distinguishes it from a link in prose, which nothing
+    /// validates.
+    #[test]
+    fn a_realized_idea_carries_its_proposal_url_in_front_matter() {
+        let tmp = temp_repo();
+        let url = "https://github.com/henry-filgueiras/scarp/issues/2";
+
+        let idea = create_idea_from(tmp.path(), "Realized", None, Some(url)).unwrap();
+
+        let content = fs::read_to_string(tmp.path().join(&idea.relative_path)).unwrap();
+        assert!(
+            content.contains(&format!("\nproposal: {url}\n")),
+            "{content}"
+        );
+        // Ordered after status and before created, like every extra field.
+        let status = content.find("status: parked").unwrap();
+        let proposal = content.find("proposal:").unwrap();
+        let created = content.find("created:").unwrap();
+        assert!(status < proposal && proposal < created, "{content}");
+
+        let parsed = crate::read::scan(tmp.path(), &crate::read::IDEA).unwrap();
+        assert_eq!(parsed[0].summary.proposal.as_deref(), Some(url));
+    }
+
+    /// An idea authored locally carries no stamp at all, rather than an
+    /// empty one: absence is the normal case and must stay invisible.
+    #[test]
+    fn an_unstamped_idea_has_no_proposal_field() {
+        let tmp = temp_repo();
+
+        let idea = create_idea(tmp.path(), "Local", None).unwrap();
+
+        let content = fs::read_to_string(tmp.path().join(&idea.relative_path)).unwrap();
+        assert!(!content.contains("proposal:"), "{content}");
+        let parsed = crate::read::scan(tmp.path(), &crate::read::IDEA).unwrap();
+        assert!(parsed[0].summary.proposal.is_none());
+    }
+
+    /// A value nobody can follow is worse than no provenance, because it
+    /// looks like provenance. Refused before any write.
+    #[test]
+    fn an_unusable_proposal_value_is_refused_before_writing() {
+        let tmp = temp_repo();
+
+        for bad in [
+            "",
+            "   ",
+            "henry-filgueiras/scarp#2",
+            "https://example.com/a b",
+        ] {
+            let err = create_idea_from(tmp.path(), "Bad stamp", None, Some(bad)).unwrap_err();
+            assert!(
+                matches!(err, Error::InvalidInvocation { .. }),
+                "expected a typed refusal for {bad:?}, got {err:?}"
+            );
+        }
+
+        let ok = create_idea(tmp.path(), "First real idea", None).unwrap();
+        assert_eq!(
+            ok.sequence, 1,
+            "a refused stamp consumed a display sequence"
         );
     }
 
