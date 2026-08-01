@@ -110,14 +110,23 @@ adjudications above.
 
 **Validation semantics were imprecise.** The sprint said the pull
 request would carry a green check run, while the design creates that
-pull request with `GITHUB_TOKEN` — which is expected to mean GitHub
-displays no check at all. Running validation and *showing* a check are
-different claims, and only the first was ever guaranteed. The invariant
-is now stated as ordering — nothing is published until the exact
-resulting state has passed validation — and the wording about what a
-reader sees is required to match observed behaviour. A Check Runs API
-integration is permitted only if it falls out of existing work; the
-sprint does not widen to make a sentence true.
+pull request with `GITHUB_TOKEN`. Running validation and *showing* a
+check are different claims, and only the first was ever guaranteed. The
+invariant is now stated as ordering — nothing is published until the
+exact resulting state has passed validation — and the wording about
+what a reader sees must match observed behaviour.
+
+*Corrected 2026-08-01 by [[tsk_01KYX1WHPS3R7FDCKG23YTGHHY|task 48]].*
+This amendment was written expecting the pull request to show no check
+at all. That is wrong: `pull_request` with `opened` is a documented
+exception to the `GITHUB_TOKEN` suppression rule, so `ci.yml` **is**
+triggered — but the run is created in an approval-required state. The
+correct description of what a reader sees is a workflow run awaiting
+approval, not a green check and not nothing. Nothing blocks the merge,
+since `main` has no required checks, and the ordering invariant above
+is unaffected because inline validation still runs before publication.
+The Check Runs API is consequently **not** built: task 48 found the
+reason for considering it had evaporated.
 
 **Replay was unaccounted for.** Serialization protects two different
 proposals from racing on sequence allocation, but says nothing about

@@ -80,28 +80,36 @@ That is a statement about *ordering*, and it is satisfied by running
 the branch is pushed. It is **not** a claim that GitHub displays a
 check on the pull request, and the two must not be conflated.
 
-A pull request opened with `GITHUB_TOKEN` is expected not to trigger
-`ci.yml`, which would leave the pull request showing no check runs on
-its head SHA at all. If [[tsk_01KYX1WHPS3R7FDCKG23YTGHHY|task 48]]
-confirms that, then this task must **not** describe the pull request as
-"carrying a green check". The honest formulation is that the
-realization run is *durably linked* from the pull request — a link to
-the workflow run, plus its recorded result — and the sprint's language
-is amended to match rather than the implementation being bent to
-satisfy the original wording.
+[[tsk_01KYX1WHPS3R7FDCKG23YTGHHY|Task 48]] settled what actually
+happens, and it is neither of the two things previously assumed.
+`pull_request` with `opened` is a documented exception to the
+`GITHUB_TOKEN` suppression rule, so `ci.yml` **is** triggered by the
+proposal pull request — but the resulting run is created in an
+**approval-required** state and does not execute until someone with
+write access approves it.
 
-Publishing a real check run through the Check Runs API against the head
-SHA is acceptable **only** if it falls naturally out of work already
-here — the workflow already knows the SHA and already holds a token
-that may have `checks: write`. It is not worth widening the sprint for,
-and inventing machinery merely to make a sentence true is exactly the
-wrong trade. If it is not done, say so plainly and record what a reader
-of the pull request actually sees.
+So the accurate description of the pull request, which this task must
+use and must confirm by looking at a real one:
 
-Separately, establish whether `ci.yml` runs on the `push` to `main`
-that the human merge produces. If it does, post-merge coverage is
-intact and should be stated as fact; if it does not, that is a real gap
-in the repository's coverage and is recorded rather than assumed away.
+- it has a `ci.yml` workflow run associated with its head SHA;
+- that run is awaiting approval, not green;
+- nothing blocks the merge, because `main` has no required checks;
+- the inline validation already ran against the exact realized state
+  before the branch was pushed, which is the invariant that matters.
+
+Approving the `ci.yml` run is therefore optional and informative, not a
+second mandatory tap. Say that plainly rather than implying either that
+the pull request is unverified or that it is green.
+
+The Check Runs API is **not** built. Task 48's finding removed the
+reason for it — the pull request is not check-less — and publishing a
+synthetic check to describe validation that already happened would add
+a permission and assert something the workflow run already records.
+
+Post-merge coverage is expected to be intact by a simpler route than
+the exception: Henry performs the merge, so the resulting `push` to
+`main` is an ordinary human-triggered event. Confirm it on the first
+real merge rather than assuming it.
 
 ## Replay and idempotency
 
@@ -246,12 +254,17 @@ follows the project's `area: what changed` convention.
 - The publish-after-validation invariant holds and is demonstrated: no
   branch or pull request exists for a proposal whose realized state
   failed `scripts/check.sh` or `scarp doctor`.
-- What a reader of the pull request actually sees is recorded exactly.
-  If GitHub exposes no check run on the head SHA, the Result says so
-  and the pull request instead carries a durable link to the
-  realization run and its result. No artifact in this sprint claims the
-  pull request "carries a green check" unless GitHub genuinely exposes
-  one on that SHA.
+- What a reader of the pull request actually sees is recorded from
+  looking at a real one: whether the `ci.yml` run appears, whether it
+  is awaiting approval as task 48's documentation research predicts,
+  and what the merge button offers. This is the live confirmation task
+  48 deferred here because it could not create a workflow, and it is
+  the first thing to check on the first run. No artifact in this sprint
+  claims the pull request "carries a green check".
+- The pull request additionally carries a durable link to the
+  realization run and its recorded validation result, so a reader does
+  not have to approve a pending run to learn whether the state was
+  validated.
 - Whether `ci.yml` runs on the post-merge `push` to `main` is
   established empirically and recorded, and the resulting post-merge
   coverage is stated accurately — including, if it does not run, that
