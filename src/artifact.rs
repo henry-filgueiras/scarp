@@ -694,6 +694,47 @@ struct Template<'a> {
 /// driven by whoever authored the input.
 const MAX_BODY_BYTES: usize = 64 * 1024;
 
+/// A Markdown fenced-code-block delimiter: three or more backticks or
+/// tildes, optionally indented. Returns the marker character and run
+/// length so a closing fence can be matched against its opener.
+fn fence_marker(line: &str) -> Option<(char, usize)> {
+    let trimmed = line.trim_start();
+    let marker = trimmed.chars().next().filter(|c| *c == '`' || *c == '~')?;
+    let run = trimmed.chars().take_while(|c| *c == marker).count();
+    (run >= 3).then_some((marker, run))
+}
+
+/// Append one non-heading line to the section being accumulated.
+///
+/// Content outside any section has nowhere canonical to go, so it is a
+/// typed refusal rather than a silently dropped line — which also refuses
+/// a body that opens with its own front matter.
+fn push_content<'a>(
+    current: &mut Option<(String, Vec<&'a str>)>,
+    line: &'a str,
+    number: usize,
+    kind: &str,
+    article: &str,
+    known: &impl Fn() -> String,
+) -> Result<(), Error> {
+    match current.as_mut() {
+        Some((_, lines)) => lines.push(line),
+        None if line.trim().is_empty() => {}
+        None => {
+            return Err(Error::InvalidInvocation {
+                message: format!(
+                    "cannot create {article} {kind}: line {number} of the body \
+                     has content before any `## ` section heading; every line \
+                     must belong to one of {} — this also refuses a body that \
+                     opens with its own `---` front matter",
+                    known()
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Section content supplied at creation time through `--body-file`.
 ///
 /// Scarp owns canonical form: the caller names sections and supplies their
@@ -756,9 +797,36 @@ impl Body {
 
         let mut parsed: Vec<(String, String)> = Vec::new();
         let mut current: Option<(String, Vec<&str>)> = None;
+        // Open fenced code block, as (marker character, run length). Inside
+        // one, nothing is a heading: a shell snippet's `# comment` is a
+        // comment, and a sample of Markdown output is a sample.
+        let mut fence: Option<(char, usize)> = None;
 
         for (index, line) in raw.lines().enumerate() {
             let number = index + 1;
+
+            if let Some((marker, run)) = fence_marker(line) {
+                match fence {
+                    None => fence = Some((marker, run)),
+                    // A closing fence matches the opener's character, is at
+                    // least as long, and carries no info string.
+                    Some((open, len))
+                        if marker == open
+                            && run >= len
+                            && line.trim_start()[run..].trim().is_empty() =>
+                    {
+                        fence = None;
+                    }
+                    Some(_) => {}
+                }
+                push_content(&mut current, line, number, kind, article, &known)?;
+                continue;
+            }
+
+            if fence.is_some() {
+                push_content(&mut current, line, number, kind, article, &known)?;
+                continue;
+            }
 
             if let Some(name) = line.strip_prefix("## ") {
                 let name = name.trim();
@@ -797,19 +865,7 @@ impl Body {
                 )));
             }
 
-            match current.as_mut() {
-                Some((_, lines)) => lines.push(line),
-                None if line.trim().is_empty() => {}
-                None => {
-                    return Err(invalid(format!(
-                        "cannot create {article} {kind}: line {number} of the body \
-                         has content before any `## ` section heading; every \
-                         line must belong to one of {} — this also refuses a \
-                         body that opens with its own `---` front matter",
-                        known()
-                    )));
-                }
-            }
+            push_content(&mut current, line, number, kind, article, &known)?;
         }
 
         if let Some((seen, lines)) = current {
@@ -1001,6 +1057,62 @@ mod tests {
                 .unwrap_or_else(|| panic!("missing or out-of-order `{heading}` in:\n{content}"));
             cursor += at + heading.len();
         }
+    }
+
+    /// Real proposals contain code. A shell snippet's `# comment` is a
+    /// comment and a sample of Markdown output is a sample — neither is a
+    /// heading. Found against a real GitHub proposal body during task 54.
+    #[test]
+    fn headings_inside_fenced_code_blocks_are_content() {
+        let tmp = temp_repo();
+        let body = "## Problem\n\n```sh\n# install it\nscarp init\n```\n\n\
+                    ## Sketch\n\n```\n## Consequences\n# Title\n```\n";
+
+        let idea = create_idea(tmp.path(), "Fenced", Some(body)).unwrap();
+
+        let content = fs::read_to_string(tmp.path().join(&idea.relative_path)).unwrap();
+        assert!(content.contains("# install it"), "{content}");
+        assert!(content.contains("\n## Consequences\n"), "{content}");
+        // The forged heading stayed inside Sketch rather than becoming a
+        // section: Boundaries and Evidence are still empty and in order.
+        assert!(
+            content.ends_with("## Boundaries\n\n## Evidence\n"),
+            "{content}"
+        );
+    }
+
+    /// A fence only closes on its own marker, at least as long, with no
+    /// info string — so a nested-looking inner fence does not end the block.
+    #[test]
+    fn fence_closes_only_on_a_matching_marker() {
+        let tmp = temp_repo();
+        let body = "## Problem\n\n~~~~\n```\n## Not a section\n```\n~~~~\n";
+
+        let idea = create_idea(tmp.path(), "Nested fences", Some(body)).unwrap();
+
+        let content = fs::read_to_string(tmp.path().join(&idea.relative_path)).unwrap();
+        assert!(content.contains("## Not a section"), "{content}");
+        assert!(
+            content.ends_with("## Sketch\n\n## Boundaries\n\n## Evidence\n"),
+            "{content}"
+        );
+    }
+
+    /// An unterminated fence swallows the rest of the body rather than
+    /// resuming heading detection halfway through a code block.
+    #[test]
+    fn an_unclosed_fence_keeps_the_remainder_as_content() {
+        let tmp = temp_repo();
+        let body = "## Problem\n\n```\n## Sketch\nstill code\n";
+
+        let idea = create_idea(tmp.path(), "Unclosed", Some(body)).unwrap();
+
+        let content = fs::read_to_string(tmp.path().join(&idea.relative_path)).unwrap();
+        assert!(content.contains("still code"), "{content}");
+        assert!(
+            content.ends_with("## Sketch\n\n## Boundaries\n\n## Evidence\n"),
+            "{content}"
+        );
     }
 
     /// The whole point of `--body-file`: a body-filled artifact must be

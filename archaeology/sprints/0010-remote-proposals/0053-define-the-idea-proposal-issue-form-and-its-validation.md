@@ -2,9 +2,10 @@
 id: tsk_01KYX1WJ03MD2WRNQBS3KGMXXA
 sequence: 53
 kind: task
-status: pending
+status: closed
 sprint: spr_01KYX1WAD7CC0RHVZY0V7VE4X1
 created: 2026-07-31
+closed: 2026-08-01
 ---
 
 # Define the idea proposal issue form and its validation
@@ -137,19 +138,50 @@ model.
 treat that literal as an empty section, or every unfilled section
 arrives carrying GitHub's placeholder as prose.
 
-### Not verified, and why
+### Verified live
 
-Two acceptance criteria are **not met** and cannot be met from here:
-that the form renders in the new-issue chooser, and that a real proposal
-is filed through it from a phone.
+Henry pushed `main` and filed the first proposal on 2026-08-01:
+`henry-filgueiras/scarp#2`, "Machine-readable repository capability
+manifest for agent collaboration".
 
-GitHub reads issue templates from the default branch, so the form does
-nothing until `main` is pushed — and pushing is a human decision under
-CLAUDE.md's commit policy. This is the ordinary human boundary rather
-than a defect, but the task is honestly incomplete until Henry pushes
-and files one. Recorded rather than quietly dropped, because "the form
-exists" and "the form works" are different claims, and the second is the
-one [[tsk_01KYX1WJ1XA2W1SWJYV96R3Y8H|task 54]] depends on. Filing that
-first proposal from a phone also produces the real payload task 54 needs
-to parse against, so doing it before task 54 starts is worth more than
-doing it after.
+The form worked. Evidence, from `gh issue view 2`:
+
+- The `idea` label was applied automatically, which is proof the Issue
+  Form was used rather than a blank issue — nothing else applies it.
+- The body carries all four sections in template order, as
+  `### Problem`, `### Sketch`, `### Boundaries`, `### Evidence`.
+- Line endings are LF only. No `_No response_` appeared, because every
+  optional section was filled; that placeholder therefore remains
+  predicted rather than observed, and
+  [[tsk_01KYX1WJ1XA2W1SWJYV96R3Y8H|task 54]] must still handle it.
+- The issue title is usable verbatim as the idea title.
+
+The `### `-not-`## ` prediction is confirmed against a real payload.
+
+### The real payload found a defect in task 51
+
+The proposal's Sketch section contains a fenced `json` code block. That
+is representative rather than unusual — proposals about tooling contain
+code — and it exposed a bug in the `--body-file` parser shipped by
+[[tsk_01KYX1WHWDG6DBCXBQH2J7YJWN|task 51]]: **it was not aware of fenced
+code blocks.**
+
+Reproduced against the built binary before fixing:
+
+- a body containing a `sh` fence and then `# install it` was refused as
+  a level-1 heading;
+- a body containing a fenced sample of `## Consequences` was refused as
+  an unknown section.
+
+Issue 2 itself did not trip either, because its JSON happens to contain
+no `#` lines — so this was one shell snippet away from breaking the
+first real proposal. Fixed in the same change: the parser now tracks
+fenced blocks, closing only on the opener's marker character at no less
+than its length and with no info string, and treats everything inside as
+content. Three tests cover it, including nested-looking and unterminated
+fences.
+
+This is the argument for filing a real proposal before building the
+parser against an imagined one, and it is recorded as such: the defect
+was invisible to every synthetic body written while implementing task
+51.
