@@ -2,9 +2,10 @@
 id: tsk_01KYX1WHRPEXG8Z8EBPQJRHHFH
 sequence: 49
 kind: task
-status: pending
+status: closed
 sprint: spr_01KYX1WAD7CC0RHVZY0V7VE4X1
 created: 2026-07-31
+closed: 2026-08-01
 ---
 
 # Research auto-merge mechanics and the cost of protecting main
@@ -102,3 +103,39 @@ frequency and severity estimate belongs here.
   conversation.
 
 ## Result
+
+Closed 2026-08-01 without performing the research, because
+[[tsk_01KYX1WHTGXMBCBA7NE27RM9CF|task 50]] chose Option B and this
+task's subject no longer has a referent.
+
+Auto-merge, branch protection, required checks, merge method, and branch
+hygiene are all properties of a pull request that Option B never opens.
+The operator realizes a proposal locally and commits through the
+ordinary workflow, so there is no proposal branch to protect, no
+automated merge to gate, and no governance change to price.
+
+**Not a finding, and not evidence.** This task asked real questions and
+they went unanswered; nothing here should be read as "auto-merge was
+investigated and rejected". If automated realization is reconsidered
+under task 50's promotion criterion, this task's questions are still
+open and still worth the day they would cost.
+
+What survives from the work already done, and is preserved rather than
+restated:
+
+- The live 2026-07-31 snapshot in this task's *Starting facts* —
+  `allow_auto_merge` false, no branch protection, no rulesets,
+  `delete_branch_on_merge` false. Still true, still the baseline any
+  future Option A work would start from, and worth having dated.
+- [[tsk_01KYX1WHPS3R7FDCKG23YTGHHY|Task 48]]'s finding that a
+  `GITHUB_TOKEN`-created pull request *does* trigger `ci.yml`, in an
+  approval-required state. That corrected a premise this task was
+  partly built on, and it would have changed the answer here.
+
+One question this task owned does survive Option B and was handed on
+rather than dropped: **concurrent realization colliding on display
+sequence** — [[drg_01KY169X7W0YXJ5QFV4D1MK4FB|dragon 1]] — is much
+less likely when a single operator realizes proposals one at a time on
+one machine, but it is not impossible across branches, and it is
+ordinary Scarp behaviour rather than anything this channel introduces.
+No new mitigation is owed by this sprint.

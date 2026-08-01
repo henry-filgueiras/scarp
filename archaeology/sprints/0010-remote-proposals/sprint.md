@@ -14,18 +14,23 @@ Let an authorized person, away from the development machine, cause a
 durable idea to appear in this repository — without hand transcription,
 and without any conversational agent holding write access.
 
+The north star, fixed by [[tsk_01KYX1WHTGXMBCBA7NE27RM9CF|task 50]]'s
+adjudication on 2026-08-01:
+
+> Remote capture becomes durable immediately; canonicalization remains
+> local, explicit, trusted, and cheap.
+
 The vertical slice is deliberately one collection wide: a structured
-GitHub issue is realized as a canonical idea artifact by Scarp itself,
-validated by `scarp doctor`, and landed through a branch and a pull
-request that Henry merges with one tap. Ideas only. No generic mutation
-endpoint.
+GitHub issue makes the proposal durable, and later — from a trusted
+development machine — the operator realizes it into a canonical idea
+through Scarp and commits normally. Ideas only. No generic mutation
+endpoint, no automation holding write authority.
 
 The channel is built to be a *recipe*, not a fixture. Scarp is a tool
 other people's repositories will use, and a proposal channel that only
-works here would be a demo. The workflow therefore installs a pinned
-published `scarp` rather than building the checkout, so this
-repository's channel is byte-identical to the one a consumer would
-copy — the same binary, the same commands, the same failure modes.
+works here would be a demo. Where practical Scarp should scaffold the
+GitHub-specific files rather than leaving a consumer to reconstruct them
+from prose.
 
 ## Rationale
 
@@ -42,10 +47,11 @@ invariant.
 The architecture exists to keep one boundary sharp. A GitHub issue
 carries **mutation intent**; it is a proposal, not the artifact. Scarp
 alone realizes canonical state — sequence allocation, stable identity,
-slug, path, template, front matter. Nothing outside Scarp manufactures
-a canonical artifact, which is why the Actions job must invoke the
-binary rather than write Markdown. That separation is the point of the
-sprint, not an implementation detail of it.
+slug, path, template, front matter. Nothing outside Scarp manufactures a
+canonical artifact. That separation is the point of the sprint, not an
+implementation detail of it, and Option B sharpens it rather than
+softening it: mutation authority is never delegated to a token at all,
+it stays with the operator.
 
 This sprint does **not** adopt
 [[ide_01KY7R7CA8FNBRH3DFKFZW8V6J|idea 22]]. Idea 22 proposes a
@@ -68,22 +74,49 @@ literally. Under the project's own change discipline that is an
 adoption gate requiring a new recorded decision, which is why
 [[tsk_01KYX1WHTGXMBCBA7NE27RM9CF|task 50]] gates the automation work.
 
-*Narrowed 2026-08-01 by Henry's direction.* The gate covers
-[[tsk_01KYX1WJ03MD2WRNQBS3KGMXXA|task 53]] and
-[[tsk_01KYX1WJ1XA2W1SWJYV96R3Y8H|task 54]] — the workflow that commits —
-not [[tsk_01KYX1WHWDG6DBCXBQH2J7YJWN|task 51]]. The gate exists because
-*CI authoring commits* is forbidden; a CLI flag a human invokes locally
-is not automation and needs no new permission. Task 51 is also the one
-deliverable on the critical path of every version of this channel,
-including ones that never grow a workflow, so building it first commits
-the sprint to nothing.
-If the adjudication goes the other way, the sprint stops there having
-produced the research and a recorded refusal.
+*Resolved 2026-08-01.* **None of the four is amended.** Task 50 chose
+Option B, under which no automation commits, nothing pushes, and no
+policy site needs qualifying. The sprint proceeds with decision 7 and
+the commit policy exactly as they were — which is the strongest
+available evidence that the channel did not need the authority it was
+originally designed around.
 
-## Shape fixed by owner direction (2026-07-31)
+## Adjudicated shape (2026-08-01)
 
-Four choices were adjudicated before implementation planning, and the
-tasks are written against them rather than re-deriving them:
+[[tsk_01KYX1WHTGXMBCBA7NE27RM9CF|Task 50]] settled the design after
+[[tsk_01KYX1WHWDG6DBCXBQH2J7YJWN|task 51]] shipped `--body-file` and
+revealed that the only genuinely missing primitive was already in hand.
+The remote side makes a proposal durable; the operator canonicalizes it
+later from a trusted machine.
+
+The load-bearing observation is that an **open GitHub issue is already
+durable**. Persistence was never the problem — canonicalization was —
+and canonicalization benefits from the operator's judgment rather than
+suffering from the delay. Everything the sprint had accumulated beyond
+that point served the threat model of a workflow holding a write token,
+not the use case.
+
+Deferred, not rejected. Automated realization keeps an explicit
+promotion criterion recorded in task 50's Result: reconsider it when
+operator-driven realization demonstrates that the manual step is
+recurring material friction — proposals accumulating, being abandoned,
+being meaningfully delayed, or needing burdensome batching. Tasks 48 and
+49 are preserved as the evidence any such reconsideration would start
+from.
+
+The GitHub-aware surface stays minimal. [[ide_01KYZRMKTFMRVWDJP5K3FVJ1SV|Idea
+37]] holds the larger direction and stays parked; this sprint implements
+only the smallest subset that makes operator-driven realization usable,
+and the raw `gh` plus `scarp new` pipeline is treated as the desire path
+that would justify more.
+
+## Superseded: shape fixed by owner direction (2026-07-31)
+
+*Retained as history. Every bullet below assumed the automated channel
+and was overtaken by the adjudication above.* Kept because the sprint
+assumed automation, built the one primitive that was actually missing,
+and then found the automation optional — and that sequence is worth more
+than a tidy charter.
 
 - **The leniency is creation-only and ideas-only.** Automation may
   cause Scarp to create a new artifact, in collections that are never
@@ -112,11 +145,17 @@ because the one-tap choice depends on it: `allow_auto_merge` is
 `false`, `main` has no branch protection, and there are no rulesets.
 The one-tap model needs none of that to change.
 
-## Review amendments (2026-08-01)
+## Superseded: review amendments (2026-08-01, pre-adjudication)
 
-Sprint review before implementation raised two findings, incorporated
-into the tasks rather than left as commentary. Neither reopens the
-adjudications above.
+*Retained as history.* These findings were raised against the automated
+channel. Under Option B most of their subject matter no longer exists —
+there is no pull request, so nothing carries or fails to carry a check,
+and there are no distributed side effects to recover. **Two survive in
+altered form and are live requirements on
+[[tsk_01KYX1WJ1XA2W1SWJYV96R3Y8H|task 54]]**: realizing the same issue
+twice must be refused rather than silently duplicated, and realization
+must consume a snapshot so later issue edits cannot mutate an
+already-created artifact.
 
 **Validation semantics were imprecise.** The sprint said the pull
 request would carry a green check run, while the design creates that
@@ -157,68 +196,72 @@ issue edits cannot silently diverge from what was realized.
 
 ## Success criteria
 
-- An authorized user creates a structured proposal issue and a
-  canonical idea artifact appears on `main`, created by Scarp, without
-  anyone editing a file by hand.
-- The realized artifact is indistinguishable in form from one created
-  locally: Scarp assigned its sequence, identity, slug, path, and
-  template, and `scarp doctor` is green after the merge.
-- Authorization is enforced on the requester, not assumed. An
-  unauthorized issue produces a refusal with a useful diagnostic and no
-  branch, no commit, and no pull request.
-- A malformed payload is refused the same way, and the diagnostic
-  reaches the person who filed the proposal.
-- No proposal branch or pull request is published until the exact
-  resulting repository state has passed the required validation.
-  Canonical state then lands through that pull request, merged by a
-  human. No path in this sprint pushes to `main`, and no path merges
-  without a person.
-- What the pull request shows a reader is described accurately. If
-  GitHub exposes no check run on a workflow-created pull request's head
-  SHA, the realization run is durably linked from the pull request and
-  the repository's prose says that, rather than claiming a check that
-  does not exist.
-- One proposal issue realizes at most one canonical idea, unless a
-  human explicitly performs a recovery operation. Duplicate deliveries,
-  re-runs, and partial failures do not produce a second artifact.
-- The proposal remains linked to the artifact it produced by a durable,
-  machine-readable receipt, so the provenance of a remotely-created
-  idea — and the state of a half-finished one — is recoverable later.
-- The channel is reproducible in a repository that is not this one: the
-  workflow runs a published `scarp`, and a consumer can copy the form,
-  the workflow, and the permissions block without editing anything but
-  their own repository name.
-- The trust boundary — proposal authority versus mutation authority,
-  and why canonical state stays repository-owned — is documented for a
+- An idea drafted in remote conversation becomes a canonical Scarp
+  artifact with **no manual transcription** and no fishing through a
+  chat transcript: the proposal is filed structured, and realization
+  consumes it directly.
+- Filing the proposal makes it durable immediately. Nothing is lost if
+  canonicalization happens hours or days later.
+- The operator realizes a proposal from a trusted local machine through
+  a bounded Scarp operation, and the resulting artifact is
+  indistinguishable from one created locally by hand — Scarp assigned
+  its sequence, identity, slug, path, and template, and `scarp doctor`
+  is green.
+- Realizing the same proposal twice refuses clearly rather than silently
+  creating a second idea.
+- Realization consumes a snapshot of the proposal taken at invocation.
+  Later edits to the issue never mutate an already-created artifact, and
+  nothing synchronizes in either direction.
+- Canonical state reaches `main` only through the operator's ordinary
+  commit and push. No automation commits, nothing pushes on its own, and
+  no CI holds a write token.
+- The GitHub-aware surface fails cleanly when `gh` is absent,
+  unauthenticated, or offline, and when the repository has no GitHub
+  remote. Ordinary Scarp commands are unaffected in every such case.
+- The channel is reproducible in a repository that is not this one, and
+  needs no repository settings configured to work.
+- The trust boundary — proposal authority versus mutation authority, and
+  why canonical state stays repository-owned — is documented for a
   reader who arrives without this sprint's conversation.
 
 ## Non-goals
 
 - Any collection but ideas. Dragons, decisions, evidence, typed edges,
-  and task closure are named extension points only; adding one to this
-  sprint is scope creep with a governance cost.
+  and task closure are named extension points only.
+- **Automated realization.** No GitHub Actions workflow that creates
+  canonical artifacts, no CI-held write token, no automated commit or
+  push. Deferred against a recorded promotion criterion, not rejected in
+  principle.
+- Amending [[dec-bootstrap-interaction-surfaces|decision 7]] or the
+  commit and push policy. Option B needs neither, and a sprint that
+  amends them anyway would be spending authority it does not use.
+- Auto-merge, branch protection, rulesets, and any repository governance
+  change. Nothing in the chosen design opens a pull request.
 - A generic mutation endpoint, a capability manifest, or anything that
-  accepts an arbitrary Scarp command. The workflow invokes one
-  operation with structured arguments; it must never grow a field whose
-  value becomes a command, a flag, or a shell fragment.
-- Arbitrary shell or remote command execution, internet-facing
-  services, and direct write access for conversational agents. The
-  agent on the phone drafts prose; a human files it and GitHub
-  authorizes it.
+  accepts an arbitrary Scarp command, flag, or path from a proposal.
+- Issue-to-artifact synchronization in either direction. Realization is
+  one-shot; the issue is never canonical, and closing or deleting it
+  invalidates nothing.
+- Arbitrary shell or remote command execution, internet-facing services,
+  and direct write access for conversational agents. The agent on the
+  phone drafts prose; a human files it and a human realizes it.
+- Scarp acquiring its own GitHub credential storage, an HTTP client for
+  this feature, a GitHub SDK, or token handling. It shells out to an
+  authenticated `gh`, as it would to `git`.
+- A forge abstraction with one implementation. GitHub has a consumer;
+  GitLab and Forgejo do not.
+- The full [[ide_01KYZRMKTFMRVWDJP5K3FVJ1SV|idea 37]] surface. Only the
+  smallest subset that makes operator-driven realization usable.
+- An in-repository `inbox/`, a `proposals/` collection, a `proposed`
+  lifecycle status, or a doctor finding for pending proposals. Idea 22's
+  boundaries hold, and GitHub Issues already provide the durable
+  noncanonical staging surface this use case needs.
 - MCP, an external proposal API, and idea 22's envelope.
-- A `proposals/` collection, a `proposed` lifecycle status, or a doctor
-  finding for pending proposals. Idea 22's boundaries hold: doctor
-  remains structural validation, and an issue is not an artifact.
 - Retrofitting existing hand-transcribed ideas.
-- Auto-merge, branch protection, and rulesets. Declined by owner
-  direction above, priced by
-  [[tsk_01KYX1WHRPEXG8Z8EBPQJRHHFH|task 49]] so a later sprint can
-  reconsider with real usage as evidence, and not built here.
 - Shipping a reusable GitHub Action, a published composite action, or
-  prebuilt binaries. The consumer story this sprint owes is a working
-  recipe someone can copy; packaging it is
-  [[ide_01KYX31AG163NY0EQPCTXAQ066|idea 36]], and the install cost that
-  makes packaging attractive is
-  [[ide_01KYX31AE8WX1HMBFNRZ3XQK4V|idea 35]]. Both stay parked.
+  prebuilt binaries. Packaging is
+  [[ide_01KYX31AG163NY0EQPCTXAQ066|idea 36]]; the install cost that
+  makes it attractive is [[ide_01KYX31AE8WX1HMBFNRZ3XQK4V|idea 35]].
+  Both stay parked.
 - The standing bootstrap non-goals: daemon, watcher, index, embeddings,
   semantic search, GraphQL, TUI.

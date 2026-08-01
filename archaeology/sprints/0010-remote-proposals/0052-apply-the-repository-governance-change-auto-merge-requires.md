@@ -2,9 +2,10 @@
 id: tsk_01KYX1WHY82P2WNW9RG5KWVGYA
 sequence: 52
 kind: task
-status: pending
+status: closed
 sprint: spr_01KYX1WAD7CC0RHVZY0V7VE4X1
 created: 2026-07-31
+closed: 2026-08-01
 ---
 
 # Apply the repository governance change auto-merge requires
@@ -67,3 +68,35 @@ discover from copying the workflow.
 - A rollback path is recorded: what to change back, and how.
 
 ## Result
+
+Closed 2026-08-01 having changed nothing, which is this task's
+acceptance criterion met rather than skipped: "if the recommendation is
+that nothing needs changing, this task closes having changed nothing and
+says so — that is a result, not a failure."
+
+[[tsk_01KYX1WHTGXMBCBA7NE27RM9CF|Task 50]] chose Option B. No branch
+protection, no ruleset, no `allow_auto_merge`, no
+`delete_branch_on_merge`, no token, no secret, and no default-permission
+change is required, because nothing in the chosen design opens a pull
+request or holds credentials in CI.
+
+**No repository setting was touched.** Verified 2026-08-01 that the
+2026-07-31 baseline still stands: `allow_auto_merge` false, `main`
+unprotected, no rulesets. Direct pushes to `main` continue to work and
+CLAUDE.md's commit policy is unaffected.
+
+That is worth stating positively rather than as an absence. This task
+existed to make a governance change that the sprint had assumed was
+necessary; the sprint found a design that needs none, so the repository
+ends the sprint with exactly the governance it started with. A consumer
+adopting this channel inherits the same property, which
+[[tsk_01KYX1WJ3P25528P5YTXJAJA4P|task 55]] should say plainly: there are
+no repository settings to configure, which is one fewer thing to get
+wrong and one fewer prerequisite a copied recipe can silently depend on.
+
+The task's title still describes the Option A work, and is left
+uncorrected for the reason already recorded in its body: renaming it
+would erase the fact that the sprint deliberately chose the cheaper
+path. If automated realization is reconsidered under task 50's promotion
+criterion, the governance work this task described becomes real again
+and its rollback-path and read-back-to-verify criteria still apply.

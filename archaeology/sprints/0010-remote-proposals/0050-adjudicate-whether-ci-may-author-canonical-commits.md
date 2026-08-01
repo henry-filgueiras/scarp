@@ -2,9 +2,10 @@
 id: tsk_01KYX1WHTGXMBCBA7NE27RM9CF
 sequence: 50
 kind: task
-status: pending
+status: closed
 sprint: spr_01KYX1WAD7CC0RHVZY0V7VE4X1
 created: 2026-07-31
+closed: 2026-08-01
 ---
 
 # Adjudicate whether CI may author canonical commits
@@ -306,3 +307,113 @@ two must not settle the same question differently.
 - No workflow file, issue form, or repository setting changes here.
 
 ## Result
+
+Adjudicated by Henry, 2026-08-01: **Option B — realization from the
+operator's machine.**
+
+```text
+phone / remote conversation
+    ->
+structured GitHub proposal issue
+    ->
+durable pending intent
+    ->
+operator later realizes the proposal from a trusted local machine
+    ->
+Scarp creates the canonical idea
+    ->
+normal local commit and push
+```
+
+The remote side is responsible only for making the proposal durable.
+Canonicalization stays an explicit operator-initiated Scarp operation on
+a trusted machine.
+
+**No decision artifact was created, and none was needed.** That is the
+substance of the outcome rather than a technicality: Option B leaves
+[[dec-bootstrap-interaction-surfaces|decision 7]] and the standing
+commit and push policy untouched, so the question this task was created
+to answer — may CI author canonical commits — is answered **no, not in
+this sprint**, and the four conflicting sites are left exactly as they
+were. Nothing was amended, qualified, or scoped.
+
+### Why
+
+Task 51 shipping `--body-file` removed the only genuinely missing
+primitive. Everything that remained was in service of a threat model,
+not the use case.
+
+The persistence problem was already solved by something nobody built: an
+open GitHub issue is durable. An idea captured remotely survives whether
+or not it is canonicalized that day. What the channel actually buys is
+*canonicalization*, and canonicalization benefits from the operator's
+judgment rather than suffering from the delay.
+
+Option B satisfies the motivating use case in full — no fishing through
+chat transcripts, no manual reconstruction or transcription, structured
+proposal input, Scarp still the sole author of canonical form, GitHub
+still the remote transport, and every existing repository authority
+boundary intact.
+
+Against Option A, the entire remaining cost is one explicit operator
+realization step. That is cheaper than what A required: CI-held write
+authority, automated canonical commits, amendments across four
+conflicting policy sites, replay and idempotency machinery for
+distributed side effects, late remote authorization re-checks,
+partial-state recovery, branch and pull-request publication machinery,
+and the additional GitHub security surface that comes with all of it.
+
+### This is not a rejection of automated realization in principle
+
+Recorded as an explicit promotion criterion, so a later sprint can
+reopen this on evidence rather than on taste:
+
+> Reconsider automated realization when actual use of operator-driven
+> realization demonstrates that the remaining explicit realization step
+> is recurring material friction — for example proposals repeatedly
+> accumulate, are abandoned, are delayed meaningfully, or require
+> burdensome batching.
+
+Option A remains a recoverable design. It is not characterized here as
+inherently undesirable; it is deferred for want of usage evidence, which
+is the same standard CLAUDE.md's change discipline applies to every
+recorded non-goal.
+
+### Option C is not pursued in Sprint 10
+
+GitHub Issues already provide the noncanonical durable staging surface
+the current use case needs. An `inbox/` would introduce a third
+repository category — pending noncanonical input — and would owe an
+answer to both GitHub Issues and
+[[ide_01KY7R7CA8FNBRH3DFKFZW8V6J|idea 22]]'s recorded rejection of a
+repository-local staging area. It stays available as a future direction
+only if forge independence, offline capture, or another concrete use
+case supplies evidence.
+
+### History this task deliberately preserves
+
+This task was created on 2026-07-31 as an authorization gate for an
+automated channel, and its title still says so. It was reframed on
+2026-08-01 after task 51 changed the design space, and only then did the
+cheaper shapes become visible. That sequence is left legible rather than
+tidied away: the sprint assumed automation, built the one primitive that
+was actually missing, and discovered the automation was optional. The
+title's narrowness is part of the record.
+
+[[idea-single-invocation-commits|Idea 9]] stays parked and unamended.
+Its adoption gate — the automatic-commits non-goal — is untouched by
+this outcome, which is exactly the consistency the task required: the
+two do not now settle the same question differently, because this one
+settles nothing about automatic commits at all.
+
+### Consequences for the rest of the sprint
+
+| Task | Effect |
+|---|---|
+| 48 | Closed research, preserved as evidence for why the cheaper design was chosen and as the basis for reopening A later. |
+| 49 | Closed without performing the research: its subject — auto-merge, branch protection, merge method — has no referent under B. |
+| 52 | Closed having changed nothing. No governance change is required. |
+| 53 | Narrowed to the durable remote proposal-entry surface. |
+| 54 | Replaced: an operator-driven realization path, not a workflow. |
+| 55 | Unchanged in purpose; its recipe now describes Option B's six steps. |
+| 56 | Removed from the critical path. The release keeps its independent reasons. |
