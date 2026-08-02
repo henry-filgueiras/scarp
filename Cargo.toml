@@ -1,6 +1,6 @@
 [package]
 name = "scarp"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 # 1.87.0 rejects this crate's `let` chains (E0658); 1.88.0 stabilised them and
 # is the first release that builds, tests, and documents the locked graph.
