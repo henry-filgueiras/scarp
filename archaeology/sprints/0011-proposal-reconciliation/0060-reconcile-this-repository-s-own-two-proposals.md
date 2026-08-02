@@ -2,9 +2,10 @@
 id: tsk_01KYZXTN71EDDR370MD3F00CK9
 sequence: 60
 kind: task
-status: pending
+status: closed
 sprint: spr_01KYZXP2MJ0EGR8KVPFZ1S8ZFX
 created: 2026-08-01
+closed: 2026-08-01
 ---
 
 # Reconcile this repository's own two proposals
@@ -140,8 +141,72 @@ precisely what an unattended workflow would have removed. Had this run
 unattended, the bare-sha defect would have been published to every
 proposal before anyone read one.
 
-### Remaining
+## Result: both proposals reconciled (2026-08-01)
 
-Issue #3 needs this sprint's commits on `main`. Pushing is Henry's, and
-the refusal is already observed: `scarp proposal reconcile 3` refuses
-with `precondition-unmet`, exit 12.
+Issue #3 was reconciled after Henry pushed. `scarp proposal list` now
+reports `no open proposals`, and the repository has no stale proposal
+for the first time since the channel existed.
+
+### The refusal and the success, in that order
+
+The point of doing #3 second was that its refusal was real rather than
+contrived. Both halves were observed against the same issue, minutes
+apart, with a `git push` as the only thing that changed:
+
+```sh
+# Before the push -- idea 40 committed locally, on no remote.
+scarp proposal reconcile 3
+# error[precondition-unmet]: ... `archaeology/ideas/0040-...md` exists
+# here but is not on the branch a reader sees; commit and push it ...
+# exit 12
+
+# Henry pushes.
+
+git fetch -q origin && git status -sb      # main...origin/main, in sync
+scarp proposal reconcile 3
+# reconciled proposal #3: closed, citing idea:40 -- exit 0
+
+gh issue view 3 --json state,stateReason,comments \
+  --jq '.state, .stateReason, .comments[].body'
+scarp proposal list                        # no open proposals
+git status --porcelain                     # empty
+scarp doctor                               # green
+```
+
+**The landing invariant is now demonstrated end to end, not argued.**
+The same command, against the same issue, refused and then succeeded
+because of a push and nothing else. That is the strongest available
+evidence that reconciliation is gated on what a reader can see rather
+than on what the operator's disk holds.
+
+### The comment fix held
+
+Issue #3's comment cites
+[`5a5a262`](https://github.com/henry-filgueiras/scarp/commit/5a5a262a191bd5aef12154691cdb7d5ba37d084b)
+as an abbreviated link. It is also the right commit: `5a5a262` is the one
+that *introduced* idea 40, which is what the rule specifies and what a
+reader wants, rather than the most recent commit to touch the file.
+
+The two comments now differ — #2 carries the bare sha, #3 the link. That
+asymmetry is left in place on purpose. It is what terminality means, and
+a reader who notices it learns the true thing: the comment records what
+was known when it was written.
+
+### The path this closes
+
+Issue #3 completes a route with no hand transcription at any step:
+drafted on a phone in conversation, filed as a structured issue, realized
+by Scarp into a canonical idea, landed by an ordinary commit and push,
+and closed by Scarp against its own canonical record. Every canonical
+mutation passed through the operator's trusted machine; nothing
+automated ever held write authority.
+
+It is also self-referential in a way worth noting: **the proposal that
+asked for reconciliation was closed by the reconciliation it asked
+for.**
+
+### Acceptance
+
+All criteria met. Ideas 38 and 40 are byte-identical to before —
+`git status --porcelain` was empty after every reconciliation — and
+`doctor` reports 132 artifacts with no problems.
