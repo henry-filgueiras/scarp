@@ -2,9 +2,10 @@
 id: tsk_01KYZXTN1EV8KKTK3Q75B8HSYR
 sequence: 57
 kind: task
-status: pending
+status: closed
 sprint: spr_01KYZXP2MJ0EGR8KVPFZ1S8ZFX
 created: 2026-08-01
+closed: 2026-08-01
 ---
 
 # Build the reconciliation primitive
@@ -123,3 +124,151 @@ ever come back to amend it.
 - The landing-proof decision, its failure modes, and its cost are
   recorded in the Result in terms task 58 can adjudicate from.
 - `scripts/check.sh` passes.
+
+## Result
+
+Shipped as `scarp proposal reconcile <number>`.
+
+### Landing is proved by asking GitHub, not the local checkout
+
+**The choice, and the argument that decided it.** The invariant is about
+what a *reader* would find on the branch the repository serves. The local
+`origin/main` remote-tracking ref answers a different question — what this
+machine saw at its last fetch — and only coincides with the real one when
+the fetch is current. It fails safe when stale (behind means refuse), so
+it was defensible.
+
+What ruled it out was noticing that **reconciliation is inherently
+online**. It has to reach GitHub to comment and close, so there is no
+offline path to protect and no network cost being introduced; the API
+call was already being paid for. Given that, trading an authoritative
+answer for a cheaper approximate one buys nothing. Asking GitHub also
+avoided introducing a `git` shell-out into a module that had none, and
+sidestepped "which remote is `origin`" entirely, since `gh` has already
+resolved the repository.
+
+Two calls, deliberately separate because they answer different questions:
+
+- `GET repos/{owner}/{repo}/contents/{path}?ref={default_branch}` —
+  presence, which is what the invariant is actually about. A file added
+  and later deleted has commits but is not there, so the commit list
+  alone would be wrong.
+- `GET repos/{owner}/{repo}/commits?path={path}&sha={default_branch}`,
+  paginated, one sha per line via `--jq` — the *introducing* commit is
+  the last line, since GitHub lists newest first. A later edit is not the
+  landing.
+
+The default branch is asked for rather than assumed to be `main`
+(`gh repo view --json nameWithOwner,defaultBranchRef`), because a
+consumer's repository need not agree with this one.
+
+**Failure modes, stated rather than discovered later.**
+
+- *404 is detected by matching `gh`'s stderr for `HTTP 404`.* `gh`
+  exposes no exit code separating "not found" from any other API
+  failure, so this is string matching on an external tool's output. It is
+  the same technique `github_repo` already uses, and the match is
+  deliberately narrow: mistaking a real failure for a clean "not there"
+  is the dangerous direction, while the reverse merely refuses during an
+  outage. Verified against the live API — `gh: Not Found (HTTP 404)`.
+- *`--paginate` costs one request per 100 commits touching the path.* An
+  archaeology file has one or two. A heavily-rewritten file would cost
+  more, for a number nobody reads closely.
+- *Both calls trust GitHub's view.* If the API is wrong or lagging, so is
+  the answer. There is no second opinion, and adding one would be a
+  cathedral.
+
+**For [[tsk_01KYZXTN3AMPNJ482J4Q13ACTW|task 58]], the datum that matters:
+proving landing locally turned out to be cheap and authoritative, not
+awkward.** The sprint charter anticipated the opposite — that a
+post-merge workflow would know for free what the operator's machine must
+go and find out, and that this might be the workflow *buying
+correctness*. It does not. The workflow's advantage here is roughly two
+API calls, on a command that was making API calls anyway. That leaves
+automation with the convenience argument alone, which is a materially
+weaker case than the charter allowed for, and task 58 should not credit
+it with a correctness benefit it does not have.
+
+### A new error category earned its place
+
+`Error::PreconditionUnmet` (code `precondition-unmet`, exit 12): the
+command is well-formed, the repository is fine, and the integration
+works — the world simply has not reached the required state, and
+retrying later can succeed with nothing repaired. That is true of no
+other category here, and it is the exact distinction `IntegrationUnavailable`
+already draws one axis over, so it was built as its sibling rather than
+overloaded onto `InvalidInvocation`.
+
+It carries the refusals a script most needs to tell apart:
+
+| Situation | Code | Exit |
+|---|---|---|
+| issue is not a proposal | `invalid-invocation` | 2 |
+| no realizing artifact on this branch | `precondition-unmet` | 12 |
+| artifact realized but not landed | `precondition-unmet` | 12 |
+
+Honest limit: the two `precondition-unmet` cases are distinguished by
+their `requirement` text, not by code. Splitting them further would mean
+one error variant per refusal, which is not a trade worth making for a
+distinction a caller can also draw by checking whether the artifact
+exists.
+
+### Decisions worth not rediscovering
+
+- **The comment goes first, then the close.** That ordering is the whole
+  recovery story: a run that dies between them leaves a commented, open
+  issue, and the next run sees its own marker, skips the comment, and
+  closes. No reachable state has a proposal closed without its
+  explanation.
+- **Idempotency keys off an HTML marker in the comment**
+  (`<!-- scarp:reconciled -->`), not prose matching. It lives on GitHub
+  rather than in canonical state on purpose: the artifact learns nothing
+  from being reconciled, so there is nothing to record on the Scarp side
+  — which also honours idea 40's own objection to opaque front matter
+  added merely to make automation convenient.
+- **An already-closed proposal is a no-op, not an error**, whatever
+  closed it. A human who closed a proposal as unwanted has settled it;
+  reopening to reconcile would be the synchronization this design
+  refuses.
+- **The number is required and singular.** A batch form was declined: one
+  invocation, one public irreversible act. It also keeps the automation
+  question honestly in task 58's hands rather than half-answered here.
+- **The third verb was argued, not assumed.** Task 54 set two as the
+  target. `list` already reports realization but can do nothing about it,
+  and folding this into `realize` is barred by the landing invariant —
+  at realization time the artifact is on exactly one disk.
+
+### Verified
+
+Live, against this repository:
+
+- **The refusal.** `scarp proposal reconcile 3` refuses with
+  `precondition-unmet`, exit 12, naming idea 40's path and saying to push
+  — the real state, since idea 40 is committed locally and pushed
+  nowhere.
+- **The landing proof.** The exact calls `landed` makes were run by hand
+  against idea 38: present on `main`, one commit, `ee8c611`.
+- **The parse shapes.** `gh issue view --json
+  number,url,state,labels,comments` returns issue 2 as `OPEN`, labelled
+  `idea`, zero comments — so `plan` would reach `CommentAndClose`.
+
+**Not verified: the comment-and-close path itself.** Exercising it means
+posting publicly and closing a real issue, which is
+[[tsk_01KYZXTN71EDDR370MD3F00CK9|task 60]] and needs Henry's go-ahead.
+Everything up to the side effect is confirmed against live state; the
+side effect is confirmed only by tests. Stated plainly rather than
+rounded up, as sprint 10's retrospective did for its own unexercised
+half.
+
+Offline: 12 new tests, all of `plan`'s refusal ordering, the introducing-
+commit rule, 404 classification, and the comment's content and marker.
+The decision logic was extracted into a pure `plan` function specifically
+so the ordering that keeps a public claim honest is testable without a
+network or a repository.
+
+### Friction
+
+[[ide_01KYZY233Z7GAKFPFSKEAF89ZD|Idea 41]] confirmed itself immediately:
+this `## Result` section had to be hand-added, because `new task` owns
+the template and `doctor` validates no sections at all. Three artifacts
+into the sprint, the finding has already recurred three times.

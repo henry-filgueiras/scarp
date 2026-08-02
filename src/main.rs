@@ -536,6 +536,18 @@ fn proposal_command(command: &ProposalCommand) -> Result<(), Error> {
             }
             Ok(())
         }
+        ProposalCommand::Reconcile { number, json } => {
+            let result = proposal::reconcile(&root, *number)?;
+            if *json {
+                println!("{}", to_json(&result));
+            } else if result.outcome == "already-reconciled" {
+                println!("proposal #{number} is already closed; nothing to do");
+            } else {
+                let reference = result.reference.as_deref().unwrap_or("the artifact");
+                println!("reconciled proposal #{number}: closed, citing {reference}");
+            }
+            Ok(())
+        }
     }
 }
 

@@ -97,6 +97,27 @@ pub enum Error {
         remedy: String,
     },
 
+    /// The operation is well-formed and available, but something it depends
+    /// on is not true yet.
+    ///
+    /// Distinct from an invalid invocation and from an unavailable
+    /// integration, and the distinction is the point: the command was
+    /// spelled correctly, the repository is fine, and the integration is
+    /// working — the world simply has not reached the state the operation
+    /// requires. Retrying later can succeed without anything being fixed,
+    /// which is not true of any other category here.
+    #[error("{operation} needs {requirement}, which is not true yet: {observed}; {remedy}")]
+    PreconditionUnmet {
+        /// The operation that could not run, e.g. `scarp proposal reconcile`.
+        operation: String,
+        /// What must become true, e.g. `the realizing artifact on `main``.
+        requirement: String,
+        /// What was observed instead.
+        observed: String,
+        /// The concrete next step.
+        remedy: String,
+    },
+
     /// `scarp doctor` completed its scan and the repository has validation
     /// findings. The findings themselves are the stdout payload; this error
     /// is the machine-readable summary on stderr.
@@ -147,6 +168,7 @@ impl Error {
             Error::ArtifactNotFound { .. } => "artifact-not-found",
             Error::AmbiguousReference { .. } => "ambiguous-reference",
             Error::IntegrationUnavailable { .. } => "integration-unavailable",
+            Error::PreconditionUnmet { .. } => "precondition-unmet",
             Error::UnhealthyRepository { .. } => "unhealthy-repository",
         }
     }
@@ -167,6 +189,9 @@ impl Error {
     /// - 11: integration unavailable (an optional integration the
     ///   operation needs is absent or unauthenticated; ordinary
     ///   operations are unaffected)
+    /// - 12: precondition unmet (the command and the environment are both
+    ///   fine; the state it needs has not happened yet, and retrying
+    ///   later can succeed with nothing repaired)
     /// - 10: retired with decision 11 (was `transition-interrupted`, the
     ///   doubly-failed two-step transition; transitions no longer move
     ///   files, so the state cannot arise; not reused)
@@ -181,6 +206,7 @@ impl Error {
             Error::AmbiguousReference { .. } => 8,
             Error::UnhealthyRepository { .. } => 9,
             Error::IntegrationUnavailable { .. } => 11,
+            Error::PreconditionUnmet { .. } => 12,
         }
     }
 
@@ -216,6 +242,12 @@ mod tests {
                 requirement: "an authenticated `gh`".into(),
                 reason: "`gh` is not on PATH".into(),
                 remedy: "install the GitHub CLI, or use `scarp new idea` directly".into(),
+            },
+            Error::PreconditionUnmet {
+                operation: "`scarp proposal reconcile`".into(),
+                requirement: "the realizing artifact on `main`".into(),
+                observed: "`archaeology/ideas/0040-x.md` is not on `main`".into(),
+                remedy: "push the commit that adds it, then retry".into(),
             },
             Error::Filesystem {
                 operation: "rename".into(),
@@ -261,6 +293,7 @@ mod tests {
             ("ambiguous-reference", 8),
             ("unhealthy-repository", 9),
             ("integration-unavailable", 11),
+            ("precondition-unmet", 12),
         ];
         for error in one_of_each() {
             let want = expected
@@ -314,9 +347,11 @@ mod tests {
                         );
                     }
                 }
-                // An unavailable integration names an environment, not a
-                // path, but it must still say what to do about it.
-                Error::IntegrationUnavailable { remedy, .. } => {
+                // An unavailable integration names an environment, and an
+                // unmet precondition names a state of the world. Neither
+                // names a path, and both must still say what to do about it.
+                Error::IntegrationUnavailable { remedy, .. }
+                | Error::PreconditionUnmet { remedy, .. } => {
                     assert!(
                         message.contains(remedy),
                         "message must name the remedy `{remedy}`: {message}"

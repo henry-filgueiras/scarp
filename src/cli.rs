@@ -24,6 +24,10 @@ pub struct Cli {
 /// A proposal is mutation intent, not canonical state: these commands
 /// read GitHub through the installed `gh` and create artifacts locally.
 /// Nothing here commits, pushes, or runs unattended.
+///
+/// `reconcile` is the one that runs outward, and it is deliberately the
+/// weakest of the three: it writes only to GitHub, and only about state
+/// the repository already published.
 #[derive(Debug, Subcommand)]
 pub enum ProposalCommand {
     /// List open proposals, noting any already realized
@@ -38,6 +42,15 @@ pub enum ProposalCommand {
         number: u64,
         /// Emit a deterministic JSON object describing the created
         /// artifact instead of the human-readable line
+        #[arg(long)]
+        json: bool,
+    },
+    /// Close a proposal whose artifact has landed, citing what realized it
+    Reconcile {
+        /// The proposal's issue number
+        number: u64,
+        /// Emit a deterministic JSON object describing what was
+        /// reconciled instead of the human-readable line
         #[arg(long)]
         json: bool,
     },
