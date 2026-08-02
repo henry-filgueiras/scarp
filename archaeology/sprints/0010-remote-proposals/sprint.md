@@ -2,8 +2,9 @@
 id: spr_01KYX1WAD7CC0RHVZY0V7VE4X1
 sequence: 10
 kind: sprint
-status: active
+status: closed
 created: 2026-07-31
+closed: 2026-08-01
 ---
 
 # Remote proposals
@@ -265,3 +266,91 @@ issue edits cannot silently diverge from what was realized.
   Both stay parked.
 - The standing bootstrap non-goals: daemon, watcher, index, embeddings,
   semantic search, GraphQL, TUI.
+
+## Retrospective (2026-08-02)
+
+Shipped in `scarp 0.2.0`. Issue
+[#2](https://github.com/henry-filgueiras/scarp/issues/2) — filed from a
+phone — is idea 38 in this corpus, created by Scarp, with no manual
+transcription anywhere in the path.
+
+### The sprint's own headline
+
+**It planned an automated channel and shipped an operator-driven one.**
+The pivot came from building the single genuinely missing primitive
+first: once `--body-file` existed, the remaining complexity was visible
+as serving a *threat model* — a workflow holding a write token — rather
+than the use case. Every mechanism the plan had accumulated (replay
+guard, receipt, partial-state recovery, late authorization,
+postcondition proof, four amended policy sites) belonged to the token,
+and the token turned out to be optional.
+
+The sprint therefore ends with **decision 7 and the commit-and-push
+policy unamended**, and with no new decision artifact. A sprint that
+sought a permission and finished without needing it is a better outcome
+than one that got the permission.
+
+### What the criteria actually got
+
+Met: no-transcription capture; immediate durability; a bounded operator
+command producing an artifact indistinguishable from a local one;
+refusal on double realization; canonical state reaching `main` only
+through an ordinary commit; clean unavailability with every other
+command unaffected; no repository setting configured; the trust boundary
+documented.
+
+Partially met, stated rather than rounded up:
+
+- **Snapshot semantics are true by construction, not demonstrated.**
+  Realization fetches once, never re-reads, and refuses a second run —
+  so a later issue edit cannot reach an existing artifact. That is
+  sound, but no test edits an issue and re-checks, and "no code path
+  exists" is a weaker claim than "we tried it".
+- **The consumer proof covered everything except GitHub.** The recipe
+  was followed into a genuinely alien repository (Python, no Rust, no
+  `scripts/`, no corpus) and worked. The GitHub half was not exercised
+  in a second repository because creating one needs `delete_repo`
+  scope, which this environment lacks — so it could be created and not
+  cleaned up. Narrow, expected to pass, unverified.
+
+### What was learned
+
+**Real payloads find what synthetic ones cannot.** A dozen hand-written
+bodies were used to build `--body-file`; not one contained a fenced code
+block. Henry's first real proposal did, and it exposed a parser that
+would refuse a shell snippet containing `# comment`. Issue 2 escaped it
+only because its JSON has no `#` lines — one snippet away from breaking
+the first proposal ever filed.
+
+**Managed beats conventional, and the correction came from outside.**
+This sprint's own reasoning had declined a front-matter provenance field
+because doctor treats unknown keys as inert. That objection applied to
+an *unmanaged* key; Henry's push-back for a managed one was right, and
+it bought something prose-scanning could not: duplicate realization is
+now a doctor finding, catching the merge-time case where two branches
+each realized once and neither run could have known.
+
+**Research gates earn their cost even when they change the answer.**
+[[tsk_01KYX1WHPS3R7FDCKG23YTGHHY|Task 48]] corrected a premise the
+sprint was built on — `GITHUB_TOKEN`-created pull requests *do* trigger
+`ci.yml`, in an approval-required state — which had been recorded
+confidently in two places.
+[[tsk_01KYX1WHRPEXG8Z8EBPQJRHHFH|Task 49]] closed without performing its
+research and is explicitly marked *not a finding*, so nobody later reads
+it as "auto-merge was investigated and rejected".
+
+### Promotion evidence carried forward
+
+- The `gh`-as-`git` shell-out stance and the `proposal:` field are new
+  architecture living only in [[ide_01KYZRMKTFMRVWDJP5K3FVJ1SV|idea 37]]
+  and task Results. A second producer or a second forge makes them
+  decision-worthy rather than something to let accrete.
+- Automated realization is deferred against a recorded criterion, with
+  tasks 48 and 49's research preserved as its starting point.
+- Four ideas parked by this sprint: prebuilt binaries
+  ([[ide_01KYX31AE8WX1HMBFNRZ3XQK4V|35]]), a reusable action
+  ([[ide_01KYX31AG163NY0EQPCTXAQ066|36]]), the GitHub integration
+  ([[ide_01KYZRMKTFMRVWDJP5K3FVJ1SV|37]]), and trusted publishing
+  ([[ide_01KYZWC2NBHCSPHFSWZZTB25MH|39]]).
+- Idea 38 arrived *through the channel this sprint built*, which is the
+  first evidence that it works for its purpose rather than merely works.

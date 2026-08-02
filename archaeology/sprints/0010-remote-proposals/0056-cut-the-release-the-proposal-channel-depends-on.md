@@ -2,9 +2,10 @@
 id: tsk_01KYX31ACH05NGA3GYH0TJA870
 sequence: 56
 kind: task
-status: pending
+status: closed
 sprint: spr_01KYX1WAD7CC0RHVZY0V7VE4X1
 created: 2026-07-31
+closed: 2026-08-01
 ---
 
 # Cut the release the proposal channel depends on
@@ -133,3 +134,84 @@ binary carries the surface, time the cold install for
 `docs/` link on the live crate page.
 
 ## Result
+
+`scarp 0.2.0` published 2026-08-02T00:05:54Z from `f770a54`, tagged
+`v0.2.0`, tag pushed. Confirmed live against the crates.io API: not
+yanked, and `0.1.0` untouched beside it.
+
+### The version judgment
+
+**0.2.0, not 0.1.1.** Everything since `0.1.0` is additive — nothing
+removed, no behaviour changed for an existing caller — so semver
+permitted a patch. It was declined because the release adds a command
+surface (`scarp proposal list` / `realize`), a managed front-matter
+field (`proposal:`), a doctor finding (`duplicate-proposal`), a CLI flag
+(`--body-file`), and an entry in the error contract
+(`integration-unavailable`, exit 11). A patch number would undersell
+that to the only audience a version number has: someone deciding whether
+to look. Henry's call, 2026-08-01.
+
+### Task 47 batched in
+
+Batched per Henry — "not worth an extra publishing raindance just for
+that" — which is the disposition
+[[tsk_01KYTS3BZDRHEFVG0H5FBK4RW5|task 47]]'s own Notes anticipated. It
+is now closed, verified on both live surfaces, and sprint 9 closed with
+it.
+
+### Verification
+
+Pre-publication, from a clean worktree, with neither `--allow-dirty` nor
+`--no-verify`: `cargo publish --dry-run --locked` passed; 38 files,
+138.0 KiB compressed. The `.crate` was unpacked outside the checkout and
+`archaeology/`, `.scarp.toml`, `docs/`, `scripts/`, `.github/`, and
+`CONTRIBUTING.md` were each confirmed **absent**. 410 tests pass from
+the unpacked source alone. `.cargo_vcs_info.json` names `f770a54`,
+matching `HEAD`.
+
+Post-publication, installed from crates.io into an empty `CARGO_HOME`
+and run there — not trusting that what was tested locally is what
+shipped:
+
+- `scarp --version` reports `0.2.0`;
+- the **shipped** binary carries `--body-file` and the `proposal`
+  subcommand;
+- it created an idea from a body file containing a fenced block with a
+  `#` comment, proving the fence fix is in the published build — that
+  input was refused by `0.1.0`;
+- `scarp doctor` green;
+- `scarp proposal list` in a non-GitHub directory refused with
+  `integration-unavailable`, exit 11.
+
+**Cold install: 6 seconds wall clock**, empty `CARGO_HOME`, 18-core
+laptop. Recorded for [[ide_01KYX31AE8WX1HMBFNRZ3XQK4V|idea 35]] with its
+caveat: that is a fast machine with a warm OS-level network path, and a
+CI runner with fewer cores pays proportionally more. It is a data point,
+not a bound.
+
+### Not a sprint dependency
+
+Stated plainly so a later reader does not infer otherwise: **Option B
+never needed this release.** The dependency existed only under Option A,
+whose workflow would have installed a pinned published `scarp` in CI.
+Under the chosen design the operator runs whatever Scarp they have, and
+[[tsk_01KYX1WJ1XA2W1SWJYV96R3Y8H|task 54]] was completed and verified
+against a local build days before this shipped. The release happened
+because `--body-file` deserved publishing and task 47 was waiting — both
+reasons that predate and outlive this sprint.
+
+### Provenance
+
+```sh
+cargo update -p scarp            # after bumping Cargo.toml
+scripts/check.sh
+cargo publish --dry-run --locked
+cargo publish --locked
+git tag -a v0.2.0 -m "scarp v0.2.0"
+git push origin main --follow-tags
+```
+
+Publication and tagging were performed by Henry, per
+[[tsk_01KYK0PTQV9PGZTHRDAPG6YGYM|task 45]]'s boundary: an agent prepares
+the exact command and stops. Everything above it was prepared and
+verified by an agent.

@@ -2,8 +2,9 @@
 id: spr_01KYTS35VYCFQ6BJN7HD2F0TK7
 sequence: 9
 kind: sprint
-status: active
+status: closed
 created: 2026-07-30
+closed: 2026-08-01
 ---
 
 # Post-release remediation

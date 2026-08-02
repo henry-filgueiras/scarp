@@ -2,9 +2,10 @@
 id: tsk_01KYTS3BZDRHEFVG0H5FBK4RW5
 sequence: 47
 kind: task
-status: pending
+status: closed
 sprint: spr_01KYTS35VYCFQ6BJN7HD2F0TK7
 created: 2026-07-30
+closed: 2026-08-01
 ---
 
 # Repair the crates.io quickstart anchor
@@ -143,11 +144,28 @@ raindance just for that." It therefore ships with
 spending a version number alone, which is the disposition this task's
 Notes anticipated.
 
-### Still to verify, and the repeatable check
+### Verified on both live surfaces (2026-08-02)
 
-This task's acceptance is deliberately observational — "not by reading
-HTML, and not by reasoning about the renderer" — and the link cannot be
-clicked on a page that does not exist yet. After publication:
+`0.2.0` was published 2026-08-02T00:05:54Z. Henry clicked all three
+links on the live pages and reported:
+
+1. **crates.io → quickstart**: goes to GitHub. ✅
+2. **GitHub README → quickstart**: works. ✅
+3. **crates.io → `docs/remote-proposals.md`**: goes to GitHub. ✅
+
+The defect is repaired on the surface it was broken on, without breaking
+the one it worked on — which was this task's bar, and the reason the
+naive `#user-content-quickstart` fix was rejected.
+
+Check 3 is the new one, and it passed on its first release: `docs/` is
+not packaged into the crate, so a relative link there would have been a
+second instance of this same defect shipped in the same version that
+repaired the first.
+
+### The repeatable check
+
+Recorded so the next release performs it rather than rediscovering the
+defect class. After any publication that touches `README.md`:
 
 1. Open the published crate page for the shipping version and click
    *quickstart* in **See it work**. It must leave crates.io and land on
