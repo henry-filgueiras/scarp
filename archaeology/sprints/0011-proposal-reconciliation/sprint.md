@@ -2,8 +2,9 @@
 id: spr_01KYZXP2MJ0EGR8KVPFZ1S8ZFX
 sequence: 11
 kind: sprint
-status: active
+status: closed
 created: 2026-08-01
+closed: 2026-08-01
 ---
 
 # Proposal reconciliation
@@ -233,3 +234,91 @@ and nothing here forbids outward-projecting automation.
   actually filed.
 - The standing bootstrap non-goals: daemon, watcher, index, embeddings,
   semantic search, GraphQL, TUI, MCP.
+
+## Retrospective (2026-08-01)
+
+Four tasks, all closed, in one day. `scarp proposal list` reports **no
+open proposals** — the first time this repository has had no stale
+proposal since the channel existed.
+
+The loop it closes is now unbroken and holds no credential anywhere
+along it: drafted on a phone, filed as a structured issue, realized by
+Scarp, landed by an ordinary commit and push, and closed by Scarp
+against its own canonical record.
+
+### The sprint's own headline
+
+**Reading the output beat testing it, twice, and both times at the
+moment a human first looked.**
+
+The first published reconciliation comment carried a defect every
+passing test had missed — a bare forty-character sha, unlinked, in a
+table otherwise made of links. `body.contains("abc1234")` cannot notice
+that a person would not read it.
+
+That single observation did more than fix a comment. It **decided
+[[tsk_01KYZXTN3AMPNJ482J4Q13ACTW|task 58]]**, which had been leaning on
+cost arguments that turned out not to matter. The judgment an unattended
+reconciler removes — *is this good enough to publish under the
+repository's name* — is precisely the judgment that caught it, on the
+first performance. Nothing about the token, the trigger, or the API
+budget was as informative as one person reading one comment.
+
+[[spr_01KYX1WAD7CC0RHVZY0V7VE4X1|Sprint 10]] learned the same thing from
+a real proposal body containing a fenced code block no fixture had.
+**Three instances across two sprints is no longer an anecdote.** If a
+fourth arrives it deserves promotion out of retrospectives and into
+something durable — a principle, on [[ide_01KYDZVN858BK52A35KJ3ZY5BP|idea
+28]]'s reading, or at least a stated testing stance.
+
+### What the charter got wrong, kept rather than tidied
+
+Two predictions, both recorded confidently and both wrong:
+
+- **The landing proof was "the strongest argument the workflow has".** It
+  was not close. Reconciliation is inherently online, so proving landing
+  costs two API calls on a command already making them. The reasoning
+  was sound and the premise was unexamined.
+- **The adjudication would turn on cost.** It turned on judgment, from
+  evidence produced by a task scheduled *after* it in the plan and run
+  before it by accident of the push.
+
+Both are left in place with dated corrections beside them. A charter
+that predicted well is less useful than one whose errors are legible.
+
+### Decisions that stayed unmade, on purpose
+
+- **No policy site was amended.** Decision 7, the "GitHub Issues
+  synchronization" non-goal, and the commit-and-push policy stand as
+  they were. Two sprints running have now sought no permission and
+  needed none.
+- **No decision artifact was created.** The `PreconditionUnmet` category
+  and the projection-authority framing are new architecture living in
+  task Results and `docs/remote-proposals.md`. A second consumer of
+  either makes them decision-worthy; one does not.
+- **Idea 40's outward-projection principle stays untested.** It asked to
+  be proved narrowly here. It was not, because the automation was never
+  granted — a null result, not support. Recorded so a later reader does
+  not find this sprint and think the question was settled.
+
+### Carried forward
+
+- **Automated reconciliation is declined against a checkable criterion**
+  (five reconciliations or two awaiting, *and* an unchanged comment
+  across three runs), not against taste.
+- **Nothing reminds the operator a proposal is waiting.** The one step
+  still carried by memory. Its home is
+  [[ide_01KY7S6GHMQ8ZWNXPX7TX21X7N|idea 24]]'s one-screen orientation,
+  not a `doctor` finding.
+- **The consumer proof is still one repository wide** for the GitHub
+  half. This sprint added a verb to that recipe and did not re-run it
+  elsewhere, so sprint 10's honest limit is inherited unchanged rather
+  than quietly upgraded.
+- **Snapshot semantics remain true by construction, not demonstrated** —
+  also inherited, also unchanged.
+- One idea parked: [[ide_01KYZY233Z7GAKFPFSKEAF89ZD|idea 41]], author-owned
+  sections in managed templates, which recurred in all four of this
+  sprint's task artifacts and in this retrospective. Creation refuses
+  `##` sections that `doctor` accepts, so the corpus has drifted into
+  two house styles. It is now a standing tax on every artifact this
+  project writes.
