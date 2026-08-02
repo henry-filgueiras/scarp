@@ -314,6 +314,18 @@ struct Landing {
     /// Permalink to the artifact at that commit — pinned rather than
     /// branch-relative, because the comment citing it is never revisited.
     permalink: String,
+    /// Permalink to the commit itself.
+    commit_url: String,
+}
+
+/// The conventional abbreviation of a commit sha.
+///
+/// A full sha is forty characters of hex that no reader parses; the
+/// abbreviation is what every other tool shows, and the link behind it
+/// carries the exact identity for anyone who needs it.
+fn short_commit(sha: &str) -> &str {
+    let end = sha.char_indices().nth(7).map_or(sha.len(), |(i, _)| i);
+    &sha[..end]
 }
 
 /// Pick the commit that introduced a path from `gh`'s newest-first list.
@@ -363,6 +375,10 @@ fn landed(operation: &str, repo: &Repo, path: &str) -> Result<Option<Landing>, E
     Ok(introducing_commit(&shas).map(|commit| Landing {
         permalink: format!(
             "https://github.com/{}/blob/{commit}/{path}",
+            repo.name_with_owner
+        ),
+        commit_url: format!(
+            "https://github.com/{}/commit/{commit}",
             repo.name_with_owner
         ),
         commit: commit.to_string(),
@@ -609,7 +625,7 @@ fn comment_body(realized: &read::Summary, landing: &Landing) -> String {
          |---|---|\n\
          | Artifact | [`{path}`]({permalink}) |\n\
          | Stable id | `{id}` |\n\
-         | Landed in | {commit} |\n\
+         | Landed in | [`{short}`]({commit_url}) |\n\
          \n\
          The Scarp artifact is the canonical record; this issue is not. \
          Its lifecycle is tracked there, and nothing will update this \
@@ -621,7 +637,8 @@ fn comment_body(realized: &read::Summary, landing: &Landing) -> String {
         path = realized.path,
         permalink = landing.permalink,
         id = realized.id,
-        commit = landing.commit,
+        short = short_commit(&landing.commit),
+        commit_url = landing.commit_url,
     )
 }
 
@@ -870,9 +887,11 @@ mod tests {
 
     fn landing() -> Landing {
         Landing {
-            commit: "abc1234".to_string(),
-            permalink: "https://github.com/o/r/blob/abc1234/archaeology/ideas/0040-reconcile.md"
-                .to_string(),
+            commit: "abc1234def5678".to_string(),
+            permalink:
+                "https://github.com/o/r/blob/abc1234def5678/archaeology/ideas/0040-reconcile.md"
+                    .to_string(),
+            commit_url: "https://github.com/o/r/commit/abc1234def5678".to_string(),
         }
     }
 
@@ -1011,11 +1030,35 @@ mod tests {
             body.contains("archaeology/ideas/0040-reconcile.md"),
             "{body}"
         );
-        assert!(body.contains("abc1234"), "{body}");
         assert!(
             body.contains("canonical record; this issue is not"),
             "{body}"
         );
+    }
+
+    /// Found by reading the first real reconciliation comment rendered on
+    /// GitHub: a bare forty-character sha is a wall of hex nobody parses,
+    /// and it was not even a link. The abbreviation is what a reader
+    /// wants; the link behind it keeps the exact identity.
+    #[test]
+    fn the_landing_commit_is_an_abbreviated_link_not_a_wall_of_hex() {
+        let body = comment_body(&summary(), &landing());
+
+        assert!(
+            body.contains("[`abc1234`](https://github.com/o/r/commit/abc1234def5678)"),
+            "{body}"
+        );
+        assert!(
+            !body.contains("| abc1234def5678 |"),
+            "the full sha must not appear bare: {body}"
+        );
+    }
+
+    #[test]
+    fn a_short_commit_is_seven_characters_and_never_panics() {
+        assert_eq!(short_commit("abc1234def5678"), "abc1234");
+        assert_eq!(short_commit("abc"), "abc");
+        assert_eq!(short_commit(""), "");
     }
 
     /// The marker is what makes a re-run idempotent, so it has to
