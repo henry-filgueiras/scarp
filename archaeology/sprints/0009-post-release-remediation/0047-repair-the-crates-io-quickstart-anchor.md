@@ -88,3 +88,76 @@ tests that the commands run, not that the prose renders — which is worth
 recording so the idea is not credited with coverage it does not have.
 
 ## Result
+
+Fix applied 2026-08-01; **verification is pending publication**, so this
+task stays open until the link has been clicked on the live crate page.
+
+### The approach, and the three rejected
+
+The link is now an **absolute URL into the repository README anchor**:
+
+```markdown
+[quickstart](https://github.com/henry-filgueiras/scarp#quickstart)
+```
+
+It resolves on crates.io because it leaves crates.io — the reader lands
+on the GitHub README, where the anchor works. It resolves on GitHub
+because that is the exact form GitHub's own heading-permalink UI
+produces. Neither surface is repaired at the other's expense, which was
+this task's bar.
+
+It is also the pattern the file already uses. Four other README links
+into the repository are absolute `github.com` URLs, precisely because
+`archaeology/` and `docs/` are not packaged into the crate. The relative
+anchor was the odd one out.
+
+Rejected, with reasons:
+
+- **Removing the link and keeping the prose.** Cheapest, and it loses a
+  real affordance: the "See it work" section explicitly promises the
+  output came from a runnable quickstart, and a reader on crates.io has
+  no other way to get there.
+- **Restructuring so the sections are adjacent.** Would put a
+  sixty-line shell block between the tagline and the install
+  instructions, harming the first-time reader to fix a link.
+- **Duplicating the anchor id by hand** (an explicit `<a id=...>` or a
+  `user-content-` href). Examined and rejected on the sanitiser
+  question: crates.io prefixes ids it generates, so a hand-written
+  `#user-content-quickstart` href would match on crates.io and break on
+  GitHub, and a raw anchor element is exactly the kind of thing a
+  Markdown sanitiser is entitled to strip. It trades a dead link for a
+  fragile one.
+
+### Cost
+
+One: on GitHub the link is now a full page navigation rather than an
+in-page jump. The scroll position lands the same place; the browser
+takes a round trip to get there. Accepted as the price of one link that
+works on both surfaces rather than two that each work on one.
+
+### Batching
+
+Henry's call, 2026-08-01: batch it. "Not worth an extra publishing
+raindance just for that." It therefore ships with
+[[tsk_01KYX31ACH05NGA3GYH0TJA870|task 56]]'s release rather than
+spending a version number alone, which is the disposition this task's
+Notes anticipated.
+
+### Still to verify, and the repeatable check
+
+This task's acceptance is deliberately observational — "not by reading
+HTML, and not by reasoning about the renderer" — and the link cannot be
+clicked on a page that does not exist yet. After publication:
+
+1. Open the published crate page for the shipping version and click
+   *quickstart* in **See it work**. It must leave crates.io and land on
+   the GitHub README's Quickstart heading.
+2. Open the GitHub README and click the same link. It must land on the
+   same heading.
+3. While there, click the **`docs/remote-proposals.md`** link in the
+   Status table. It is new in this release and it points at a path that
+   is *not* packaged into the crate — the same trap in a new place, and
+   the reason it too was written absolutely.
+
+That third step is the durable form of this defect's lesson, and it is
+recorded in task 56's preparation so the next release repeats it.

@@ -35,7 +35,8 @@ read or edit with a text editor.
 ## See it work
 
 Recording a known risk, listing it, and closing it once it is handled — every
-line below is real output from the [quickstart](#quickstart), which you can run
+line below is real output from the
+[quickstart](https://github.com/henry-filgueiras/scarp#quickstart), which you can run
 yourself in a throwaway directory in about a minute:
 
 ```console
