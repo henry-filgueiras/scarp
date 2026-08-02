@@ -55,6 +55,13 @@ worked example.
 
 ### The unsettled question
 
+*Settled 2026-08-01 by [[tsk_01KYZXTN3AMPNJ482J4Q13ACTW|task 58]]:
+**declined**, against a recorded promotion criterion. Reconciliation
+stays an operator command; no workflow, no token, nothing unattended,
+and none of the policy sites below amended. The reasoning below is
+retained as written, including the prediction it got wrong — see
+"Adjudicated" after this section.*
+
 Idea 40 prefers a post-merge GitHub Actions workflow that observes
 newly-landed ideas, and leaves the door open to a local command "if
 evidence shows that is simpler and equally reliable".
@@ -113,6 +120,54 @@ projects established canonical truth outward can be granted more freely
 than automation that changes canon.* If it survives this sprint it is
 durable architecture; if it does not, that is worth knowing before
 anything else leans on it.
+
+## Adjudicated: operator-driven, declined against a criterion (2026-08-01)
+
+[[tsk_01KYZXTN3AMPNJ482J4Q13ACTW|Task 58]] declined automation. `scarp
+proposal reconcile <number>` is the whole feature. **No policy site is
+amended** — decision 7, the "GitHub Issues synchronization" non-goal, and
+the commit-and-push policy stand as they were, because the operator path
+implicates none of them.
+
+**Two of the charter's predictions above were wrong, and are worth more
+than a tidy record.**
+
+*The landing proof was supposed to be the hard part.* The section above
+calls it "the strongest argument the workflow has", reasoning that a
+post-merge workflow knows for free what the operator's machine must go
+and find out. [[tsk_01KYZXTN1EV8KKTK3Q75B8HSYR|Task 57]] found the
+opposite, for a reason not noticed when this was written:
+**reconciliation is inherently online**, since it must reach GitHub to
+comment and close. The landing proof therefore costs two API calls on a
+command already making them. The workflow's advantage is approximately
+two HTTP requests, which deletes the correctness argument and leaves
+convenience.
+
+*The deciding evidence came from somewhere else entirely.* Not cost —
+judgment. [[tsk_01KYZXTN71EDDR370MD3F00CK9|Task 60]] published the first
+real reconciliation comment, and reading it found a defect every passing
+test had missed: a bare forty-character sha, unlinked, in a table
+otherwise made of links. Had that run unattended, it would have been
+published to every proposal before anyone read one. The judgment
+automation removes is exactly the judgment that caught it, on the first
+performance.
+
+That is an argument about young code, not about automation forever,
+which is why task 58 records a **promotion criterion** rather than a
+prohibition: reconsider when five reconciliations have been performed (or
+two await at once) *and* the comment body has gone unchanged across three
+consecutive runs.
+
+**The general claim stays untested.** Idea 40's outward-projection
+principle asked to be proved narrowly here first. It was not — the
+automation was never granted, so the experiment never ran. That is a null
+result, not support, and the principle stays parked in idea 40 rather
+than accreting as settled architecture.
+
+One thing this sprint got right and should not lose: **idea 40 was right
+about the authority.** A reconciling workflow would hold `issues: write`
+and never `contents: write`. Declining is about value, not permission,
+and nothing here forbids outward-projecting automation.
 
 ## Success criteria
 
