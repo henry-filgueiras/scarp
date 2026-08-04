@@ -298,9 +298,13 @@ narrative it owes — `--body-file` writes the collection's terminal section
 in the same atomic write as the transition, so the state and the story
 land together or not at all. Legal `[[kind:N]]` sugar in that narrative is
 bound to `[[stable-id|label]]` at authorship time, so nobody hand-copies a
-ULID to cite an artifact. A bare `[[idea:30]]` takes the target's full
-title as its frozen label; write `[[idea:30|idea 30]]` when you want
-shorter prose, and your label is kept. Lifecycle directories are not
+ULID to cite an artifact. The same binding applies to `new --body-file`:
+wherever Scarp accepts authored prose that becomes canonical through a
+Scarp write, resolvable sugar is bound at that boundary, and sugar that
+resolves to nothing refuses the write rather than landing half-bound. A
+bare `[[idea:30]]` takes the target's full title as its frozen label;
+write `[[idea:30|idea 30]]` when you want shorter prose, and your label
+is kept. Lifecycle directories are not
 part of managed collection semantics. Terminal states are transitions,
 never deletions: history is the product.
 
@@ -319,6 +323,9 @@ flowchart LR
     subgraph log
         l1([no lifecycle])
     end
+    subgraph principle
+        p1([active])
+    end
     subgraph task["sprint task"]
         t1([pending]) --> t2([closed])
     end
@@ -330,6 +337,7 @@ archaeology/
 ├── dragons/            known risks, open and closed
 ├── ideas/              proposals: parked, adopted, or rejected
 ├── logs/               durable discoveries, stateless and free-form
+├── principles/         reusable guidance that shapes later decisions
 └── sprints/
     └── 0001-bootstrap/
         ├── sprint.md
@@ -361,12 +369,15 @@ Scarp is bootstrapping its smallest useful vertical slice. Honest scoreboard:
 | `scarp proposal list` / `realize N` / `reconcile N` | realize a GitHub issue as a canonical idea, from your machine, then close the issue citing it ([how and why](https://github.com/henry-filgueiras/scarp/blob/HEAD/docs/remote-proposals.md)) | ✅ |
 | `scarp completions <shell>` | emit a completion script for bash, zsh, fish, elvish, or powershell | ✅ |
 
-Dragons, ideas, decisions, logs, sprints, and tasks are managed collections:
-`new`, `list`, and `show` cover all six, and the rows above show the dragon
-spelling. Lifecycle verbs are collection-specific rather than universal —
+Dragons, ideas, decisions, logs, principles, sprints, and tasks are managed
+collections: `new`, `list`, and `show` cover all seven, and the rows above
+show the dragon spelling. Lifecycle verbs are collection-specific rather than universal —
 `close` applies to dragons, sprints, and tasks, `reopen` to dragons, `adopt`
 and `reject` to ideas. Decisions are permanent records with no lifecycle verbs
-at all: a changed position is a new decision that supersedes the old one. Logs
+at all: a changed position is a new decision that supersedes the old one.
+Principles have one state for the same reason, and they only ever advise:
+`doctor` validates a principle's structure and never judges whether anything
+conforms to one. Logs
 have no lifecycle either, and no template: a log records something that
 already happened, so `--body-file` writes its prose verbatim beneath the
 title and its `--json` projection carries no `status` key.

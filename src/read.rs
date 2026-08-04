@@ -39,7 +39,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::artifact::MAX_SEQUENCE;
 use crate::error::Error;
-use crate::repo::{DECISIONS_DIR, DRAGONS_DIR, IDEAS_DIR, LOGS_DIR, SPRINTS_DIR};
+use crate::repo::{DECISIONS_DIR, DRAGONS_DIR, IDEAS_DIR, LOGS_DIR, PRINCIPLES_DIR, SPRINTS_DIR};
 
 /// Per-file byte cap on every managed content read (thread 4, task 22).
 ///
@@ -298,6 +298,40 @@ pub static SPRINT: Collection = Collection {
         name: "Retrospective",
         dated: true,
     }),
+};
+
+/// The principle template's sections, in template order, as idea 28
+/// proposed them and as log 3's candidate exercised them.
+pub const PRINCIPLE_SECTIONS: &[&str] = &[
+    "Statement",
+    "Rationale",
+    "Application ordering",
+    "Counterpressure",
+    "Failure signals",
+];
+
+/// The principle collection: durable heuristics that shape many later
+/// decisions without themselves being decisions.
+///
+/// One admitted state and no transitions, as `decision` has, adjudicated
+/// 2026-08-04. A principle plainly *can* stop applying, but there is
+/// evidence for durable principles — four instances in one sprint — and
+/// none at all for retirement, and the three ways a principle might end
+/// (superseded by a sharper statement, overtaken by a changed world,
+/// found to have been wrong) are not obviously one transition. Naming
+/// `retired` today would settle that on zero specimens.
+///
+/// Single-state rather than stateless is what keeps the deferral cheap:
+/// the `status:` line is already there, so admitting a terminal state
+/// later is a transitions-table change with no corpus migration, where a
+/// stateless collection would need one.
+pub static PRINCIPLE: Collection = Collection {
+    kind: "principle",
+    dir: PRINCIPLES_DIR,
+    states: &[Status::Active],
+    transitions: &[],
+    stamp_closed: false,
+    terminal: None,
 };
 
 /// The log collection: dated narrative records of what happened and what

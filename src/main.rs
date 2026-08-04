@@ -84,6 +84,7 @@ fn scan(root: &std::path::Path, collection: Collection) -> Result<Vec<read::Arti
         Collection::Idea => read::scan(root, &read::IDEA),
         Collection::Decision => read::scan(root, &read::DECISION),
         Collection::Log => read::scan(root, &read::LOG),
+        Collection::Principle => read::scan(root, &read::PRINCIPLE),
         Collection::Sprint => read::scan_sprints(root),
         Collection::Task => read::scan_tasks(root),
     }
@@ -106,6 +107,9 @@ fn verb_guidance(collection: Collection) -> &'static str {
         Collection::Decision => "decisions have no lifecycle verbs; they are permanent records",
         Collection::Log => {
             "logs have no lifecycle verbs; a log records something that already happened"
+        }
+        Collection::Principle => {
+            "principles have no lifecycle verbs; a principle advises until a later record supersedes it"
         }
         Collection::Sprint => "sprints close: use `scarp close`",
         Collection::Task => "tasks close: use `scarp close`",
@@ -174,6 +178,7 @@ fn transition(
             Collection::Idea => &read::IDEA,
             Collection::Decision => &read::DECISION,
             Collection::Log => &read::LOG,
+            Collection::Principle => &read::PRINCIPLE,
             Collection::Sprint => &read::SPRINT,
             Collection::Task => &read::TASK,
         },
@@ -299,6 +304,14 @@ fn close(
                 message: format!(
                     "`{target}` is a log reference; {}",
                     verb_guidance(Collection::Log)
+                ),
+            });
+        }
+        Collection::Principle => {
+            return Err(Error::InvalidInvocation {
+                message: format!(
+                    "`{target}` is a principle reference; {}",
+                    verb_guidance(Collection::Principle)
                 ),
             });
         }
@@ -611,13 +624,22 @@ fn new_artifact(
     // Read before the repository is touched: an unreadable or non-UTF-8
     // body must fail with a filesystem error, not a half-created artifact.
     let body = body_file.map(read_body_file).transpose()?;
-    let body = body.as_deref();
     let root = repo::discover(&cwd()?)?;
+    // Bind the body's legal sugar at the write boundary, exactly as
+    // `close --body-file` binds terminal narrative: authored prose that
+    // becomes canonical through a Scarp write carries canonical markers,
+    // whichever command performed the write. Unresolvable sugar refuses
+    // creation here, before a sequence is allocated or a path is touched.
+    let body = body
+        .map(|raw| scarp::edges::bind_prose(&root, &raw))
+        .transpose()?;
+    let body = body.as_deref();
     let created = match collection {
         Collection::Dragon => artifact::create_dragon(&root, title, body)?,
         Collection::Idea => artifact::create_idea(&root, title, body)?,
         Collection::Decision => artifact::create_decision(&root, title, body)?,
         Collection::Log => artifact::create_log(&root, title, body)?,
+        Collection::Principle => artifact::create_principle(&root, title, body)?,
         Collection::Sprint => artifact::create_sprint(&root, title, body)?,
         Collection::Task => artifact::create_task(
             &root,
@@ -633,6 +655,7 @@ fn new_artifact(
         Collection::Idea => artifact::probe_reachability(&root, &read::IDEA, &created),
         Collection::Decision => artifact::probe_reachability(&root, &read::DECISION, &created),
         Collection::Log => artifact::probe_reachability(&root, &read::LOG, &created),
+        Collection::Principle => artifact::probe_reachability(&root, &read::PRINCIPLE, &created),
         Collection::Sprint | Collection::Task => artifact::Reachability::Reachable,
     };
     if json {
@@ -748,6 +771,7 @@ fn show(target: &ArtifactTarget, json: bool) -> Result<(), Error> {
                 all.extend(read::scan(&root, &read::IDEA)?);
                 all.extend(read::scan(&root, &read::DECISION)?);
                 all.extend(read::scan(&root, &read::LOG)?);
+                all.extend(read::scan(&root, &read::PRINCIPLE)?);
                 all.extend(read::scan_sprints(&root)?);
                 all.extend(read::scan_tasks(&root)?);
                 Ok(all)

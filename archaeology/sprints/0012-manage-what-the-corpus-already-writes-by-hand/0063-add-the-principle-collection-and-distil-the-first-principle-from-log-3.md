@@ -2,9 +2,10 @@
 id: tsk_01KZ738BJ5MXNBDWECX8REA391
 sequence: 63
 kind: task
-status: pending
+status: closed
 sprint: spr_01KZ7352BYX19E0DNDG05744AM
 created: 2026-08-04
+closed: 2026-08-04
 ---
 
 # Add the principle collection and distil the first principle from log 3
@@ -100,3 +101,81 @@ makes every lifecycle verb refuse a principle with truthful guidance,
 which is the decision collection's existing behaviour and needs no new
 code. The first principle worth retiring is the evidence that reopens
 this.
+
+## Result
+
+Delivered, with one adjudicated addition: sugar binding now applies to
+`new --body-file` as well as `close --body-file`.
+
+**The invariant, stated once.** Wherever Scarp accepts authored prose
+that becomes canonical through a Scarp write, resolvable sugar in that
+prose is bound at the write boundary. There was never a semantic reason
+for a closure to bind `[[log:3]]` while a creation preserved it; that
+distinction would only have recorded which command received the binder
+first. The binder moved from `transition` to `edges`, where the marker
+grammar, the claimant catalog, and addressability already live, and
+`resolve_edge` now calls into it rather than owning it — one binder,
+three callers, no parallel machinery. Creation binds before a sequence
+is allocated or a path is touched, so unresolvable sugar refuses without
+leaving an artifact, and a test asserts the directory is still empty
+afterwards.
+
+**The collection.** `archaeology/principles/`, flat, one admitted state
+`active`, no transitions, template exactly [[ide_01KYDZVN858BK52A35KJ3ZY5BP|Principles: durable heuristics that shape decisions]]'s five fields in
+its order. Added through the collection-data pattern the last two tasks
+established — a `Collection` static, a directory constant, a section
+list, an id prefix, a `create_*`, four dispatch arms, one `doctor` array
+entry — and deliberately without extracting anything, so
+[[tsk_01KZ738BQTR4H7Z7YBKPPCXGHT|Measure the collection-definition duplication three collections cost]] measures what is really there rather than what was tidied
+ahead of it.
+
+Single-state rather than stateless is load-bearing for the deferred
+retirement question: the `status:` line already exists, so admitting a
+terminal state later is a transitions-table change with no corpus
+migration, where a stateless collection would need one.
+
+**Principle 1** carries the verification blind-spot heuristic and its
+companion, and cites [[log_01KYK8RC0YEY51YP37RGV7M7N4|Verification blind spots found while preparing the first release]] — which is unchanged, and remains the
+canonical account of how the shape was found, with its four instances
+and its admission that three of them were found after the work they
+invalidated had been recorded as verified.
+
+### Dogfood
+
+Principle 1's citation was authored as `[[log:3]]` and bound on the way
+in, against the real corpus, to log 3's ULID and its full title. No
+stable id was transcribed by hand anywhere in this task except in the
+dated section appended to [[ide_01KYDZVN858BK52A35KJ3ZY5BP|Principles: durable heuristics that shape decisions]], which is a hand-append to an
+existing file and therefore outside every write boundary Scarp owns —
+the residue this invariant does not reach, and the reason
+[[idea-doctor-reference-graph|Doctor checks over the derived reference graph]]'s label check stays worth having.
+
+This Result was itself supplied through `close --body-file`, so the
+markers above were sugar when written.
+
+### What was not built, and why
+
+`applies` and `overrides` are deferred with the cost now measured rather
+than estimated. Declaring an edge kind is two `EDGE_KINDS` entries;
+*authoring* one is the expensive half, because the only authoring
+surface is `resolve_edge`, reached exclusively from a lifecycle verb's
+flag, and decisions have no lifecycle verb. No decision written in this
+sprint cites a principle, so there is no specimen, and inventing a
+decision mutation surface to complete a two-week-old sketch would be the
+sketch driving the design. Recorded in idea 28 rather than left implicit.
+
+Retirement stays deferred per the 2026-08-04 adjudication above. The
+sketch's sixth field, "related decisions as they accumulate", is those
+edges under another name and waits on them.
+
+### One finding worth carrying forward
+
+Writing the first principle immediately wanted a sixth section. Its
+provenance — which log it came from, and that the log is not superseded
+— is neither rationale nor a failure signal, and it was folded into
+`Rationale`, where it reads acceptably rather than naturally. That is
+[[ide_01KYZY233Z7GAKFPFSKEAF89ZD|Author-owned sections in managed templates]]'s tension appearing on the template's first day of use, in a
+template designed from a worked example, which is about as favourable a
+case as templates get. It is recorded rather than fixed: adding a
+section on one specimen's evidence would be the same premature guess the
+lifecycle deferral exists to avoid.

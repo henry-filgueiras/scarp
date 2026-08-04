@@ -38,7 +38,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 use crate::error::Error;
-use crate::read::{Collection, DECISION, DRAGON, IDEA, LOG, SPRINT, Status, TASK};
+use crate::read::{Collection, DECISION, DRAGON, IDEA, LOG, PRINCIPLE, SPRINT, Status, TASK};
 use crate::repo::{SPRINT_FILE, SPRINTS_DIR};
 
 /// Prefix for generated dragon identities.
@@ -49,6 +49,9 @@ pub const IDEA_ID_PREFIX: &str = "ide_";
 
 /// Prefix for generated decision identities.
 pub const DECISION_ID_PREFIX: &str = "dec_";
+
+/// Prefix for generated principle identities.
+pub const PRINCIPLE_ID_PREFIX: &str = "prn_";
 
 /// Prefix for generated log identities. The two logs written before the
 /// collection was managed carry hand-seeded ids
@@ -216,6 +219,25 @@ pub fn create_idea_from(
         None => Vec::new(),
     };
     create_with(root, &IDEA, IDEA_ID_PREFIX, sections, title, body, &extra)
+}
+
+/// Create a new active principle in the repository at `root`.
+///
+/// Principles advise; nothing here or in `doctor` ever judges whether an
+/// artifact conforms to one.
+pub fn create_principle(
+    root: &Path,
+    title: &str,
+    body: Option<&str>,
+) -> Result<NewArtifact, Error> {
+    create(
+        root,
+        &PRINCIPLE,
+        PRINCIPLE_ID_PREFIX,
+        crate::read::PRINCIPLE_SECTIONS,
+        title,
+        body,
+    )
 }
 
 /// Create a new log in the repository at `root`.

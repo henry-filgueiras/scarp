@@ -46,6 +46,11 @@ pub const IDEAS_DIR: &str = "archaeology/ideas";
 /// a single lifecycle state (`accepted`), so placement is trivially flat.
 pub const DECISIONS_DIR: &str = "archaeology/decisions";
 
+/// Root-relative directory holding every principle, flat. Principles
+/// have one admitted state, so placement is trivially flat for the same
+/// reason decisions are.
+pub const PRINCIPLES_DIR: &str = "archaeology/principles";
+
 /// Root-relative directory holding every log, flat. Logs have no
 /// lifecycle, so placement is trivially flat for a second reason: there
 /// are no states for a directory to encode.

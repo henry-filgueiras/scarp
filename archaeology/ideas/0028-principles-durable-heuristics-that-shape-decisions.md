@@ -2,8 +2,9 @@
 id: ide_01KYDZVN858BK52A35KJ3ZY5BP
 sequence: 28
 kind: idea
-status: parked
+status: adopted
 created: 2026-07-25
+adopted-by: "[[tsk_01KZ738BJ5MXNBDWECX8REA391|Add the principle collection and distil the first principle from log 3]]"
 ---
 
 # Principles: durable heuristics that shape decisions
@@ -133,3 +134,60 @@ only by reading two task Results end to end, which is how it was
 nearly lost. Writing it as a log is the available approximation;
 what a log cannot do is be cited by a decision as `applies` or
 `overrides`, which is precisely the gap this idea proposes to close.
+
+### Adopted 2026-08-04, sprint 12 task 63: what was built and what was not
+
+The collection exists. `archaeology/principles/` is managed, its
+template is this idea's five fields in this idea's order, and
+[[prn_01KZ76WRJ5QMEDGCPB6076HEAC|principle 1]] carries the
+verification blind-spot heuristic distilled from
+[[log_01KYK8RC0YEY51YP37RGV7M7N4|log 3]], which is unchanged and
+remains the canonical account of how the shape was found. `doctor`
+validates a principle's structure exactly as it validates any
+artifact's, and judges conformance to one never — the Boundaries
+section's rule survived intact.
+
+Three parts of the sketch were deliberately not built.
+
+**Lifecycle.** Principles ship with one admitted state, `active`, and
+no transitions, as decisions do. The sketch left lifecycle open and
+guessed at `retired`/`superseded`; adjudicated 2026-08-04, that guess
+stays unmade, because there is evidence for durable principles — four
+instances in one sprint — and none for principle retirement. A
+principle superseded by a sharper statement of the same force, one
+overtaken by a changed world, and one found to have been wrong are
+three different events, and the last two look more like this idea's
+neighbour [[ide_01KY7S6GMN26BFTEVGGKZHN4ZC|idea 26]] than like a
+lifecycle transition. Single-state rather than stateless is what keeps
+the deferral cheap: the `status:` line already exists, so admitting a
+terminal state later is a transitions-table change with no corpus
+migration.
+
+**`applies` / `overrides` edges, with the cost now measured rather
+than estimated.** Declaring an edge kind is two `EDGE_KINDS` entries
+and nothing else; `settled_status` is trivially `accepted`, since a
+decision has no other state. *Authoring* one is the expensive half,
+and task 62 established why: the only authoring surface is
+`resolve_edge`, reached exclusively from a lifecycle verb's flag
+(`close --resolved-by`, `adopt --adopted-by`). Decisions have no
+lifecycle verb, so an `applies` edge would need either a
+`new decision --applies` flag or a hand-edited front-matter line —
+and a hand-edited bound marker is exactly the transcription fault
+[[idea-doctor-reference-graph|idea 2]] now records twice. Deferred
+until a decision genuinely cites a principle; no decision written in
+this sprint does. Inventing a decision mutation surface to complete
+the sketch would have been the sketch driving the design.
+
+**"Related decisions, as they accumulate"** — the sketch's sixth
+field — is not a template section. It is the edges above under
+another name, and it waits on them.
+
+One finding from writing the first principle. Its provenance —
+which log it came from, and that the log is not superseded — wanted
+to be its own section, and the template does not have one, so it was
+folded into `Rationale`, where it reads acceptably. That is the
+[[ide_01KYZY233Z7GAKFPFSKEAF89ZD|idea 41]] tension appearing on its
+first day of use, in a template designed from a worked example. It is
+recorded rather than fixed: a sixth section added on one specimen's
+evidence would be the same premature guess the lifecycle deferral
+avoided.

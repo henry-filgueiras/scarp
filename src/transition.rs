@@ -151,7 +151,7 @@ pub fn prepare_narrative(
             });
         }
     }
-    bind_narrative(root, narrative)
+    crate::edges::bind_prose(root, narrative)
 }
 
 /// Resolve one provenance-flag target to its front-matter line.
@@ -169,7 +169,7 @@ fn resolve_edge(root: &Path, key: &'static str, raw: &str) -> Result<(String, St
         .find(|kind| kind.key == key)
         .expect("provenance flags only carry decided edge keys");
     let catalog = crate::edges::Catalog::build(root);
-    let target = resolve_claim(&catalog, raw, &format!("--{key} {raw}"))?;
+    let target = crate::edges::resolve_claim(&catalog, raw, &format!("--{key} {raw}"))?;
     if !kind.target_kinds.contains(&target.kind.as_str()) {
         return Err(Error::InvalidInvocation {
             message: format!(
@@ -180,222 +180,13 @@ fn resolve_edge(root: &Path, key: &'static str, raw: &str) -> Result<(String, St
             ),
         });
     }
-    let marker = bound_marker(root, &target, &format!("--{key} {raw}"))?;
+    let marker = crate::edges::bound_marker(root, &target, &format!("--{key} {raw}"))?;
     let Some(crate::edges::Marker::Bound { id, label }) = crate::edges::parse_marker(&marker)
     else {
         unreachable!("bound_marker validates its own round-trip")
     };
     let label = label.replace('\\', "\\\\").replace('"', "\\\"");
     Ok((key.to_string(), format!("\"[[{id}|{label}]]\"")))
-}
-
-/// Bind every legal sugar marker in supplied narrative to its canonical
-/// form, at authorship time (decision 10).
-///
-/// `[[task:62]]` becomes `[[tsk_…|Carry the terminal narrative on the
-/// close transition]]`, so an author closing an artifact never
-/// hand-copies a ULID — the transcription that produced a marker with a
-/// valid target and a false label while closing task 61.
-///
-/// Deliberately narrow:
-///
-/// - **Only sugar is touched.** A fully bound marker is already canonical
-///   and passes through untouched; nothing here validates or repairs one,
-///   which stays idea 2's question.
-/// - **An author's explicit label wins.** `[[task:62|the task that fixes
-///   this]]` keeps its label and gains the stable id. The label was
-///   written beside a reference the tool then verified, so the pairing is
-///   correct by construction, and replacing it would flatten the author's
-///   prose into a title.
-/// - **Unresolvable sugar refuses the whole closure**, before any
-///   mutation. A marker naming nothing is a typo in the narrative, and
-///   binding "as much as possible" would land a half-bound section that
-///   nobody re-reads.
-/// - Fenced blocks and inline code spans are not prose, so markers inside
-///   them are mentions and are left exactly as written.
-///
-/// Rewriting is right-to-left so each replacement leaves earlier ranges
-/// valid.
-fn bind_narrative(root: &Path, narrative: &str) -> Result<String, Error> {
-    let markers = crate::edges::markers_in_prose(narrative);
-    if markers.is_empty() {
-        return Ok(narrative.to_string());
-    }
-    let catalog = crate::edges::Catalog::build(root);
-    let mut replacements = Vec::new();
-    for (range, marker) in markers {
-        let crate::edges::Marker::Sugar { reference, label } = marker else {
-            continue;
-        };
-        let context = format!("[[{reference}]]");
-        // Report the marker, not the bare reference: a closure of
-        // `task:1` whose narrative cites `task:999` must not read as if
-        // the target of the closure were the thing that went missing.
-        let target = resolve_claim(&catalog, reference, &context).map_err(|err| match err {
-            Error::ArtifactNotFound { .. } => Error::ArtifactNotFound {
-                reference: context.clone(),
-            },
-            Error::AmbiguousReference { candidates, .. } => Error::AmbiguousReference {
-                reference: context.clone(),
-                candidates,
-            },
-            other => other,
-        })?;
-        let bound = match label {
-            // The author's own words, kept; only the target is canonicalized.
-            Some(label) => {
-                if let Err(violation) = crate::edges::addressable(&target.id) {
-                    return Err(Error::MalformedArtifact {
-                        path: root.join(&target.path),
-                        reason: format!(
-                            "cannot bind `{context}`: the target's stable id `{}` {}, so it \
-                             is not addressable as a bound-marker target",
-                            target.id,
-                            violation.describe()
-                        ),
-                    });
-                }
-                format!("[[{}|{label}]]", target.id)
-            }
-            None => bound_marker(root, &target, &context)?,
-        };
-        replacements.push((range, bound));
-    }
-    let mut out = narrative.to_string();
-    for (range, bound) in replacements.into_iter().rev() {
-        out.replace_range(range, &bound);
-    }
-    Ok(out)
-}
-
-/// Resolve one `kind:N` reference or bare stable id through the identity
-/// claimant catalog (task 23, decision 12).
-///
-/// `context` names the invocation surface for diagnostics — a provenance
-/// flag, or a marker in supplied narrative. A stable id claimed by more
-/// than one artifact is refused as `ambiguous-reference` naming every
-/// claimant path, before any mutation, exactly as the `kind:N` form
-/// already refuses duplicated sequences.
-fn resolve_claim(
-    catalog: &crate::edges::Catalog,
-    raw: &str,
-    context: &str,
-) -> Result<crate::edges::Harvested, Error> {
-    let target = if let Some((target_kind, sequence)) = raw.split_once(':') {
-        let sequence: u32 = sequence.parse().map_err(|_| Error::InvalidInvocation {
-            message: format!(
-                "invalid sequence in `{context}`; expected `kind:N` or a \
-                 stable artifact id"
-            ),
-        })?;
-        let matches: Vec<&crate::edges::Claimant> = catalog
-            .claimants()
-            .iter()
-            .filter(|claimant| {
-                claimant.claim.kind == target_kind && claimant.claim.sequence == Some(sequence)
-            })
-            .collect();
-        match matches.as_slice() {
-            [] => {
-                return Err(Error::ArtifactNotFound {
-                    reference: raw.to_string(),
-                });
-            }
-            [only] => only.claim.clone(),
-            several => {
-                return Err(Error::AmbiguousReference {
-                    reference: raw.to_string(),
-                    candidates: several
-                        .iter()
-                        .map(|claimant| claimant.claim.path.clone())
-                        .collect(),
-                });
-            }
-        }
-    } else {
-        match catalog.resolve(raw) {
-            crate::edges::Resolution::Missing => {
-                return Err(Error::ArtifactNotFound {
-                    reference: raw.to_string(),
-                });
-            }
-            crate::edges::Resolution::Unique(claimant) => claimant.claim.clone(),
-            crate::edges::Resolution::Ambiguous(claimants) => {
-                return Err(Error::AmbiguousReference {
-                    reference: raw.to_string(),
-                    candidates: claimants
-                        .iter()
-                        .map(|claimant| claimant.claim.path.clone())
-                        .collect(),
-                });
-            }
-        }
-    };
-    Ok(target)
-}
-
-/// Build the canonical bound marker `[[stable-id|frozen label]]` for a
-/// resolved target (decision 10), validating every part before any
-/// mutation (decision 12).
-///
-/// `context` names the invocation surface for diagnostics. An
-/// unaddressable target id or an unrepresentable frozen title is refused
-/// naming the offending character class, and the constructed marker must
-/// round-trip through the one marker parser before it is returned — a
-/// marker Scarp writes must be one Scarp can read.
-fn bound_marker(
-    root: &Path,
-    target: &crate::edges::Harvested,
-    context: &str,
-) -> Result<String, Error> {
-    let Some(title) = target.title.as_deref() else {
-        return Err(Error::MalformedArtifact {
-            path: root.join(&target.path),
-            reason: format!(
-                "cannot freeze a label for `{context}`: the target has \
-                 no readable title heading"
-            ),
-        });
-    };
-    // Decision 12: validate the constructed semantic marker — the decoded
-    // id and the frozen title — through the one marker parser before any
-    // mutation; YAML carrier escaping happens after and changes neither.
-    if let Err(violation) = crate::edges::addressable(&target.id) {
-        return Err(Error::MalformedArtifact {
-            path: root.join(&target.path),
-            reason: format!(
-                "cannot bind `{context}`: the target's stable id `{}` \
-                 {}, so it is not addressable as a bound-marker target",
-                target.id,
-                violation.describe()
-            ),
-        });
-    }
-    if let Err(violation) = crate::edges::label_valid(title) {
-        return Err(Error::MalformedArtifact {
-            path: root.join(&target.path),
-            reason: format!(
-                "cannot freeze a label for `{context}`: the target's \
-                 title {}",
-                violation.describe()
-            ),
-        });
-    }
-    let marker = format!("[[{}|{title}]]", target.id);
-    match crate::edges::parse_marker(&marker) {
-        Some(crate::edges::Marker::Bound { id, label }) if id == target.id && label == title => {}
-        _ => {
-            return Err(Error::MalformedArtifact {
-                path: root.join(&target.path),
-                reason: format!(
-                    "cannot bind `{context}`: the constructed marker \
-                     `{marker}` does not round-trip through the reference \
-                     grammar"
-                ),
-            });
-        }
-    }
-    Ok(marker)
 }
 
 /// Close one sprint, refusing while it still has pending tasks.

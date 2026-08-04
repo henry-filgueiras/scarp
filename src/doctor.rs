@@ -99,7 +99,13 @@ pub fn check(root: &Path) -> Result<Report, Error> {
     let mut findings = Vec::new();
     let mut artifacts = Vec::new();
 
-    for collection in [&read::DRAGON, &read::IDEA, &read::DECISION, &read::LOG] {
+    for collection in [
+        &read::DRAGON,
+        &read::IDEA,
+        &read::DECISION,
+        &read::LOG,
+        &read::PRINCIPLE,
+    ] {
         scan_dir(root, collection, &mut findings, &mut artifacts)?;
     }
     scan_sprints_dir(root, &mut findings, &mut artifacts)?;

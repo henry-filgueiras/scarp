@@ -33,6 +33,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::doctor::Severity;
+use crate::error::Error;
 use crate::read::{Status, Summary};
 
 /// The character class that makes a stable id unaddressable, per decision
@@ -528,6 +529,219 @@ pub(crate) fn check_prose(content: &str, catalog: &Catalog) -> Vec<EdgeIssue> {
             )
         })
         .collect()
+}
+
+/// Bind every legal sugar marker in authored prose to its canonical
+/// form, at authorship time (decision 10).
+///
+/// `[[task:62]]` becomes `[[tsk_…|Carry the terminal narrative on the
+/// close transition]]`, so nobody hand-copies a ULID — the transcription
+/// that produced a marker with a valid target and a false label while
+/// closing task 61.
+///
+/// Applied wherever Scarp accepts authored prose that becomes canonical
+/// through a Scarp write: creation bodies and terminal narrative alike.
+/// The write boundary is the authority boundary, and which command
+/// happened to receive the binder first is not a semantic distinction.
+///
+/// Deliberately narrow:
+///
+/// - **Only sugar is touched.** A fully bound marker is already canonical
+///   and passes through untouched; nothing here validates or repairs one,
+///   which stays idea 2's question.
+/// - **An author's explicit label wins.** `[[task:62|the task that fixes
+///   this]]` keeps its label and gains the stable id. The label was
+///   written beside a reference the tool then verified, so the pairing is
+///   correct by construction, and replacing it would flatten the author's
+///   prose into a title.
+/// - **Unresolvable sugar refuses the whole write**, before any mutation.
+///   A marker naming nothing is a typo, and binding "as much as
+///   possible" would land half-bound prose that nobody re-reads.
+/// - Fenced blocks and inline code spans are not prose, so markers inside
+///   them are mentions and are left exactly as written.
+///
+/// Rewriting is right-to-left so each replacement leaves earlier ranges
+/// valid.
+pub fn bind_prose(root: &Path, narrative: &str) -> Result<String, Error> {
+    let markers = markers_in_prose(narrative);
+    if markers.is_empty() {
+        return Ok(narrative.to_string());
+    }
+    let catalog = Catalog::build(root);
+    let mut replacements = Vec::new();
+    for (range, marker) in markers {
+        let Marker::Sugar { reference, label } = marker else {
+            continue;
+        };
+        let context = format!("[[{reference}]]");
+        // Report the marker, not the bare reference: a write whose prose
+        // cites `task:999` must not read as if the artifact being
+        // created or closed were the thing that went missing.
+        let target = resolve_claim(&catalog, reference, &context).map_err(|err| match err {
+            Error::ArtifactNotFound { .. } => Error::ArtifactNotFound {
+                reference: context.clone(),
+            },
+            Error::AmbiguousReference { candidates, .. } => Error::AmbiguousReference {
+                reference: context.clone(),
+                candidates,
+            },
+            other => other,
+        })?;
+        let bound = match label {
+            // The author's own words, kept; only the target is canonicalized.
+            Some(label) => {
+                if let Err(violation) = addressable(&target.id) {
+                    return Err(Error::MalformedArtifact {
+                        path: root.join(&target.path),
+                        reason: format!(
+                            "cannot bind `{context}`: the target's stable id `{}` {}, so it \
+                             is not addressable as a bound-marker target",
+                            target.id,
+                            violation.describe()
+                        ),
+                    });
+                }
+                format!("[[{}|{label}]]", target.id)
+            }
+            None => bound_marker(root, &target, &context)?,
+        };
+        replacements.push((range, bound));
+    }
+    let mut out = narrative.to_string();
+    for (range, bound) in replacements.into_iter().rev() {
+        out.replace_range(range, &bound);
+    }
+    Ok(out)
+}
+
+/// Resolve one `kind:N` reference or bare stable id through the identity
+/// claimant catalog (task 23, decision 12).
+///
+/// `context` names the invocation surface for diagnostics — a provenance
+/// flag, or a marker in supplied narrative. A stable id claimed by more
+/// than one artifact is refused as `ambiguous-reference` naming every
+/// claimant path, before any mutation, exactly as the `kind:N` form
+/// already refuses duplicated sequences.
+pub(crate) fn resolve_claim(
+    catalog: &Catalog,
+    raw: &str,
+    context: &str,
+) -> Result<Harvested, Error> {
+    let target = if let Some((target_kind, sequence)) = raw.split_once(':') {
+        let sequence: u32 = sequence.parse().map_err(|_| Error::InvalidInvocation {
+            message: format!(
+                "invalid sequence in `{context}`; expected `kind:N` or a \
+                 stable artifact id"
+            ),
+        })?;
+        let matches: Vec<&Claimant> = catalog
+            .claimants()
+            .iter()
+            .filter(|claimant| {
+                claimant.claim.kind == target_kind && claimant.claim.sequence == Some(sequence)
+            })
+            .collect();
+        match matches.as_slice() {
+            [] => {
+                return Err(Error::ArtifactNotFound {
+                    reference: raw.to_string(),
+                });
+            }
+            [only] => only.claim.clone(),
+            several => {
+                return Err(Error::AmbiguousReference {
+                    reference: raw.to_string(),
+                    candidates: several
+                        .iter()
+                        .map(|claimant| claimant.claim.path.clone())
+                        .collect(),
+                });
+            }
+        }
+    } else {
+        match catalog.resolve(raw) {
+            Resolution::Missing => {
+                return Err(Error::ArtifactNotFound {
+                    reference: raw.to_string(),
+                });
+            }
+            Resolution::Unique(claimant) => claimant.claim.clone(),
+            Resolution::Ambiguous(claimants) => {
+                return Err(Error::AmbiguousReference {
+                    reference: raw.to_string(),
+                    candidates: claimants
+                        .iter()
+                        .map(|claimant| claimant.claim.path.clone())
+                        .collect(),
+                });
+            }
+        }
+    };
+    Ok(target)
+}
+
+/// Build the canonical bound marker `[[stable-id|frozen label]]` for a
+/// resolved target (decision 10), validating every part before any
+/// mutation (decision 12).
+///
+/// `context` names the invocation surface for diagnostics. An
+/// unaddressable target id or an unrepresentable frozen title is refused
+/// naming the offending character class, and the constructed marker must
+/// round-trip through the one marker parser before it is returned — a
+/// marker Scarp writes must be one Scarp can read.
+pub(crate) fn bound_marker(
+    root: &Path,
+    target: &Harvested,
+    context: &str,
+) -> Result<String, Error> {
+    let Some(title) = target.title.as_deref() else {
+        return Err(Error::MalformedArtifact {
+            path: root.join(&target.path),
+            reason: format!(
+                "cannot freeze a label for `{context}`: the target has \
+                 no readable title heading"
+            ),
+        });
+    };
+    // Decision 12: validate the constructed semantic marker — the decoded
+    // id and the frozen title — through the one marker parser before any
+    // mutation; YAML carrier escaping happens after and changes neither.
+    if let Err(violation) = addressable(&target.id) {
+        return Err(Error::MalformedArtifact {
+            path: root.join(&target.path),
+            reason: format!(
+                "cannot bind `{context}`: the target's stable id `{}` \
+                 {}, so it is not addressable as a bound-marker target",
+                target.id,
+                violation.describe()
+            ),
+        });
+    }
+    if let Err(violation) = label_valid(title) {
+        return Err(Error::MalformedArtifact {
+            path: root.join(&target.path),
+            reason: format!(
+                "cannot freeze a label for `{context}`: the target's \
+                 title {}",
+                violation.describe()
+            ),
+        });
+    }
+    let marker = format!("[[{}|{title}]]", target.id);
+    match parse_marker(&marker) {
+        Some(Marker::Bound { id, label }) if id == target.id && label == title => {}
+        _ => {
+            return Err(Error::MalformedArtifact {
+                path: root.join(&target.path),
+                reason: format!(
+                    "cannot bind `{context}`: the constructed marker \
+                     `{marker}` does not round-trip through the reference \
+                     grammar"
+                ),
+            });
+        }
+    }
+    Ok(marker)
 }
 
 /// Repository-relative paths of `claimants`, preserving their path-sorted
