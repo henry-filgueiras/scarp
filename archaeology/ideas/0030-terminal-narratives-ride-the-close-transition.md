@@ -2,8 +2,9 @@
 id: ide_01KYE386E7T9AZW4Z6MW39JB0R
 sequence: 30
 kind: idea
-status: parked
+status: adopted
 created: 2026-07-25
+adopted-by: "[[tsk_01KZ738BG7HDGBJDM57TW40ED5|Carry the terminal narrative on the close transition]]"
 ---
 
 # Terminal narratives ride the close transition

@@ -69,12 +69,89 @@ pub fn transition_with_provenance(
     to: Status,
     edge: Option<(&'static str, &str)>,
 ) -> Result<Transition, Error> {
+    transition_closing(root, collection, target, display, to, edge, None)
+}
+
+/// Transition one artifact, optionally writing a provenance edge and the
+/// terminal narrative, all in the one write.
+///
+/// `narrative` is the raw `--body-file` payload; it is validated and
+/// bound here, before the artifact is touched.
+pub fn transition_closing(
+    root: &Path,
+    collection: &Collection,
+    target: Selector<'_>,
+    display: &str,
+    to: Status,
+    edge: Option<(&'static str, &str)>,
+    narrative: Option<&str>,
+) -> Result<Transition, Error> {
     let artifacts = read::scan_collection(root, collection).map_err(|err| err.blocking(display))?;
     let artifact = read::resolve(&artifacts, target, display)?;
     let edge_line = edge
         .map(|(key, raw)| resolve_edge(root, key, raw))
         .transpose()?;
-    perform_with_edge(root, collection, artifact, to, edge_line)
+    let narrative = narrative
+        .map(|raw| prepare_narrative(root, collection, raw))
+        .transpose()?;
+    perform(
+        root,
+        collection,
+        artifact,
+        to,
+        edge_line,
+        narrative.as_deref(),
+    )
+}
+
+/// Prepare supplied terminal narrative for one collection: refuse it when
+/// the collection has no terminal section, refuse a body that writes the
+/// heading Scarp owns, then bind its legal sugar markers.
+///
+/// Every refusal here happens before the transition write begins, so a
+/// rejected narrative leaves the artifact exactly as it was.
+pub fn prepare_narrative(
+    root: &Path,
+    collection: &Collection,
+    narrative: &str,
+) -> Result<String, Error> {
+    let kind = collection.kind;
+    let Some(section) = collection.terminal else {
+        return Err(Error::InvalidInvocation {
+            message: format!(
+                "`--body-file` supplies the narrative a closure carries, and \
+                 {kind}s have no terminal section; the corpus records one \
+                 for tasks, dragons, and sprints only"
+            ),
+        });
+    };
+    if narrative.trim().is_empty() {
+        return Err(Error::InvalidInvocation {
+            message: format!(
+                "the supplied `--body-file` is empty; a {kind} closure either \
+                 carries a narrative or omits the flag — an empty `## {}` \
+                 section is worse than none",
+                section.name
+            ),
+        });
+    }
+    // Scarp owns the heading, exactly as it owns a creation template's
+    // section names: the file supplies what goes beneath it.
+    for line in narrative.lines() {
+        if let Some(rest) = line.strip_prefix("## ")
+            && rest.trim_start().starts_with(section.name)
+        {
+            return Err(Error::InvalidInvocation {
+                message: format!(
+                    "the supplied `--body-file` writes `{}`, but Scarp writes \
+                     that heading when it closes the {kind} — supply only the \
+                     prose that goes beneath it",
+                    line.trim_end()
+                ),
+            });
+        }
+    }
+    bind_narrative(root, narrative)
 }
 
 /// Resolve one provenance-flag target to its front-matter line.
@@ -92,10 +169,122 @@ fn resolve_edge(root: &Path, key: &'static str, raw: &str) -> Result<(String, St
         .find(|kind| kind.key == key)
         .expect("provenance flags only carry decided edge keys");
     let catalog = crate::edges::Catalog::build(root);
+    let target = resolve_claim(&catalog, raw, &format!("--{key} {raw}"))?;
+    if !kind.target_kinds.contains(&target.kind.as_str()) {
+        return Err(Error::InvalidInvocation {
+            message: format!(
+                "`--{key}` targets `{}`, a {}; legal targets are: {}",
+                target.id,
+                target.kind,
+                kind.target_kinds.join(", ")
+            ),
+        });
+    }
+    let marker = bound_marker(root, &target, &format!("--{key} {raw}"))?;
+    let Some(crate::edges::Marker::Bound { id, label }) = crate::edges::parse_marker(&marker)
+    else {
+        unreachable!("bound_marker validates its own round-trip")
+    };
+    let label = label.replace('\\', "\\\\").replace('"', "\\\"");
+    Ok((key.to_string(), format!("\"[[{id}|{label}]]\"")))
+}
+
+/// Bind every legal sugar marker in supplied narrative to its canonical
+/// form, at authorship time (decision 10).
+///
+/// `[[task:62]]` becomes `[[tsk_…|Carry the terminal narrative on the
+/// close transition]]`, so an author closing an artifact never
+/// hand-copies a ULID — the transcription that produced a marker with a
+/// valid target and a false label while closing task 61.
+///
+/// Deliberately narrow:
+///
+/// - **Only sugar is touched.** A fully bound marker is already canonical
+///   and passes through untouched; nothing here validates or repairs one,
+///   which stays idea 2's question.
+/// - **An author's explicit label wins.** `[[task:62|the task that fixes
+///   this]]` keeps its label and gains the stable id. The label was
+///   written beside a reference the tool then verified, so the pairing is
+///   correct by construction, and replacing it would flatten the author's
+///   prose into a title.
+/// - **Unresolvable sugar refuses the whole closure**, before any
+///   mutation. A marker naming nothing is a typo in the narrative, and
+///   binding "as much as possible" would land a half-bound section that
+///   nobody re-reads.
+/// - Fenced blocks and inline code spans are not prose, so markers inside
+///   them are mentions and are left exactly as written.
+///
+/// Rewriting is right-to-left so each replacement leaves earlier ranges
+/// valid.
+fn bind_narrative(root: &Path, narrative: &str) -> Result<String, Error> {
+    let markers = crate::edges::markers_in_prose(narrative);
+    if markers.is_empty() {
+        return Ok(narrative.to_string());
+    }
+    let catalog = crate::edges::Catalog::build(root);
+    let mut replacements = Vec::new();
+    for (range, marker) in markers {
+        let crate::edges::Marker::Sugar { reference, label } = marker else {
+            continue;
+        };
+        let context = format!("[[{reference}]]");
+        // Report the marker, not the bare reference: a closure of
+        // `task:1` whose narrative cites `task:999` must not read as if
+        // the target of the closure were the thing that went missing.
+        let target = resolve_claim(&catalog, reference, &context).map_err(|err| match err {
+            Error::ArtifactNotFound { .. } => Error::ArtifactNotFound {
+                reference: context.clone(),
+            },
+            Error::AmbiguousReference { candidates, .. } => Error::AmbiguousReference {
+                reference: context.clone(),
+                candidates,
+            },
+            other => other,
+        })?;
+        let bound = match label {
+            // The author's own words, kept; only the target is canonicalized.
+            Some(label) => {
+                if let Err(violation) = crate::edges::addressable(&target.id) {
+                    return Err(Error::MalformedArtifact {
+                        path: root.join(&target.path),
+                        reason: format!(
+                            "cannot bind `{context}`: the target's stable id `{}` {}, so it \
+                             is not addressable as a bound-marker target",
+                            target.id,
+                            violation.describe()
+                        ),
+                    });
+                }
+                format!("[[{}|{label}]]", target.id)
+            }
+            None => bound_marker(root, &target, &context)?,
+        };
+        replacements.push((range, bound));
+    }
+    let mut out = narrative.to_string();
+    for (range, bound) in replacements.into_iter().rev() {
+        out.replace_range(range, &bound);
+    }
+    Ok(out)
+}
+
+/// Resolve one `kind:N` reference or bare stable id through the identity
+/// claimant catalog (task 23, decision 12).
+///
+/// `context` names the invocation surface for diagnostics — a provenance
+/// flag, or a marker in supplied narrative. A stable id claimed by more
+/// than one artifact is refused as `ambiguous-reference` naming every
+/// claimant path, before any mutation, exactly as the `kind:N` form
+/// already refuses duplicated sequences.
+fn resolve_claim(
+    catalog: &crate::edges::Catalog,
+    raw: &str,
+    context: &str,
+) -> Result<crate::edges::Harvested, Error> {
     let target = if let Some((target_kind, sequence)) = raw.split_once(':') {
         let sequence: u32 = sequence.parse().map_err(|_| Error::InvalidInvocation {
             message: format!(
-                "invalid sequence in `--{key} {raw}`; expected `kind:N` or a \
+                "invalid sequence in `{context}`; expected `kind:N` or a \
                  stable artifact id"
             ),
         })?;
@@ -142,21 +331,28 @@ fn resolve_edge(root: &Path, key: &'static str, raw: &str) -> Result<(String, St
             }
         }
     };
-    if !kind.target_kinds.contains(&target.kind.as_str()) {
-        return Err(Error::InvalidInvocation {
-            message: format!(
-                "`--{key}` targets `{}`, a {}; legal targets are: {}",
-                target.id,
-                target.kind,
-                kind.target_kinds.join(", ")
-            ),
-        });
-    }
-    let Some(title) = target.title else {
+    Ok(target)
+}
+
+/// Build the canonical bound marker `[[stable-id|frozen label]]` for a
+/// resolved target (decision 10), validating every part before any
+/// mutation (decision 12).
+///
+/// `context` names the invocation surface for diagnostics. An
+/// unaddressable target id or an unrepresentable frozen title is refused
+/// naming the offending character class, and the constructed marker must
+/// round-trip through the one marker parser before it is returned — a
+/// marker Scarp writes must be one Scarp can read.
+fn bound_marker(
+    root: &Path,
+    target: &crate::edges::Harvested,
+    context: &str,
+) -> Result<String, Error> {
+    let Some(title) = target.title.as_deref() else {
         return Err(Error::MalformedArtifact {
             path: root.join(&target.path),
             reason: format!(
-                "cannot freeze a label for `--{key} {raw}`: the target has \
+                "cannot freeze a label for `{context}`: the target has \
                  no readable title heading"
             ),
         });
@@ -168,18 +364,18 @@ fn resolve_edge(root: &Path, key: &'static str, raw: &str) -> Result<(String, St
         return Err(Error::MalformedArtifact {
             path: root.join(&target.path),
             reason: format!(
-                "cannot bind `--{key} {raw}`: the target's stable id `{}` \
+                "cannot bind `{context}`: the target's stable id `{}` \
                  {}, so it is not addressable as a bound-marker target",
                 target.id,
                 violation.describe()
             ),
         });
     }
-    if let Err(violation) = crate::edges::label_valid(&title) {
+    if let Err(violation) = crate::edges::label_valid(title) {
         return Err(Error::MalformedArtifact {
             path: root.join(&target.path),
             reason: format!(
-                "cannot freeze a label for `--{key} {raw}`: the target's \
+                "cannot freeze a label for `{context}`: the target's \
                  title {}",
                 violation.describe()
             ),
@@ -192,15 +388,14 @@ fn resolve_edge(root: &Path, key: &'static str, raw: &str) -> Result<(String, St
             return Err(Error::MalformedArtifact {
                 path: root.join(&target.path),
                 reason: format!(
-                    "cannot bind `--{key} {raw}`: the constructed marker \
+                    "cannot bind `{context}`: the constructed marker \
                      `{marker}` does not round-trip through the reference \
                      grammar"
                 ),
             });
         }
     }
-    let label = title.replace('\\', "\\\\").replace('"', "\\\"");
-    Ok((key.to_string(), format!("\"[[{}|{label}]]\"", target.id)))
+    Ok(marker)
 }
 
 /// Close one sprint, refusing while it still has pending tasks.
@@ -208,7 +403,12 @@ fn resolve_edge(root: &Path, key: &'static str, raw: &str) -> Result<(String, St
 /// The refusal names each pending task, because the caller's next move is
 /// to close or reassign them; an empty sprint closes like any other
 /// artifact, stamping its `closed:` date.
-pub fn close_sprint(root: &Path, target: Selector<'_>, display: &str) -> Result<Transition, Error> {
+pub fn close_sprint(
+    root: &Path,
+    target: Selector<'_>,
+    display: &str,
+    narrative: Option<&str>,
+) -> Result<Transition, Error> {
     let sprints = read::scan_sprints(root).map_err(|err| err.blocking(display))?;
     let sprint = read::resolve(&sprints, target, display)?;
     let pending: Vec<String> = read::scan_tasks(root)
@@ -230,27 +430,56 @@ pub fn close_sprint(root: &Path, target: Selector<'_>, display: &str) -> Result<
             ),
         });
     }
-    perform(root, &read::SPRINT, sprint, Status::Closed)
+    let narrative = narrative
+        .map(|raw| prepare_narrative(root, &read::SPRINT, raw))
+        .transpose()?;
+    perform(
+        root,
+        &read::SPRINT,
+        sprint,
+        Status::Closed,
+        None,
+        narrative.as_deref(),
+    )
 }
 
-/// Perform the transition of one resolved artifact.
+/// Today's date, stamped identically into the `closed:` field and any
+/// dated terminal heading written by the same transition.
+fn today() -> String {
+    jiff::Zoned::now().strftime("%Y-%m-%d").to_string()
+}
+
+/// Append a terminal narrative section to an artifact's payload.
+///
+/// The result is byte-identical to the same section appended by hand:
+/// exactly one blank line before the heading, a blank line beneath it,
+/// the body, and a closing newline.
+fn append_section(content: &str, heading: &str, body: &str) -> String {
+    let mut out = content.trim_end().to_string();
+    out.push_str("\n\n");
+    out.push_str(heading);
+    out.push_str("\n\n");
+    out.push_str(body.trim());
+    out.push('\n');
+    out
+}
+
+/// Perform the transition of one resolved artifact, optionally writing a
+/// provenance edge line and appending the collection's terminal narrative
+/// section — all in the one safe write.
+///
+/// `narrative` is the already-bound section body. One intent, one
+/// mutation: a closure never lands without its story, and a story never
+/// lands without its closure. Everything that can be refused — the
+/// resolution of the target, of every sugar marker in the narrative, and
+/// of the transition itself — is refused before the write begins.
 pub(crate) fn perform(
     root: &Path,
     collection: &Collection,
     artifact: &Artifact,
     to: Status,
-) -> Result<Transition, Error> {
-    perform_with_edge(root, collection, artifact, to, None)
-}
-
-/// Perform the transition of one resolved artifact, optionally writing a
-/// resolved provenance edge line in the same write.
-pub(crate) fn perform_with_edge(
-    root: &Path,
-    collection: &Collection,
-    artifact: &Artifact,
-    to: Status,
     edge_line: Option<(String, String)>,
+    narrative: Option<&str>,
 ) -> Result<Transition, Error> {
     let reference = artifact.summary.reference();
     let path_rel = &artifact.summary.path;
@@ -293,9 +522,8 @@ pub(crate) fn perform_with_edge(
             reason,
         })?;
     if to == Status::Closed && collection.stamp_closed {
-        let today = jiff::Zoned::now().strftime("%Y-%m-%d").to_string();
         rewritten =
-            stamp_closed(&rewritten, &today).map_err(|reason| Error::MalformedArtifact {
+            stamp_closed(&rewritten, &today()).map_err(|reason| Error::MalformedArtifact {
                 path: path.clone(),
                 reason,
             })?;
@@ -307,6 +535,12 @@ pub(crate) fn perform_with_edge(
                 reason,
             }
         })?;
+    }
+    if let Some(narrative) = narrative {
+        let section = collection
+            .terminal
+            .expect("a narrative is only accepted for a collection that has a terminal section");
+        rewritten = append_section(&rewritten, &section.heading(&today()), narrative);
     }
 
     replace(&path, &rewritten).map_err(|source| Error::Filesystem {
@@ -901,7 +1135,7 @@ mod tests {
         let tmp = temp_repo();
         seed_sprint(tmp.path(), "0001-done", 1, "active");
 
-        let done = close_sprint(tmp.path(), Selector::Sequence(1), "sprint:1").unwrap();
+        let done = close_sprint(tmp.path(), Selector::Sequence(1), "sprint:1", None).unwrap();
 
         assert_eq!(done.to, Status::Closed);
         let content = fs::read_to_string(
@@ -931,7 +1165,7 @@ mod tests {
         )
         .unwrap();
 
-        let err = close_sprint(tmp.path(), Selector::Sequence(1), "sprint:1").unwrap_err();
+        let err = close_sprint(tmp.path(), Selector::Sequence(1), "sprint:1", None).unwrap_err();
 
         assert!(matches!(err, Error::InvalidInvocation { .. }), "{err:?}");
         let message = err.to_string();

@@ -204,6 +204,36 @@ pub struct Collection {
     /// Whether reaching `closed` stamps a `closed:` date line into the
     /// front matter as part of the transition write.
     pub stamp_closed: bool,
+    /// The narrative section a closure may carry, or `None` for a
+    /// collection whose corpus has no such convention.
+    pub terminal: Option<TerminalSection>,
+}
+
+/// The narrative section appended by a terminal transition.
+///
+/// Both fields are read off the corpus rather than chosen: 58 of the 60
+/// closed tasks carry a bare `## Result`, while both closed dragons carry
+/// `## Resolution (YYYY-MM-DD)` and all ten closed sprints carry
+/// `## Retrospective (YYYY-MM-DD)`. The date the dated forms want is the
+/// transition date, which the write already computes for the `closed:`
+/// stamp.
+#[derive(Debug, Clone, Copy)]
+pub struct TerminalSection {
+    /// Heading text, without the `## ` prefix or any date.
+    pub name: &'static str,
+    /// Whether the heading carries the transition date in parentheses.
+    pub dated: bool,
+}
+
+impl TerminalSection {
+    /// The rendered heading for a transition performed on `date`.
+    pub fn heading(&self, date: &str) -> String {
+        if self.dated {
+            format!("## {} ({date})", self.name)
+        } else {
+            format!("## {}", self.name)
+        }
+    }
 }
 
 /// The dragon collection: unresolved technical risks, `open <-> closed`.
@@ -216,6 +246,10 @@ pub static DRAGON: Collection = Collection {
         (Status::Closed, Status::Open),
     ],
     stamp_closed: false,
+    terminal: Some(TerminalSection {
+        name: "Resolution",
+        dated: true,
+    }),
 };
 
 /// The idea template's sections, in template order. Shared so a caller
@@ -234,6 +268,7 @@ pub static IDEA: Collection = Collection {
         (Status::Parked, Status::Rejected),
     ],
     stamp_closed: false,
+    terminal: None,
 };
 
 /// The decision collection: settled tradeoffs. Decisions are permanent
@@ -247,6 +282,7 @@ pub static DECISION: Collection = Collection {
     states: &[Status::Accepted],
     transitions: &[],
     stamp_closed: false,
+    terminal: None,
 };
 
 /// The sprint collection: units of scoped work, `active -> closed`.
@@ -258,6 +294,10 @@ pub static SPRINT: Collection = Collection {
     states: &[Status::Active, Status::Closed],
     transitions: &[(Status::Active, Status::Closed)],
     stamp_closed: true,
+    terminal: Some(TerminalSection {
+        name: "Retrospective",
+        dated: true,
+    }),
 };
 
 /// The log collection: dated narrative records of what happened and what
@@ -277,6 +317,7 @@ pub static LOG: Collection = Collection {
     states: &[],
     transitions: &[],
     stamp_closed: false,
+    terminal: None,
 };
 
 /// The task collection: work items, `pending -> closed`. Task files live
@@ -288,6 +329,10 @@ pub static TASK: Collection = Collection {
     states: &[Status::Pending, Status::Closed],
     transitions: &[(Status::Pending, Status::Closed)],
     stamp_closed: true,
+    terminal: Some(TerminalSection {
+        name: "Result",
+        dated: false,
+    }),
 };
 
 impl Collection {

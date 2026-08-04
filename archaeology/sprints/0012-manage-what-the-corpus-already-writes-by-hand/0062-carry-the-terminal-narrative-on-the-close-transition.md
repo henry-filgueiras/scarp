@@ -2,9 +2,10 @@
 id: tsk_01KZ738BG7HDGBJDM57TW40ED5
 sequence: 62
 kind: task
-status: pending
+status: closed
 sprint: spr_01KZ7352BYX19E0DNDG05744AM
 created: 2026-08-04
+closed: 2026-08-04
 ---
 
 # Carry the terminal narrative on the close transition
@@ -59,3 +60,75 @@ the strict tier parked as idea 13.
 - [[ide_01KYE386E7T9AZW4Z6MW39JB0R|Idea 30]] transitions to `adopted`
   with an `adopted-by` edge naming this task.
 - `scripts/check.sh` passes.
+
+## Result
+
+Delivered as specified, and this `## Result` is the proof: it was
+supplied to `scarp close task:62 --body-file`, so the section and the
+transition landed in one write. The markers below were written as
+`[[idea:30]]` and `[[task:61]]` sugar and bound on the way in — no ULID
+was transcribed by hand anywhere in this closure.
+
+**Shape.** `TerminalSection` is collection data — a heading name and
+whether it carries the transition date — beside `states` and
+`transitions`, so the corpus's own convention is declared rather than
+branched on: `Result` bare for tasks, `Resolution (date)` for dragons,
+`Retrospective (date)` for sprints, `None` for the three collections
+whose corpus has no such section. The write path grew one parameter;
+`perform` now stamps `closed:`, inserts any provenance edge, and appends
+the narrative in the same staged-and-renamed payload, so every refusal
+still leaves the artifact byte-identical.
+
+**The binder was reusable, and reusing it removed duplication.**
+`resolve_edge` already resolved `kind:N` and bare ids through the
+identity catalog and built a validated `[[id|label]]`. It split cleanly
+into `resolve_claim` and `bound_marker`, both now shared with prose
+binding; the provenance path kept its behaviour, which the existing
+suite proves. The one genuinely new piece is `markers_in_prose`, and it
+too came out of existing code: `check_prose`'s traversal already skipped
+fenced blocks and inline code spans, and now yields byte ranges so a
+caller can rewrite through them. Both consumers share one traversal
+instead of two, and three tests pin the ranges, because an off-by-one
+there corrupts an artifact rather than mis-reporting one.
+
+**Two binding choices worth stating.**
+
+An author's explicit label survives: `[[dragon:1|the risk we already
+knew about]]` keeps those words and gains the stable id. The label was
+written beside a reference the tool then verified, so the pairing is
+correct by construction, and overwriting it with the target's title
+would flatten prose into a heading.
+
+Unresolvable sugar refuses the entire closure rather than binding what
+it can. A marker naming nothing is a typo, and a half-bound section is
+one nobody re-reads. The diagnostic names the marker rather than the
+bare reference — a closure of `task:62` whose narrative cites a missing
+`task:999` must not read as though the closure's own target went
+missing.
+
+### What this does not do
+
+The check half of [[ide_01KYE386E7T9AZW4Z6MW39JB0R|Terminal narratives ride the close transition]] is not here, deliberately: that idea
+argues the mechanism must land first so a doctor finding arrives as a
+backstop for a path the tool already paves, and its promotion belongs to
+the strict tier parked as idea 13. `adopt` and `reject` gained nothing,
+since idea terminal states still have zero specimens. Nothing validates
+or repairs an already-bound marker, which remains idea 2's question —
+the mislabeled marker found while closing [[tsk_01KZ738BECT3VAFX99CKPM9VDB|Adopt the log collection, stateless and template-free]] is recorded there
+and is not fixed here.
+
+### Dogfood
+
+Closing this task exercised the path against the real corpus rather than
+a fixture: a task in a repository of 145 artifacts, with two sugar
+markers resolving to a genuine adopted idea and a genuine closed task,
+and a `closed:` stamp sharing the date the narrative was written. The
+previous task's Result needed `cat >>` and a separate `scarp close`; this
+one needed neither.
+
+The friction that remains is honest and small: the narrative still has
+to be written to a file first, because there is no stdin path yet. Idea
+30 named a non-interactive argument or stdin as the first input surface
+and `$EDITOR` through idea 3 as the later one; only `--body-file` exists.
+For an agent, which is the demonstrated closer, writing a temporary file
+is not friction worth a flag yet — recorded rather than fixed.

@@ -47,7 +47,8 @@ fn run(command: &Command) -> Result<(), Error> {
         Command::Close {
             reference,
             resolved_by,
-        } => close(reference, resolved_by.as_deref()),
+            body_file,
+        } => close(reference, resolved_by.as_deref(), body_file.as_deref()),
         Command::Reopen { reference } => {
             transition(reference, "reopen", Collection::Dragon, Status::Open)
         }
@@ -223,8 +224,14 @@ fn adopt(target: &ArtifactTarget, adopted_by: Option<&str>) -> Result<(), Error>
 /// collection picks the lifecycle; a bare stable id resolves over the
 /// union of the closable collections. `--resolved-by` records dragon
 /// resolution provenance and belongs to no other collection's vocabulary.
-fn close(target: &ArtifactTarget, resolved_by: Option<&str>) -> Result<(), Error> {
+fn close(
+    target: &ArtifactTarget,
+    resolved_by: Option<&str>,
+    body_file: Option<&Path>,
+) -> Result<(), Error> {
     let root = repo::discover(&cwd()?)?;
+    let narrative = body_file.map(read_body_file).transpose()?;
+    let narrative = narrative.as_deref();
     let collection = match target {
         ArtifactTarget::Reference(reference) => reference.collection,
         ArtifactTarget::Id(id) => {
@@ -258,23 +265,26 @@ fn close(target: &ArtifactTarget, resolved_by: Option<&str>) -> Result<(), Error
         });
     }
     let done = match collection {
-        Collection::Dragon => transition::transition_with_provenance(
+        Collection::Dragon => transition::transition_closing(
             &root,
             &read::DRAGON,
             selector(target),
             &target.to_string(),
             Status::Closed,
             resolved_by.map(|raw| ("resolved-by", raw)),
+            narrative,
         )?,
         Collection::Sprint => {
-            transition::close_sprint(&root, selector(target), &target.to_string())?
+            transition::close_sprint(&root, selector(target), &target.to_string(), narrative)?
         }
-        Collection::Task => transition::transition(
+        Collection::Task => transition::transition_closing(
             &root,
             &read::TASK,
             selector(target),
             &target.to_string(),
             Status::Closed,
+            None,
+            narrative,
         )?,
         Collection::Idea => {
             return Err(Error::InvalidInvocation {

@@ -293,7 +293,14 @@ about should be findable by strangers, not just by the person who found them.
 
 Lifecycle state lives in front matter, and transitions rewrite it in place:
 a state change is a one-line diff, never a file move, so canonical paths
-stay stable across an artifact's whole life. Lifecycle directories are not
+stay stable across an artifact's whole life. A closure may carry the
+narrative it owes — `--body-file` writes the collection's terminal section
+in the same atomic write as the transition, so the state and the story
+land together or not at all. Legal `[[kind:N]]` sugar in that narrative is
+bound to `[[stable-id|label]]` at authorship time, so nobody hand-copies a
+ULID to cite an artifact. A bare `[[idea:30]]` takes the target's full
+title as its frozen label; write `[[idea:30|idea 30]]` when you want
+shorter prose, and your label is kept. Lifecycle directories are not
 part of managed collection semantics. Terminal states are transitions,
 never deletions: history is the product.
 
@@ -346,7 +353,7 @@ Scarp is bootstrapping its smallest useful vertical slice. Honest scoreboard:
 | `scarp list dragons [--json]` | discover and list a collection | ✅ |
 | `scarp show dragon:N [--json]` | inspect one artifact | ✅ |
 | `scarp doctor [--json]` | validate repository invariants, report every finding | ✅ |
-| `scarp close dragon:N [--resolved-by …]` | close a dragon, sprint, or task; optionally record what resolved it | ✅ |
+| `scarp close dragon:N [--resolved-by …] [--body-file PATH]` | close a dragon, sprint, or task; optionally record what resolved it, and the closure's terminal narrative — its `Result`, `Resolution`, or `Retrospective` — in the same write | ✅ |
 | `scarp reopen dragon:N` | return a closed dragon to `open` | ✅ |
 | `scarp adopt idea:N [--adopted-by …]` / `scarp reject idea:N` | move a parked idea to a terminal state | ✅ |
 | `scarp resolve idea:15 … [--json]` | resolve references to stable ids, one per line, in input order | ✅ |

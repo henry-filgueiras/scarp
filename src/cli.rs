@@ -124,6 +124,13 @@ pub enum Command {
         /// write
         #[arg(long)]
         resolved_by: Option<String>,
+        /// Read the closure's terminal narrative from a file — a task's
+        /// `Result`, a dragon's `Resolution`, a sprint's `Retrospective` —
+        /// written in the same atomic write as the transition. Scarp
+        /// writes the heading; the file carries only the prose beneath
+        /// it. Legal `[[kind:N]]` sugar is bound to its canonical form.
+        #[arg(long, value_name = "PATH")]
+        body_file: Option<PathBuf>,
     },
     /// Reopen a closed dragon
     Reopen {

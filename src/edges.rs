@@ -413,7 +413,7 @@ fn check_marker(
 /// by the next run of exactly the same length; an unpaired run is
 /// literal text and hides nothing. Backticks are ASCII, so byte offsets
 /// of backtick runs are always character boundaries.
-fn outside_code_spans(line: &str) -> Vec<&str> {
+fn outside_code_spans(line: &str) -> Vec<(usize, &str)> {
     let bytes = line.as_bytes();
     let mut segments = Vec::new();
     let mut segment_start = 0;
@@ -439,15 +439,67 @@ fn outside_code_spans(line: &str) -> Vec<&str> {
                 search += 1;
             }
             if search - close_start == run_len {
-                segments.push(&line[segment_start..run_start]);
+                segments.push((segment_start, &line[segment_start..run_start]));
                 segment_start = search;
                 pos = search;
                 break;
             }
         }
     }
-    segments.push(&line[segment_start..]);
+    segments.push((segment_start, &line[segment_start..]));
     segments
+}
+
+/// Every reference marker in `prose`, as `(byte range, marker)` in
+/// source order.
+///
+/// The traversal is the shared one: fenced blocks and inline code spans
+/// hide markers from every consumer alike, so a grammar discussion that
+/// writes `[[stable-id|label]]` in backticks is a mention rather than a
+/// reference, and a sample of Markdown output inside a fence is a sample.
+/// Ranges index `prose` directly, so a caller may rewrite in place.
+pub(crate) fn markers_in_prose(prose: &str) -> Vec<(std::ops::Range<usize>, Marker<'_>)> {
+    let mut found = Vec::new();
+    let mut in_fence = false;
+    let mut line_start = 0;
+    for raw_line in prose.split_inclusive('\n') {
+        let line = raw_line.trim_end();
+        if line.starts_with("```") || line.starts_with("~~~") {
+            in_fence = !in_fence;
+            line_start += raw_line.len();
+            continue;
+        }
+        if in_fence {
+            line_start += raw_line.len();
+            continue;
+        }
+        for (segment_start, segment) in outside_code_spans(line) {
+            let mut consumed = 0;
+            let mut rest = segment;
+            while let Some(start) = rest.find("[[") {
+                let candidate = &rest[start..];
+                let Some(close) = candidate.find("]]") else {
+                    break;
+                };
+                let text = &candidate[..close + 2];
+                match parse_marker(text) {
+                    Some(marker) => {
+                        let from = line_start + segment_start + consumed + start;
+                        found.push((from..from + text.len(), marker));
+                        consumed += start + close + 2;
+                        rest = &candidate[close + 2..];
+                    }
+                    // Not a marker; the next candidate may begin inside it.
+                    None => {
+                        consumed += start + 1;
+                        rest = &rest[start + 1..];
+                    }
+                }
+            }
+        }
+        line_start += raw_line.len();
+    }
+    found
 }
 
 pub(crate) fn check_prose(content: &str, catalog: &Catalog) -> Vec<EdgeIssue> {
@@ -455,37 +507,12 @@ pub(crate) fn check_prose(content: &str, catalog: &Catalog) -> Vec<EdgeIssue> {
         return Vec::new();
     };
     let mut missing: Vec<&str> = Vec::new();
-    let mut in_fence = false;
-    for line in body.lines() {
-        let line = line.trim_end();
-        if line.starts_with("```") || line.starts_with("~~~") {
-            in_fence = !in_fence;
-            continue;
-        }
-        if in_fence {
-            continue;
-        }
-        for segment in outside_code_spans(line) {
-            let mut rest = segment;
-            while let Some(start) = rest.find("[[") {
-                let candidate = &rest[start..];
-                let Some(close) = candidate.find("]]") else {
-                    break;
-                };
-                match parse_marker(&candidate[..close + 2]) {
-                    Some(Marker::Bound { id, .. }) => {
-                        if matches!(catalog.resolve(id), Resolution::Missing)
-                            && !missing.contains(&id)
-                        {
-                            missing.push(id);
-                        }
-                        rest = &candidate[close + 2..];
-                    }
-                    Some(Marker::Sugar { .. }) => rest = &candidate[close + 2..],
-                    // Not a marker; the next candidate may begin inside it.
-                    None => rest = &rest[start + 1..],
-                }
-            }
+    for (_, marker) in markers_in_prose(body) {
+        if let Marker::Bound { id, .. } = marker
+            && matches!(catalog.resolve(id), Resolution::Missing)
+            && !missing.contains(&id)
+        {
+            missing.push(id);
         }
     }
     missing
@@ -794,6 +821,51 @@ fn canonical_parse(root: &Path, path_rel: &str) -> Option<Result<(), crate::erro
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn marker_ranges_index_the_prose_they_were_found_in() {
+        // The ranges are load-bearing: the terminal-narrative binder
+        // rewrites through them, so an off-by-one corrupts an artifact.
+        let prose = "See [[task:62]] and [[dec-x|a decision]].\n\n\
+                     `[[task:1]]` is a mention.\n\n\
+                     ```\n[[task:2]]\n```\n\n\
+                     Tail [[idea:41]].\n";
+
+        let found = markers_in_prose(prose);
+
+        let texts: Vec<&str> = found
+            .iter()
+            .map(|(range, _)| &prose[range.clone()])
+            .collect();
+        assert_eq!(
+            texts,
+            vec!["[[task:62]]", "[[dec-x|a decision]]", "[[idea:41]]"],
+            "code spans and fences must hide markers from the binder too"
+        );
+    }
+
+    #[test]
+    fn multibyte_prose_does_not_shift_marker_ranges() {
+        let prose = "Counterpressure — isolation costs — see [[task:62]] again.\n";
+
+        let found = markers_in_prose(prose);
+
+        assert_eq!(found.len(), 1);
+        assert_eq!(&prose[found[0].0.clone()], "[[task:62]]");
+    }
+
+    #[test]
+    fn several_markers_on_one_line_keep_distinct_ranges() {
+        let prose = "[[task:1]] then [[task:2]] then [[task:3]]\n";
+
+        let found = markers_in_prose(prose);
+
+        let texts: Vec<&str> = found
+            .iter()
+            .map(|(range, _)| &prose[range.clone()])
+            .collect();
+        assert_eq!(texts, vec!["[[task:1]]", "[[task:2]]", "[[task:3]]"]);
+    }
 
     #[test]
     fn parse_marker_accepts_bound_and_sugar_forms() {
