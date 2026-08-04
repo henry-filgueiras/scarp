@@ -39,7 +39,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::artifact::MAX_SEQUENCE;
 use crate::error::Error;
-use crate::repo::{DECISIONS_DIR, DRAGONS_DIR, IDEAS_DIR, LOGS_DIR, PRINCIPLES_DIR, SPRINTS_DIR};
+use crate::repo::{
+    DECISIONS_DIR, DRAGONS_DIR, IDEAS_DIR, LOGS_DIR, MAINTENANCE_DIR, PRINCIPLES_DIR, SPRINTS_DIR,
+};
 
 /// Per-file byte cap on every managed content read (thread 4, task 22).
 ///
@@ -297,6 +299,36 @@ pub static SPRINT: Collection = Collection {
     terminal: Some(TerminalSection {
         name: "Retrospective",
         dated: true,
+    }),
+};
+
+/// The maintenance template's one creation section. The terminal
+/// `Result` is not here: a creation stub must never carry an empty
+/// terminal section, so it arrives through `close --body-file`.
+pub const MAINTENANCE_SECTIONS: &[&str] = &["Work"];
+
+/// The maintenance collection: bounded repository work worth recording
+/// but not commissioned in service of a sprint goal.
+///
+/// Sharply not a `task`, which a sprint commissions and owns, and
+/// sharply not a `chore` (idea 7), which is a recurring obligation with
+/// a staleness tolerance and a performance ledger. It exists because
+/// WitnessGlass had to commission an entire sprint to file one piece of
+/// housekeeping: the cheapest path was to skip tracking altogether,
+/// which is what the workflow exists to prevent.
+///
+/// `pending -> closed`, with no `cancelled`. An item not worth doing
+/// closes with a Result saying so, which is lossless and needs no new
+/// status vocabulary, no second terminal stamp, and no new verb.
+pub static MAINTENANCE: Collection = Collection {
+    kind: "maintenance",
+    dir: MAINTENANCE_DIR,
+    states: &[Status::Pending, Status::Closed],
+    transitions: &[(Status::Pending, Status::Closed)],
+    stamp_closed: true,
+    terminal: Some(TerminalSection {
+        name: "Result",
+        dated: false,
     }),
 };
 

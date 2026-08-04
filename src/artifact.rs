@@ -38,7 +38,9 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 use crate::error::Error;
-use crate::read::{Collection, DECISION, DRAGON, IDEA, LOG, PRINCIPLE, SPRINT, Status, TASK};
+use crate::read::{
+    Collection, DECISION, DRAGON, IDEA, LOG, MAINTENANCE, PRINCIPLE, SPRINT, Status, TASK,
+};
 use crate::repo::{SPRINT_FILE, SPRINTS_DIR};
 
 /// Prefix for generated dragon identities.
@@ -49,6 +51,9 @@ pub const IDEA_ID_PREFIX: &str = "ide_";
 
 /// Prefix for generated decision identities.
 pub const DECISION_ID_PREFIX: &str = "dec_";
+
+/// Prefix for generated maintenance identities.
+pub const MAINTENANCE_ID_PREFIX: &str = "mnt_";
 
 /// Prefix for generated principle identities.
 pub const PRINCIPLE_ID_PREFIX: &str = "prn_";
@@ -219,6 +224,25 @@ pub fn create_idea_from(
         None => Vec::new(),
     };
     create_with(root, &IDEA, IDEA_ID_PREFIX, sections, title, body, &extra)
+}
+
+/// Create a new pending maintenance item in the repository at `root`.
+///
+/// No sprint membership: maintenance is precisely the work no sprint
+/// commissioned, so nothing here consults or records one.
+pub fn create_maintenance(
+    root: &Path,
+    title: &str,
+    body: Option<&str>,
+) -> Result<NewArtifact, Error> {
+    create(
+        root,
+        &MAINTENANCE,
+        MAINTENANCE_ID_PREFIX,
+        crate::read::MAINTENANCE_SECTIONS,
+        title,
+        body,
+    )
 }
 
 /// Create a new active principle in the repository at `root`.

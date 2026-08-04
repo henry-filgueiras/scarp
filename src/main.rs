@@ -85,6 +85,7 @@ fn scan(root: &std::path::Path, collection: Collection) -> Result<Vec<read::Arti
         Collection::Decision => read::scan(root, &read::DECISION),
         Collection::Log => read::scan(root, &read::LOG),
         Collection::Principle => read::scan(root, &read::PRINCIPLE),
+        Collection::Maintenance => read::scan(root, &read::MAINTENANCE),
         Collection::Sprint => read::scan_sprints(root),
         Collection::Task => read::scan_tasks(root),
     }
@@ -111,6 +112,7 @@ fn verb_guidance(collection: Collection) -> &'static str {
         Collection::Principle => {
             "principles have no lifecycle verbs; a principle advises until a later record supersedes it"
         }
+        Collection::Maintenance => "maintenance items close: use `scarp close`",
         Collection::Sprint => "sprints close: use `scarp close`",
         Collection::Task => "tasks close: use `scarp close`",
     }
@@ -179,6 +181,7 @@ fn transition(
             Collection::Decision => &read::DECISION,
             Collection::Log => &read::LOG,
             Collection::Principle => &read::PRINCIPLE,
+            Collection::Maintenance => &read::MAINTENANCE,
             Collection::Sprint => &read::SPRINT,
             Collection::Task => &read::TASK,
         },
@@ -243,6 +246,7 @@ fn close(
             let union = || -> Result<Vec<read::Artifact>, Error> {
                 let mut all = read::scan(&root, &read::DRAGON)?;
                 all.extend(read::scan(&root, &read::DECISION)?);
+                all.extend(read::scan(&root, &read::MAINTENANCE)?);
                 all.extend(read::scan_sprints(&root)?);
                 all.extend(read::scan_tasks(&root)?);
                 Ok(all)
@@ -253,6 +257,7 @@ fn close(
                 "sprint" => Collection::Sprint,
                 "task" => Collection::Task,
                 "decision" => Collection::Decision,
+                "maintenance" => Collection::Maintenance,
                 _ => Collection::Dragon,
             }
         }
@@ -285,6 +290,15 @@ fn close(
         Collection::Task => transition::transition_closing(
             &root,
             &read::TASK,
+            selector(target),
+            &target.to_string(),
+            Status::Closed,
+            None,
+            narrative,
+        )?,
+        Collection::Maintenance => transition::transition_closing(
+            &root,
+            &read::MAINTENANCE,
             selector(target),
             &target.to_string(),
             Status::Closed,
@@ -640,6 +654,7 @@ fn new_artifact(
         Collection::Decision => artifact::create_decision(&root, title, body)?,
         Collection::Log => artifact::create_log(&root, title, body)?,
         Collection::Principle => artifact::create_principle(&root, title, body)?,
+        Collection::Maintenance => artifact::create_maintenance(&root, title, body)?,
         Collection::Sprint => artifact::create_sprint(&root, title, body)?,
         Collection::Task => artifact::create_task(
             &root,
@@ -656,6 +671,9 @@ fn new_artifact(
         Collection::Decision => artifact::probe_reachability(&root, &read::DECISION, &created),
         Collection::Log => artifact::probe_reachability(&root, &read::LOG, &created),
         Collection::Principle => artifact::probe_reachability(&root, &read::PRINCIPLE, &created),
+        Collection::Maintenance => {
+            artifact::probe_reachability(&root, &read::MAINTENANCE, &created)
+        }
         Collection::Sprint | Collection::Task => artifact::Reachability::Reachable,
     };
     if json {
@@ -718,8 +736,8 @@ fn list(collection: Collection, json: bool, active: bool) -> Result<(), Error> {
         println!("{}", to_json(&summaries));
     } else if artifacts.is_empty() {
         println!(
-            "no {}s found; create one with `scarp new {} \"<title>\"`",
-            collection.name(),
+            "no {} found; create one with `scarp new {} \"<title>\"`",
+            collection.plural(),
             collection.name()
         );
     } else {
@@ -772,6 +790,7 @@ fn show(target: &ArtifactTarget, json: bool) -> Result<(), Error> {
                 all.extend(read::scan(&root, &read::DECISION)?);
                 all.extend(read::scan(&root, &read::LOG)?);
                 all.extend(read::scan(&root, &read::PRINCIPLE)?);
+                all.extend(read::scan(&root, &read::MAINTENANCE)?);
                 all.extend(read::scan_sprints(&root)?);
                 all.extend(read::scan_tasks(&root)?);
                 Ok(all)

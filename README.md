@@ -326,6 +326,9 @@ flowchart LR
     subgraph principle
         p1([active])
     end
+    subgraph maintenance
+        m1([pending]) --> m2([closed])
+    end
     subgraph task["sprint task"]
         t1([pending]) --> t2([closed])
     end
@@ -338,6 +341,7 @@ archaeology/
 ├── ideas/              proposals: parked, adopted, or rejected
 ├── logs/               durable discoveries, stateless and free-form
 ├── principles/         reusable guidance that shapes later decisions
+├── maintenance/        bounded housekeeping no sprint commissioned
 └── sprints/
     └── 0001-bootstrap/
         ├── sprint.md
@@ -369,12 +373,18 @@ Scarp is bootstrapping its smallest useful vertical slice. Honest scoreboard:
 | `scarp proposal list` / `realize N` / `reconcile N` | realize a GitHub issue as a canonical idea, from your machine, then close the issue citing it ([how and why](https://github.com/henry-filgueiras/scarp/blob/HEAD/docs/remote-proposals.md)) | ✅ |
 | `scarp completions <shell>` | emit a completion script for bash, zsh, fish, elvish, or powershell | ✅ |
 
-Dragons, ideas, decisions, logs, principles, sprints, and tasks are managed
-collections: `new`, `list`, and `show` cover all seven, and the rows above
-show the dragon spelling. Lifecycle verbs are collection-specific rather than universal —
-`close` applies to dragons, sprints, and tasks, `reopen` to dragons, `adopt`
+Dragons, ideas, decisions, logs, principles, maintenance, sprints, and tasks
+are managed collections: `new`, `list`, and `show` cover all eight, and the
+rows above show the dragon spelling. Lifecycle verbs are collection-specific rather than universal —
+`close` applies to dragons, sprints, tasks, and maintenance items, `reopen`
+to dragons, `adopt`
 and `reject` to ideas. Decisions are permanent records with no lifecycle verbs
 at all: a changed position is a new decision that supersedes the old one.
+A maintenance item is bounded repository work that no sprint commissioned —
+the gap that otherwise forces you to open a whole sprint just to record one
+piece of housekeeping. It is deliberately not a recurring chore: no staleness
+tolerance, no performance ledger, no sprint membership.
+
 Principles have one state for the same reason, and they only ever advise:
 `doctor` validates a principle's structure and never judges whether anything
 conforms to one. Logs

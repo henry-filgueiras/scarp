@@ -2,9 +2,10 @@
 id: tsk_01KZ738BM2YPD3R55M0JG8QH5Z
 sequence: 64
 kind: task
-status: pending
+status: closed
 sprint: spr_01KZ7352BYX19E0DNDG05744AM
 created: 2026-08-04
+closed: 2026-08-04
 ---
 
 # Add a flat maintenance collection for unsprinted bounded work
@@ -67,3 +68,54 @@ terminal stamp, and no new verb.
   recording that `maintenance` exists, what it deliberately omits, and
   that the chore gate is therefore unchanged rather than satisfied.
 - `scripts/check.sh` passes.
+
+## Result
+
+Delivered as specified, and the cheapest collection yet: no new `Status`
+variant, no new verb, no new scanner, no new doctor check, no placement
+topology of its own.
+
+**Shape.** `pending -> closed`, flat under `archaeology/maintenance/`,
+`mnt_` ids, one creation section `Work`, and a `Result` that arrives
+through [[tsk_01KZ738BG7HDGBJDM57TW40ED5|Carry the terminal narrative on the close transition]]'s machinery with no maintenance-specific special
+case — `TerminalSection { name: "Result", dated: false }` in the
+collection data, matching tasks, because tasks are what the corpus
+already writes that way.
+
+Dropping `cancelled` is the choice worth stating. An item that turns out
+not to be worth doing closes with a Result saying so, which is lossless
+and costs nothing; a `cancelled` state would have needed a new `Status`
+variant, a second terminal stamp (`closed:` is a lie on a cancelled
+item), and a new verb, to record a distinction a sentence already
+carries.
+
+No sprint membership anywhere: no `sprint:` field, no `--sprint`, and
+`doctor` looks for neither. That is the whole point — WitnessGlass had
+to commission an entire sprint to file one piece of housekeeping, and
+the pressure ran the wrong way, since the cheapest path was to skip
+tracking altogether.
+
+**What it deliberately is not.** Not a chore ([[idea-chore-artifacts|Chore artifacts: recurring maintenance with staleness and a ledger]]): no staleness
+tolerance, no recurring-performance ledger, no JSONL sidecar, no fortune
+weighting. Tests assert each absence rather than leaving it to reading,
+including that `fortune` does not surface maintenance.
+
+**Placement.** Flat, per the 2026-08-04 adjudication recorded as
+[[ide_01KZ73A671YV99APMXAWEQ20X9|Creation-time temporal sharding for high-volume collections]]. Sequences are collection-global and ids owe nothing to
+placement, which is exactly the property that keeps a later move to
+temporal buckets a pure `git mv`; a test pins it by closing an item
+mid-sequence and asserting nothing moved.
+
+Nothing was extracted. The collection went in through the same pattern
+[[tsk_01KZ738BECT3VAFX99CKPM9VDB|Adopt the log collection, stateless and template-free]] and [[tsk_01KZ738BJ5MXNBDWECX8REA391|Add the principle collection and distil the first principle from log 3]] used, untidied, so [[tsk_01KZ738BQTR4H7Z7YBKPPCXGHT|Measure the collection-definition duplication three collections cost]] measures what
+is really there.
+
+### One thing the mass noun cost
+
+`maintenance` does not pluralize, and `list`'s empty-collection message
+was built from `name()` plus an `s`. That needed a `plural()` method —
+seven mechanical arms and one real exception. It is a small thing, and
+it is also the first place where a collection's *linguistic* shape, not
+its lifecycle or template, forced a per-collection branch. Worth handing
+to task 66: a declarative spec would have to carry the plural as data,
+and would not have made this any smaller.

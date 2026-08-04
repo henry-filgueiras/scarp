@@ -64,9 +64,9 @@ pub enum Command {
     /// Create an artifact; Scarp assigns its sequence, slug, and identity
     New {
         /// Collection for the new artifact (`dragon`, `idea`, `decision`,
-        /// `log`, `principle`, `sprint`, or `task`; tasks are created in
-        /// an active sprint, chosen with `--sprint` when several are
-        /// active)
+        /// `log`, `principle`, `maintenance`, `sprint`, or `task`; tasks
+        /// are created in an active sprint, chosen with `--sprint` when
+        /// several are active)
         collection: Collection,
         /// Human-readable title for the artifact
         title: String,
@@ -90,7 +90,7 @@ pub enum Command {
     /// List the artifacts in a collection
     List {
         /// Collection to list (`dragons`, `ideas`, `decisions`, `logs`,
-        /// `principles`, `sprints`, or `tasks`)
+        /// `principles`, `maintenance`, `sprints`, or `tasks`)
         collection: Collection,
         /// Emit a deterministic JSON array instead of human-readable lines
         #[arg(long)]
@@ -115,7 +115,8 @@ pub enum Command {
         #[arg(long)]
         json: bool,
     },
-    /// Close an open dragon, an active sprint, or a pending task
+    /// Close an open dragon, an active sprint, or a pending task or
+    /// maintenance item
     Close {
         /// `dragon:sequence`, `sprint:sequence`, or `task:sequence`
         /// reference, or a stable artifact `id`
@@ -184,11 +185,31 @@ pub enum Collection {
     Decision,
     Log,
     Principle,
+    Maintenance,
     Sprint,
     Task,
 }
 
 impl Collection {
+    /// The plural spelling `list` uses in prose. Every collection but
+    /// one pluralizes by suffix; `maintenance` is a mass noun and does
+    /// not pluralize at all.
+    pub fn plural(self) -> &'static str {
+        match self {
+            Collection::Maintenance => "maintenance",
+            other => match other {
+                Collection::Dragon => "dragons",
+                Collection::Idea => "ideas",
+                Collection::Decision => "decisions",
+                Collection::Log => "logs",
+                Collection::Principle => "principles",
+                Collection::Sprint => "sprints",
+                Collection::Task => "tasks",
+                Collection::Maintenance => unreachable!("handled above"),
+            },
+        }
+    }
+
     /// Canonical singular name, as used in artifact references.
     pub fn name(self) -> &'static str {
         match self {
@@ -197,6 +218,7 @@ impl Collection {
             Collection::Decision => "decision",
             Collection::Log => "log",
             Collection::Principle => "principle",
+            Collection::Maintenance => "maintenance",
             Collection::Sprint => "sprint",
             Collection::Task => "task",
         }
@@ -213,11 +235,12 @@ impl FromStr for Collection {
             "decision" | "decisions" => Ok(Collection::Decision),
             "log" | "logs" => Ok(Collection::Log),
             "principle" | "principles" => Ok(Collection::Principle),
+            "maintenance" => Ok(Collection::Maintenance),
             "sprint" | "sprints" => Ok(Collection::Sprint),
             "task" | "tasks" => Ok(Collection::Task),
             other => Err(format!(
                 "unknown collection `{other}`; collections are: dragon, idea, \
-                 decision, log, principle, sprint, task"
+                 decision, log, principle, maintenance, sprint, task"
             )),
         }
     }

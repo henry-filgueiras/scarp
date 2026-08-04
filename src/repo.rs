@@ -46,6 +46,15 @@ pub const IDEAS_DIR: &str = "archaeology/ideas";
 /// a single lifecycle state (`accepted`), so placement is trivially flat.
 pub const DECISIONS_DIR: &str = "archaeology/decisions";
 
+/// Root-relative directory holding every maintenance item, flat.
+///
+/// Flat, adjudicated 2026-08-04: creation-time temporal sharding would
+/// make derived physical placement a canonical invariant and add a third
+/// stable-containment topology before any maintenance corpus exists to
+/// need one. Collection-global sequences and stable ids keep that later
+/// migration a `git mv` (idea 42).
+pub const MAINTENANCE_DIR: &str = "archaeology/maintenance";
+
 /// Root-relative directory holding every principle, flat. Principles
 /// have one admitted state, so placement is trivially flat for the same
 /// reason decisions are.

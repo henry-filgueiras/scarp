@@ -105,6 +105,7 @@ pub fn check(root: &Path) -> Result<Report, Error> {
         &read::DECISION,
         &read::LOG,
         &read::PRINCIPLE,
+        &read::MAINTENANCE,
     ] {
         scan_dir(root, collection, &mut findings, &mut artifacts)?;
     }
