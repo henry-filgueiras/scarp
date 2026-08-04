@@ -75,3 +75,40 @@ artifact class to grumble about. Prior art: `anacron` (tolerance-based,
 not schedule-based, recurrence), aviation and equipment maintenance
 logbooks (append-only ledgers with staleness tolerances and sign-offs),
 oil-change stickers, MOTD nagging.
+
+### 2026-08-04: `maintenance` exists, and the chore gate is unchanged
+
+Sprint 12 added a `maintenance` collection —
+[[tsk_01KZ738BM2YPD3R55M0JG8QH5Z|task 64]] — for bounded repository work
+worth recording but not commissioned in service of a sprint goal. It is
+adjacent to this idea and deliberately does not satisfy it.
+
+What maintenance has: `pending -> closed`, a `Work` section, a `Result`
+supplied at close, flat placement, and no sprint membership.
+
+What it deliberately does **not** have, each of which is load-bearing
+here: no `stale_after` tolerance, no recurrence of any kind, no
+append-only execution ledger, no JSONL sidecar, no effort measures, and
+no place in `fortune`'s nagging pool. Tests assert those absences rather
+than leaving them to reading, so the boundary cannot erode quietly.
+
+The distinction that matters: a maintenance item is performed **once**
+and reaches a terminal state. A chore is never *done* — it is performed
+repeatedly, and the interesting data is the history of performances and
+how overdue the next one is. Nothing in maintenance can express "again
+in ninety days", and nothing should be stretched to.
+
+So this idea's motivating instance is untouched: "keep the README status
+table in sync" is still homeless, because it recurs. The gate stated in
+the Sketch — that chores need a staleness tolerance, a ledger, and
+`fortune` integration — is neither met nor weakened by maintenance
+existing.
+
+One genuine data point in favour, though, arrived immediately.
+[[mnt_01KZ7A8KPX088RA46TKXG65N7G|maintenance:2]] records a one-off
+obligation due at an external trigger (bump the version before the next
+publish) rather than at a staleness threshold. It sits `pending`
+indefinitely and that is correct. If a second and third such item
+accumulate and start being forgotten, *that* is the evidence this idea
+has been waiting for — recurrence pressure observed rather than
+predicted.

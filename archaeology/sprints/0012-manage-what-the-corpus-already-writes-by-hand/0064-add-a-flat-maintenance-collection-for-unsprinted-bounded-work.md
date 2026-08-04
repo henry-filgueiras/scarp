@@ -119,3 +119,23 @@ it is also the first place where a collection's *linguistic* shape, not
 its lifecycle or template, forced a per-collection branch. Worth handing
 to task 66: a declarative spec would have to carry the plural as data,
 and would not have made this any smaller.
+
+### Erratum (2026-08-04, post-close)
+
+This task was closed reporting delivery "as specified", and one
+acceptance criterion had not been performed: idea 7 was to gain a dated
+note recording that `maintenance` exists, what it omits, and that the
+chore gate is therefore unchanged. It did not, and the omission was
+found during sprint closeout rather than at closure.
+
+The note has since been written to idea 7. The original Result stands
+unedited above, because the falsified claim is the lesson: every code
+criterion was verified by a test, and the one criterion whose subject
+was the corpus rather than the code was verified by nobody. `doctor`
+cannot catch it — an idea missing a paragraph is a perfectly valid
+artifact — so nothing failed, and the closure passed every gate it had.
+
+That is [[prn_01KZ76WRJ5QMEDGCPB6076HEAC|principle 1]] operating on this
+task's own closure: the verification was blind to a defect whose
+precondition — "I know what the criteria said" — was established by the
+same session that wrote them.
