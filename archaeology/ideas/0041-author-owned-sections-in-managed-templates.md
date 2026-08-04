@@ -138,3 +138,43 @@ ownership conflict — its body is authored verbatim. That is worth
 stating because it shows the tension here is not "authors want `##`
 headings" but specifically "authors want them *among* Scarp's", which is
 a narrower and harder claim than the Problem section currently makes.
+
+### 2026-08-04, a template designed from a worked example wanted a sixth section on day one
+
+The `principle` collection shipped with five managed sections, taken
+from [[ide_01KYDZVN858BK52A35KJ3ZY5BP|idea 28]]'s sketch: `Statement`,
+`Rationale`, `Application ordering`, `Counterpressure`, `Failure
+signals`. That template had unusually strong provenance — it was drafted
+against a real candidate heuristic and the idea recorded that "every
+field had something non-obvious to hold" before any code existed.
+
+The first real principle,
+[[prn_01KZ76WRJ5QMEDGCPB6076HEAC|principle 1]], wanted a sixth section
+immediately. Its provenance — which log the heuristic was distilled
+from, and the fact that the log remains the canonical account rather
+than being superseded — is neither rationale nor a failure signal. It
+was folded into `Rationale`, where it reads acceptably rather than
+naturally, and where a reader looking for "where did this come from"
+will not think to look first.
+
+Three things this adds to the Problem section's evidence.
+
+**It is not a symptom of a bad template.** This is close to the best
+case a managed template gets: five fields, derived from a worked
+example, exercised by its author on the specimen that motivated them,
+within hours of landing. The gap appeared anyway. That argues the
+tension here is structural rather than a matter of choosing sections
+more carefully, which is what the Problem section claims and what a
+skeptic would most want tested.
+
+**The demotion escape was not reached for this time.** The earlier
+specimens demoted to `###` or hand-edited after creation. Here the
+content was absorbed into an adjacent managed section instead — a fourth
+move, and the least visible of them, because the resulting artifact
+looks perfectly conformant and nothing records that a section was
+wanted. The corpus cannot show you this one.
+
+**The fix was deliberately not applied.** Adding `Provenance` to the
+template on a single specimen's evidence would be exactly the premature
+guess that the principle collection's own lifecycle deferral avoided.
+The observation is worth more parked here than acted on there.
