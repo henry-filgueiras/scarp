@@ -99,7 +99,7 @@ pub fn check(root: &Path) -> Result<Report, Error> {
     let mut findings = Vec::new();
     let mut artifacts = Vec::new();
 
-    for collection in [&read::DRAGON, &read::IDEA, &read::DECISION] {
+    for collection in [&read::DRAGON, &read::IDEA, &read::DECISION, &read::LOG] {
         scan_dir(root, collection, &mut findings, &mut artifacts)?;
     }
     scan_sprints_dir(root, &mut findings, &mut artifacts)?;
@@ -704,10 +704,16 @@ fn representation_findings(
         }
     }
     for artifact in artifacts {
-        if let Err(reason) = crate::transition::canonical_status_carrier(
-            &artifact.content,
-            artifact.summary.status.name(),
-        ) {
+        // Stateless artifacts have no carrier to be canonical: the check
+        // exists so a transition can rewrite exactly one `status:` line,
+        // and nothing ever rewrites one here. A log that grew a `status:`
+        // line is already a malformed-artifact finding from the parser.
+        let Some(status) = artifact.summary.status else {
+            continue;
+        };
+        if let Err(reason) =
+            crate::transition::canonical_status_carrier(&artifact.content, status.name())
+        {
             findings.push(Finding {
                 problem: "non-canonical-artifact",
                 path: artifact.summary.path.clone(),
@@ -1649,11 +1655,15 @@ mod tests {
             "0001-risk.md",
             &dragon_markdown("dup-shared", 1, "open", "Risk"),
         );
-        let logs = tmp.path().join("archaeology/logs");
-        fs::create_dir_all(&logs).unwrap();
+        // `notes` is an invented unmanaged kind. This fixture used a log
+        // until task 61 made logs a managed collection, at which point a
+        // log stopped being an example of an unmanaged claimant and
+        // became a malformed managed one.
+        let notes = tmp.path().join("archaeology/notes");
+        fs::create_dir_all(&notes).unwrap();
         fs::write(
-            logs.join("0001-log.md"),
-            "---\nid: dup-shared\nkind: log\n---\n\n# A log\n",
+            notes.join("0001-note.md"),
+            "---\nid: dup-shared\nkind: note\n---\n\n# A note\n",
         )
         .unwrap();
 
@@ -1665,7 +1675,7 @@ mod tests {
         );
         let detail = &report.findings[0].detail;
         assert!(
-            detail.contains("archaeology/logs/0001-log.md (unmanaged)")
+            detail.contains("archaeology/notes/0001-note.md (unmanaged)")
                 && detail.contains("archaeology/dragons/0001-risk.md"),
             "every claimant and its disposition must be named: {detail}"
         );
@@ -1676,11 +1686,13 @@ mod tests {
         // Thread 5 specimen 2: both claimants sit outside the strong set;
         // the catalog still sees the collision.
         let tmp = temp_repo();
-        let logs = tmp.path().join("archaeology/logs");
-        fs::create_dir_all(&logs).unwrap();
+        // Both kinds are invented and unmanaged; see the sibling test for
+        // why neither is a log any more.
+        let memos = tmp.path().join("archaeology/memos");
+        fs::create_dir_all(&memos).unwrap();
         fs::write(
-            logs.join("0001-log.md"),
-            "---\nid: note-twin\nkind: log\n---\n\n# A log\n",
+            memos.join("0001-memo.md"),
+            "---\nid: note-twin\nkind: memo\n---\n\n# A memo\n",
         )
         .unwrap();
         let notes = tmp.path().join("archaeology/notes");
@@ -1696,7 +1708,7 @@ mod tests {
         assert_eq!(report.artifacts_checked, 0);
         assert_eq!(
             problems(&report),
-            vec![("duplicate-id", "archaeology/logs/0001-log.md")]
+            vec![("duplicate-id", "archaeology/memos/0001-memo.md")]
         );
         assert!(
             report.findings[0]

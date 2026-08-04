@@ -876,7 +876,7 @@ mod tests {
             id: "ide_01ABC".to_string(),
             sequence: 40,
             kind: "idea".to_string(),
-            status: read::Status::Parked,
+            status: Some(read::Status::Parked),
             title: "Reconcile realized proposals".to_string(),
             created: "2026-08-01".to_string(),
             sprint: None,

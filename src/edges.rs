@@ -364,15 +364,27 @@ fn check_marker(
                     ),
                 ))
             }
-            Resolution::Unique(_) if summary.status != kind.settled_status => Some(issue(
-                Severity::Advice,
-                "stale-edge",
-                format!(
-                    "`{}` claims settlement, but this {} is {}, not {}; \
-                     investigate or remove the edge",
-                    kind.key, summary.kind, summary.status, kind.settled_status
-                ),
-            )),
+            // A stateless artifact cannot contradict a settlement claim:
+            // there is no state for the edge to disagree with, so the
+            // advice would be noise rather than a finding.
+            Resolution::Unique(_)
+                if summary
+                    .status
+                    .is_some_and(|status| status != kind.settled_status) =>
+            {
+                Some(issue(
+                    Severity::Advice,
+                    "stale-edge",
+                    format!(
+                        "`{}` claims settlement, but this {} is {}, not {}; \
+                         investigate or remove the edge",
+                        kind.key,
+                        summary.kind,
+                        summary.state(),
+                        kind.settled_status
+                    ),
+                ))
+            }
             Resolution::Unique(_) => None,
         },
     }

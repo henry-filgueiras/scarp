@@ -39,7 +39,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::artifact::MAX_SEQUENCE;
 use crate::error::Error;
-use crate::repo::{DECISIONS_DIR, DRAGONS_DIR, IDEAS_DIR, SPRINTS_DIR};
+use crate::repo::{DECISIONS_DIR, DRAGONS_DIR, IDEAS_DIR, LOGS_DIR, SPRINTS_DIR};
 
 /// Per-file byte cap on every managed content read (thread 4, task 22).
 ///
@@ -193,6 +193,11 @@ pub struct Collection {
     pub dir: &'static str,
     /// Admitted lifecycle states; the first is the home state new
     /// artifacts are created in.
+    ///
+    /// **Empty means the collection has no lifecycle at all** — see
+    /// [`Collection::is_stateless`]. A stateless collection's artifacts
+    /// carry no `status:` front-matter line, and one that does is
+    /// malformed rather than tolerated.
     pub states: &'static [Status],
     /// Legal lifecycle transitions as `(from, to)` pairs.
     pub transitions: &'static [(Status, Status)],
@@ -255,6 +260,25 @@ pub static SPRINT: Collection = Collection {
     stamp_closed: true,
 };
 
+/// The log collection: dated narrative records of what happened and what
+/// was concluded, with **no lifecycle and no template**.
+///
+/// Both absences are read off the corpus rather than chosen. The three
+/// logs that predate this collection's adoption carry no `status:` line,
+/// because a log records an event that already happened and has no state
+/// to be in; stamping one in to satisfy the parser would have invented a
+/// lifecycle and rewritten history to suit the tool. They also share no
+/// section vocabulary — log 1 is bare prose beneath its title, logs 2 and
+/// 3 each invent their own headings — so there is no template to derive
+/// and a log body is authored verbatim.
+pub static LOG: Collection = Collection {
+    kind: "log",
+    dir: LOGS_DIR,
+    states: &[],
+    transitions: &[],
+    stamp_closed: false,
+};
+
 /// The task collection: work items, `pending -> closed`. Task files live
 /// inside their owning sprint's containment directory; sequences are
 /// global across sprints.
@@ -267,6 +291,12 @@ pub static TASK: Collection = Collection {
 };
 
 impl Collection {
+    /// Whether this collection has no lifecycle: no admitted states, no
+    /// transitions, and no `status:` front-matter line on its artifacts.
+    pub fn is_stateless(&self) -> bool {
+        self.states.is_empty()
+    }
+
     /// Parse a front-matter status string against this collection's states.
     pub fn parse_status(&self, name: &str) -> Option<Status> {
         self.states
@@ -323,8 +353,12 @@ pub struct Summary {
     /// Artifact kind: the collection's singular name, e.g. `dragon`.
     pub kind: String,
     /// Lifecycle state, from front matter (the sole authority per
-    /// decision 11).
-    pub status: Status,
+    /// decision 11). Absent for stateless collections, whose artifacts
+    /// carry no `status:` line; the key is omitted from projections
+    /// rather than emitted as null, so every stateful collection's
+    /// `--json` output is unchanged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<Status>,
     /// Title from the artifact's level-one Markdown heading.
     pub title: String,
     /// Opaque creation stamp from front matter.
@@ -352,6 +386,12 @@ impl Summary {
     /// Human reference for this artifact, e.g. `dragon:7`.
     pub fn reference(&self) -> String {
         format!("{}:{}", self.kind, self.sequence)
+    }
+
+    /// The lifecycle state as displayable text, naming the absence for a
+    /// stateless collection rather than printing an empty column.
+    pub fn state(&self) -> &'static str {
+        self.status.map_or("stateless", Status::name)
     }
 }
 
@@ -400,7 +440,9 @@ struct FrontMatter {
     id: String,
     sequence: u32,
     kind: String,
-    status: String,
+    /// Required on collections that declare lifecycle states, refused on
+    /// those that do not; the collection decides, not this struct.
+    status: Option<String>,
     created: String,
     /// Required on tasks (the owning sprint's stable id); inert elsewhere.
     sprint: Option<String>,
@@ -760,13 +802,31 @@ pub(crate) fn parse_artifact_at(
             meta.kind
         )));
     }
-    let status = collection.parse_status(&meta.status).ok_or_else(|| {
-        malformed(format!(
-            "front-matter `status` is `{}`; {kind}s are `{}`",
-            meta.status,
-            collection.status_names()
-        ))
-    })?;
+    // A stateless collection refuses `status:` rather than ignoring it:
+    // silently tolerating the line would let a fake lifecycle accumulate
+    // in a collection that has none, and the corpus would drift toward a
+    // vocabulary no code admits.
+    let status = match (collection.is_stateless(), &meta.status) {
+        (true, None) => None,
+        (true, Some(value)) => {
+            return Err(malformed(format!(
+                "front-matter carries `status: {value}`, but {kind}s have no \
+                 lifecycle and no admitted states — remove the line"
+            )));
+        }
+        (false, None) => {
+            return Err(malformed(format!(
+                "front-matter `status` is missing; {kind}s are `{}`",
+                collection.status_names()
+            )));
+        }
+        (false, Some(value)) => Some(collection.parse_status(value).ok_or_else(|| {
+            malformed(format!(
+                "front-matter `status` is `{value}`; {kind}s are `{}`",
+                collection.status_names()
+            ))
+        })?),
+    };
     if !(1..=MAX_SEQUENCE).contains(&meta.sequence) {
         return Err(malformed(format!(
             "front-matter `sequence` is {}, outside the valid range 1..={MAX_SEQUENCE}",
@@ -974,7 +1034,7 @@ mod tests {
 
         assert_eq!(artifacts.len(), 2);
         assert_eq!(artifacts[0].summary.id, "drg-bootstrap-branch-collisions");
-        assert_eq!(artifacts[0].summary.status, Status::Closed);
+        assert_eq!(artifacts[0].summary.status, Some(Status::Closed));
         assert_eq!(artifacts[0].summary.title, "Legacy dragon");
         assert_eq!(
             artifacts[0].summary.path,
@@ -1046,8 +1106,8 @@ mod tests {
 
         assert_eq!(ideas.len(), 3);
         assert_eq!(ideas[0].summary.reference(), "idea:1");
-        assert_eq!(ideas[0].summary.status, Status::Parked);
-        assert_eq!(ideas[2].summary.status, Status::Rejected);
+        assert_eq!(ideas[0].summary.status, Some(Status::Parked));
+        assert_eq!(ideas[2].summary.status, Some(Status::Rejected));
     }
 
     #[test]
@@ -1065,6 +1125,101 @@ mod tests {
         expect_malformed(err, "0001-open-idea.md", "parked");
     }
 
+    fn seed_log(root: &Path, name: &str, content: &str) {
+        fs::create_dir_all(root.join(LOGS_DIR)).unwrap();
+        fs::write(root.join(LOGS_DIR).join(name), content).unwrap();
+    }
+
+    #[test]
+    fn logs_parse_without_a_status_line() {
+        let tmp = temp_repo();
+        seed_log(
+            tmp.path(),
+            "0001-inception.md",
+            "---\nid: log-seeded\nsequence: 1\nkind: log\ncreated: 2026-07-20\n---\n\n# Inception\n",
+        );
+
+        let logs = scan(tmp.path(), &LOG).unwrap();
+
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0].summary.status, None);
+        assert_eq!(logs[0].summary.id, "log-seeded");
+    }
+
+    #[test]
+    fn a_status_line_on_a_stateless_artifact_is_malformed() {
+        // Refused rather than ignored: tolerating the line would let a
+        // lifecycle vocabulary no code admits accumulate in the corpus.
+        let tmp = temp_repo();
+        seed_log(
+            tmp.path(),
+            "0001-inception.md",
+            "---\nid: log-seeded\nsequence: 1\nkind: log\nstatus: open\ncreated: 2026-07-20\n---\n\n# Inception\n",
+        );
+
+        let err = scan(tmp.path(), &LOG).unwrap_err();
+
+        expect_malformed(err, "0001-inception.md", "no lifecycle");
+    }
+
+    #[test]
+    fn a_missing_status_line_on_a_stateful_artifact_is_malformed() {
+        let tmp = temp_repo();
+        fs::create_dir_all(tmp.path().join(DRAGONS_DIR)).unwrap();
+        fs::write(
+            tmp.path().join(DRAGONS_DIR).join("0001-risk.md"),
+            "---\nid: drg-x\nsequence: 1\nkind: dragon\ncreated: 2026-07-20\n---\n\n# Risk\n",
+        )
+        .unwrap();
+
+        let err = scan(tmp.path(), &DRAGON).unwrap_err();
+
+        expect_malformed(err, "0001-risk.md", "`status` is missing");
+    }
+
+    #[test]
+    fn stateless_summaries_omit_the_status_key_and_stateful_ones_keep_it() {
+        // The compatibility half of task 61: adding an optional field must
+        // not perturb any existing collection's projection.
+        let stateless = Summary {
+            id: "log-x".into(),
+            sequence: 3,
+            kind: "log".into(),
+            status: None,
+            title: "A log".into(),
+            created: "2026-07-27".into(),
+            sprint: None,
+            proposal: None,
+            path: "archaeology/logs/0003-a-log.md".into(),
+        };
+        assert_eq!(
+            serde_json::to_string(&stateless).unwrap(),
+            "{\"id\":\"log-x\",\"sequence\":3,\"kind\":\"log\",\"title\":\"A log\",\
+             \"created\":\"2026-07-27\",\"path\":\"archaeology/logs/0003-a-log.md\"}"
+        );
+
+        let stateful = Summary {
+            status: Some(Status::Open),
+            kind: "dragon".into(),
+            path: "archaeology/dragons/0003-a-log.md".into(),
+            ..stateless
+        };
+        assert!(
+            serde_json::to_string(&stateful)
+                .unwrap()
+                .contains("\"status\":\"open\""),
+            "a stateful collection's projection must be unchanged"
+        );
+    }
+
+    #[test]
+    fn stateless_collections_admit_no_status_and_no_transitions() {
+        assert!(LOG.is_stateless());
+        assert!(!DRAGON.is_stateless());
+        assert_eq!(LOG.parse_status("open"), None);
+        assert!(!LOG.allows(Status::Open, Status::Closed));
+    }
+
     #[test]
     fn decision_status_vocabulary_admits_only_accepted() {
         let tmp = temp_repo();
@@ -1077,7 +1232,7 @@ mod tests {
 
         let decisions = scan(tmp.path(), &DECISION).unwrap();
         assert_eq!(decisions.len(), 1);
-        assert_eq!(decisions[0].summary.status, Status::Accepted);
+        assert_eq!(decisions[0].summary.status, Some(Status::Accepted));
         assert_eq!(decisions[0].summary.reference(), "decision:1");
 
         fs::write(
@@ -1149,7 +1304,7 @@ mod tests {
 
         assert_eq!(sprints.len(), 2);
         assert_eq!(sprints[0].summary.reference(), "sprint:1");
-        assert_eq!(sprints[1].summary.status, Status::Active);
+        assert_eq!(sprints[1].summary.status, Some(Status::Active));
         assert_eq!(
             sprints[1].summary.path,
             format!("{SPRINTS_DIR}/0002-second/sprint.md")
@@ -1212,7 +1367,7 @@ mod tests {
 
         assert_eq!(tasks.len(), 2);
         assert_eq!(tasks[0].summary.sprint.as_deref(), Some("spr-1"));
-        assert_eq!(tasks[1].summary.status, Status::Pending);
+        assert_eq!(tasks[1].summary.status, Some(Status::Pending));
 
         // A task without a sprint field is malformed.
         fs::write(
@@ -1376,7 +1531,7 @@ mod tests {
 
         let artifacts = scan(tmp.path(), &DRAGON).unwrap();
 
-        assert_eq!(artifacts[0].summary.status, Status::Closed);
+        assert_eq!(artifacts[0].summary.status, Some(Status::Closed));
     }
 
     #[test]
@@ -1623,7 +1778,7 @@ mod tests {
             id: "drg-x".into(),
             sequence: 7,
             kind: "dragon".into(),
-            status: Status::Open,
+            status: Some(Status::Open),
             title: "A title".into(),
             created: "2026-07-20".into(),
             sprint: None,
@@ -1645,7 +1800,7 @@ mod tests {
             id: "tsk-x".into(),
             sequence: 17,
             kind: "task".into(),
-            status: Status::Pending,
+            status: Some(Status::Pending),
             title: "A task".into(),
             created: "2026-07-22".into(),
             sprint: Some("spr-x".into()),

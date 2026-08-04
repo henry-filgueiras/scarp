@@ -309,6 +309,9 @@ flowchart LR
     subgraph decision
         a1([accepted])
     end
+    subgraph log
+        l1([no lifecycle])
+    end
     subgraph task["sprint task"]
         t1([pending]) --> t2([closed])
     end
@@ -319,7 +322,7 @@ archaeology/
 ├── decisions/          settled tradeoffs and their evidence
 ├── dragons/            known risks, open and closed
 ├── ideas/              proposals: parked, adopted, or rejected
-├── logs/               durable discoveries
+├── logs/               durable discoveries, stateless and free-form
 └── sprints/
     └── 0001-bootstrap/
         ├── sprint.md
@@ -327,7 +330,7 @@ archaeology/
 ```
 
 Stable containment is collection-specific (decision 11 as amended):
-dragons and ideas file directly in their collection directories, while
+dragons, ideas, and logs file directly in their collection directories, while
 each sprint owns a stable containment directory and its tasks live inside
 it. Containment never changes over an artifact's lifecycle — state is
 carried only in front matter.
@@ -351,13 +354,15 @@ Scarp is bootstrapping its smallest useful vertical slice. Honest scoreboard:
 | `scarp proposal list` / `realize N` / `reconcile N` | realize a GitHub issue as a canonical idea, from your machine, then close the issue citing it ([how and why](https://github.com/henry-filgueiras/scarp/blob/HEAD/docs/remote-proposals.md)) | ✅ |
 | `scarp completions <shell>` | emit a completion script for bash, zsh, fish, elvish, or powershell | ✅ |
 
-Dragons, ideas, decisions, sprints, and tasks are managed collections: `new`,
-`list`, and `show` cover all five, and the rows above show the dragon spelling.
-Lifecycle verbs are collection-specific rather than universal — `close` applies
-to dragons, sprints, and tasks, `reopen` to dragons, `adopt` and `reject` to
-ideas. Decisions are permanent records with no lifecycle verbs at all: a
-changed position is a new decision that supersedes the old one. Logs remain
-manually maintained.
+Dragons, ideas, decisions, logs, sprints, and tasks are managed collections:
+`new`, `list`, and `show` cover all six, and the rows above show the dragon
+spelling. Lifecycle verbs are collection-specific rather than universal —
+`close` applies to dragons, sprints, and tasks, `reopen` to dragons, `adopt`
+and `reject` to ideas. Decisions are permanent records with no lifecycle verbs
+at all: a changed position is a new decision that supersedes the old one. Logs
+have no lifecycle either, and no template: a log records something that
+already happened, so `--body-file` writes its prose verbatim beneath the
+title and its `--json` projection carries no `status` key.
 
 What is *not* here matters as much. There is no automatic capture from your
 editor or agent session, no context injection, no search, no index, and no

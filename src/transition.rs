@@ -215,7 +215,7 @@ pub fn close_sprint(root: &Path, target: Selector<'_>, display: &str) -> Result<
         .map_err(|err| err.blocking(display))?
         .iter()
         .filter(|task| {
-            task.summary.status == Status::Pending
+            task.summary.status == Some(Status::Pending)
                 && task.summary.sprint.as_deref() == Some(sprint.summary.id.as_str())
         })
         .map(|task| format!("{} ({})", task.summary.reference(), task.summary.title))
@@ -252,9 +252,21 @@ pub(crate) fn perform_with_edge(
     to: Status,
     edge_line: Option<(String, String)>,
 ) -> Result<Transition, Error> {
-    let from = artifact.summary.status;
     let reference = artifact.summary.reference();
     let path_rel = &artifact.summary.path;
+    // Unreachable through the CLI, which refuses a stateless collection's
+    // reference before dispatch. Refused rather than unwrapped so a future
+    // caller cannot rewrite a `status:` line into an artifact whose
+    // collection has none.
+    let Some(from) = artifact.summary.status else {
+        return Err(Error::InvalidInvocation {
+            message: format!(
+                "`{reference}` is a {}, and {}s have no lifecycle to \
+                 transition (at `{path_rel}`)",
+                collection.kind, collection.kind
+            ),
+        });
+    };
     if from == to {
         return Err(Error::InvalidInvocation {
             message: format!(

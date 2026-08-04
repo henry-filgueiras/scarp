@@ -64,8 +64,8 @@ pub enum Command {
     /// Create an artifact; Scarp assigns its sequence, slug, and identity
     New {
         /// Collection for the new artifact (`dragon`, `idea`, `decision`,
-        /// `sprint`, or `task`; tasks are created in an active sprint,
-        /// chosen with `--sprint` when several are active)
+        /// `log`, `sprint`, or `task`; tasks are created in an active
+        /// sprint, chosen with `--sprint` when several are active)
         collection: Collection,
         /// Human-readable title for the artifact
         title: String,
@@ -88,8 +88,8 @@ pub enum Command {
     Proposal(ProposalCommand),
     /// List the artifacts in a collection
     List {
-        /// Collection to list (`dragons`, `ideas`, `decisions`, `sprints`,
-        /// or `tasks`)
+        /// Collection to list (`dragons`, `ideas`, `decisions`, `logs`,
+        /// `sprints`, or `tasks`)
         collection: Collection,
         /// Emit a deterministic JSON array instead of human-readable lines
         #[arg(long)]
@@ -174,6 +174,7 @@ pub enum Collection {
     Dragon,
     Idea,
     Decision,
+    Log,
     Sprint,
     Task,
 }
@@ -185,6 +186,7 @@ impl Collection {
             Collection::Dragon => "dragon",
             Collection::Idea => "idea",
             Collection::Decision => "decision",
+            Collection::Log => "log",
             Collection::Sprint => "sprint",
             Collection::Task => "task",
         }
@@ -199,11 +201,12 @@ impl FromStr for Collection {
             "dragon" | "dragons" => Ok(Collection::Dragon),
             "idea" | "ideas" => Ok(Collection::Idea),
             "decision" | "decisions" => Ok(Collection::Decision),
+            "log" | "logs" => Ok(Collection::Log),
             "sprint" | "sprints" => Ok(Collection::Sprint),
             "task" | "tasks" => Ok(Collection::Task),
             other => Err(format!(
                 "unknown collection `{other}`; collections are: dragon, idea, \
-                 decision, sprint, task"
+                 decision, log, sprint, task"
             )),
         }
     }

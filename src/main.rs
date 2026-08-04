@@ -82,6 +82,7 @@ fn scan(root: &std::path::Path, collection: Collection) -> Result<Vec<read::Arti
         Collection::Dragon => read::scan(root, &read::DRAGON),
         Collection::Idea => read::scan(root, &read::IDEA),
         Collection::Decision => read::scan(root, &read::DECISION),
+        Collection::Log => read::scan(root, &read::LOG),
         Collection::Sprint => read::scan_sprints(root),
         Collection::Task => read::scan_tasks(root),
     }
@@ -102,6 +103,9 @@ fn verb_guidance(collection: Collection) -> &'static str {
         Collection::Dragon => "dragons close and reopen: use `scarp close` or `scarp reopen`",
         Collection::Idea => "ideas adopt or reject: use `scarp adopt` or `scarp reject`",
         Collection::Decision => "decisions have no lifecycle verbs; they are permanent records",
+        Collection::Log => {
+            "logs have no lifecycle verbs; a log records something that already happened"
+        }
         Collection::Sprint => "sprints close: use `scarp close`",
         Collection::Task => "tasks close: use `scarp close`",
     }
@@ -168,6 +172,7 @@ fn transition(
             Collection::Dragon => &read::DRAGON,
             Collection::Idea => &read::IDEA,
             Collection::Decision => &read::DECISION,
+            Collection::Log => &read::LOG,
             Collection::Sprint => &read::SPRINT,
             Collection::Task => &read::TASK,
         },
@@ -279,6 +284,14 @@ fn close(target: &ArtifactTarget, resolved_by: Option<&str>) -> Result<(), Error
                 ),
             });
         }
+        Collection::Log => {
+            return Err(Error::InvalidInvocation {
+                message: format!(
+                    "`{target}` is a log reference; {}",
+                    verb_guidance(Collection::Log)
+                ),
+            });
+        }
         Collection::Decision => unreachable!("decision targets are refused before dispatch"),
     };
     render_transition(&done);
@@ -312,11 +325,11 @@ fn fortune() -> Result<(), Error> {
     // dragons and parked ideas. Terminal states never resurface.
     let pool: Vec<_> = dragons
         .iter()
-        .filter(|artifact| artifact.summary.status == Status::Open)
+        .filter(|artifact| artifact.summary.status == Some(Status::Open))
         .chain(
             ideas
                 .iter()
-                .filter(|artifact| artifact.summary.status == Status::Parked),
+                .filter(|artifact| artifact.summary.status == Some(Status::Parked)),
         )
         .collect();
     if pool.is_empty() {
@@ -594,6 +607,7 @@ fn new_artifact(
         Collection::Dragon => artifact::create_dragon(&root, title, body)?,
         Collection::Idea => artifact::create_idea(&root, title, body)?,
         Collection::Decision => artifact::create_decision(&root, title, body)?,
+        Collection::Log => artifact::create_log(&root, title, body)?,
         Collection::Sprint => artifact::create_sprint(&root, title, body)?,
         Collection::Task => artifact::create_task(
             &root,
@@ -608,6 +622,7 @@ fn new_artifact(
         Collection::Dragon => artifact::probe_reachability(&root, &read::DRAGON, &created),
         Collection::Idea => artifact::probe_reachability(&root, &read::IDEA, &created),
         Collection::Decision => artifact::probe_reachability(&root, &read::DECISION, &created),
+        Collection::Log => artifact::probe_reachability(&root, &read::LOG, &created),
         Collection::Sprint | Collection::Task => artifact::Reachability::Reachable,
     };
     if json {
@@ -653,7 +668,7 @@ fn list(collection: Collection, json: bool, active: bool) -> Result<(), Error> {
         let sprints = read::scan_sprints(&root)?;
         let active_ids: Vec<&str> = sprints
             .iter()
-            .filter(|sprint| sprint.summary.status == Status::Active)
+            .filter(|sprint| sprint.summary.status == Some(Status::Active))
             .map(|sprint| sprint.summary.id.as_str())
             .collect();
         // The union across every active sprint, in the scan's global
@@ -677,13 +692,26 @@ fn list(collection: Collection, json: bool, active: bool) -> Result<(), Error> {
     } else {
         for artifact in &artifacts {
             let summary = &artifact.summary;
-            println!(
-                "{}  {:<8}  {}  ({})",
-                summary.reference(),
-                summary.status,
-                summary.title,
-                summary.path
-            );
+            // The status column is dropped entirely for a stateless
+            // collection rather than filled with a constant: every row
+            // would carry the same word, which is noise in the human
+            // projection for the same reason the key is omitted from the
+            // JSON one.
+            match summary.status {
+                Some(status) => println!(
+                    "{}  {:<8}  {}  ({})",
+                    summary.reference(),
+                    status,
+                    summary.title,
+                    summary.path
+                ),
+                None => println!(
+                    "{}  {}  ({})",
+                    summary.reference(),
+                    summary.title,
+                    summary.path
+                ),
+            }
         }
     }
     Ok(())
@@ -709,6 +737,7 @@ fn show(target: &ArtifactTarget, json: bool) -> Result<(), Error> {
                 let mut all = read::scan(&root, &read::DRAGON)?;
                 all.extend(read::scan(&root, &read::IDEA)?);
                 all.extend(read::scan(&root, &read::DECISION)?);
+                all.extend(read::scan(&root, &read::LOG)?);
                 all.extend(read::scan_sprints(&root)?);
                 all.extend(read::scan_tasks(&root)?);
                 Ok(all)

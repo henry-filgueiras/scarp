@@ -38,7 +38,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 use crate::error::Error;
-use crate::read::{Collection, DECISION, DRAGON, IDEA, SPRINT, Status, TASK};
+use crate::read::{Collection, DECISION, DRAGON, IDEA, LOG, SPRINT, Status, TASK};
 use crate::repo::{SPRINT_FILE, SPRINTS_DIR};
 
 /// Prefix for generated dragon identities.
@@ -49,6 +49,11 @@ pub const IDEA_ID_PREFIX: &str = "ide_";
 
 /// Prefix for generated decision identities.
 pub const DECISION_ID_PREFIX: &str = "dec_";
+
+/// Prefix for generated log identities. The two logs written before the
+/// collection was managed carry hand-seeded ids
+/// (`log-bootstrap-inception`) and stay exactly as they are.
+pub const LOG_ID_PREFIX: &str = "log_";
 
 /// Prefix for generated sprint identities.
 pub const SPRINT_ID_PREFIX: &str = "spr_";
@@ -213,6 +218,16 @@ pub fn create_idea_from(
     create_with(root, &IDEA, IDEA_ID_PREFIX, sections, title, body, &extra)
 }
 
+/// Create a new log in the repository at `root`.
+///
+/// Logs have no template, so a supplied body is written verbatim beneath
+/// the title and an omitted one leaves nothing but the title. There is no
+/// status line to write and no home state to enter: a log records
+/// something that already happened.
+pub fn create_log(root: &Path, title: &str, body: Option<&str>) -> Result<NewArtifact, Error> {
+    create(root, &LOG, LOG_ID_PREFIX, &[], title, body)
+}
+
 /// Create a new accepted decision in the repository at `root`.
 ///
 /// Decisions are created directly in their one admitted state: a decision
@@ -284,7 +299,7 @@ fn create_sprint_with(
         id: &id,
         sequence,
         kind: SPRINT.kind,
-        status: Status::Active.name(),
+        status: Some(Status::Active.name()),
         extra_fields: &[],
         created: &created,
         title,
@@ -425,12 +440,11 @@ fn create_with(
     let sequence = next_sequence(root, collection)?;
     let id = format!("{id_prefix}{}", ulid::Ulid::new());
     let created = jiff::Zoned::now().strftime("%Y-%m-%d").to_string();
-    let home_status = collection.states[0];
     let content = render_artifact(&Template {
         id: &id,
         sequence,
         kind,
-        status: home_status.name(),
+        status: collection.states.first().map(|home| home.name()),
         extra_fields,
         created: &created,
         title,
@@ -487,14 +501,14 @@ pub fn create_task(
             // contracts (not-found, ambiguity), then requires the sprint
             // to be active — a closed sprint is refused before writing.
             let sprint = crate::read::resolve(&sprints, selector, display)?;
-            if sprint.summary.status != Status::Active {
+            if sprint.summary.status != Some(Status::Active) {
                 return Err(Error::InvalidInvocation {
                     message: format!(
                         "sprint `{}` ({}) is {}; tasks are created only in \
                          an active sprint",
                         sprint.summary.reference(),
                         sprint.summary.title,
-                        sprint.summary.status
+                        sprint.summary.state()
                     ),
                 });
             }
@@ -503,7 +517,7 @@ pub fn create_task(
         None => {
             let active: Vec<&crate::read::Artifact> = sprints
                 .iter()
-                .filter(|sprint| sprint.summary.status == Status::Active)
+                .filter(|sprint| sprint.summary.status == Some(Status::Active))
                 .collect();
             match active.as_slice() {
                 [] => {
@@ -561,7 +575,7 @@ pub fn create_task(
         id: &id,
         sequence,
         kind: TASK.kind,
-        status: Status::Pending.name(),
+        status: Some(Status::Pending.name()),
         extra_fields: &[("sprint", &active.summary.id)],
         created: &created,
         title,
@@ -720,7 +734,9 @@ struct Template<'a> {
     id: &'a str,
     sequence: u32,
     kind: &'a str,
-    status: &'a str,
+    /// The home lifecycle state, or `None` for a stateless collection,
+    /// whose rendered front matter carries no `status:` line at all.
+    status: Option<&'a str>,
     extra_fields: &'a [(&'a str, &'a str)],
     created: &'a str,
     title: &'a str,
@@ -750,6 +766,21 @@ fn fence_marker(line: &str) -> Option<(char, usize)> {
 /// Content outside any section has nowhere canonical to go, so it is a
 /// typed refusal rather than a silently dropped line — which also refuses
 /// a body that opens with its own front matter.
+/// Advance fenced-code-block state across a line already known to be a
+/// fence marker. A closing fence matches the opener's character, is at
+/// least as long, and carries no info string.
+fn advance_fence(fence: &mut Option<(char, usize)>, line: &str, marker: char, run: usize) {
+    match *fence {
+        None => *fence = Some((marker, run)),
+        Some((open, len))
+            if marker == open && run >= len && line.trim_start()[run..].trim().is_empty() =>
+        {
+            *fence = None;
+        }
+        Some(_) => {}
+    }
+}
+
 fn push_content<'a>(
     current: &mut Option<(String, Vec<&'a str>)>,
     line: &'a str,
@@ -784,10 +815,15 @@ fn push_content<'a>(
 /// reorders one, and never reaches the front matter. Parsing happens before
 /// any sequence is allocated or any file is opened, so a rejected body
 /// leaves the repository untouched.
-struct Body {
+enum Body {
     /// `(section name, content)` in input order, each name already checked
     /// against the collection's template.
-    sections: Vec<(String, String)>,
+    Sections(Vec<(String, String)>),
+    /// The whole body, verbatim, for a collection with no managed
+    /// template. Scarp owns no headings in such an artifact, so it
+    /// polices none: there is no section vocabulary to violate and no
+    /// template order to disturb.
+    Verbatim(String),
 }
 
 impl Body {
@@ -797,6 +833,12 @@ impl Body {
     /// The accepted grammar is deliberately the one a human already writes:
     /// `## Section` headings from the collection's own template, with prose
     /// beneath each. Deeper headings are ordinary content.
+    ///
+    /// An empty `sections` means the collection has no template, and the
+    /// body is taken verbatim. The guards every body passes — the size
+    /// limit, the control-character refusal, CRLF normalization, and the
+    /// refusal of a level-1 heading that would compete with the title —
+    /// still apply, because none of them is about sections.
     fn parse(kind: &str, sections: &[&str], raw: &str) -> Result<Self, Error> {
         let invalid = |message: String| Error::InvalidInvocation { message };
         let article = article(kind);
@@ -836,6 +878,36 @@ impl Body {
             )));
         }
 
+        if sections.is_empty() {
+            // A level-1 heading is still refused: the title is the
+            // command's argument, and a second `# ` would make the
+            // written artifact fail title extraction on read-back. Fences
+            // are tracked for the same reason they are below — a shell
+            // snippet's `# comment` is a comment, and title extraction
+            // ignores fenced text too, so refusing it here would reject a
+            // body that reads back perfectly.
+            let mut fence: Option<(char, usize)> = None;
+            for (index, line) in raw.lines().enumerate() {
+                if let Some((marker, run)) = fence_marker(line) {
+                    advance_fence(&mut fence, line, marker, run);
+                    continue;
+                }
+                if fence.is_some() {
+                    continue;
+                }
+                if let Some(rest) = line.strip_prefix("# ") {
+                    return Err(invalid(format!(
+                        "cannot create {article} {kind}: line {} of the body is the \
+                         level-1 heading `# {}`; the title is the command's \
+                         argument and the body carries the prose beneath it",
+                        index + 1,
+                        rest.trim()
+                    )));
+                }
+            }
+            return Ok(Self::Verbatim(raw.trim().to_string()));
+        }
+
         let mut parsed: Vec<(String, String)> = Vec::new();
         let mut current: Option<(String, Vec<&str>)> = None;
         // Open fenced code block, as (marker character, run length). Inside
@@ -847,19 +919,7 @@ impl Body {
             let number = index + 1;
 
             if let Some((marker, run)) = fence_marker(line) {
-                match fence {
-                    None => fence = Some((marker, run)),
-                    // A closing fence matches the opener's character, is at
-                    // least as long, and carries no info string.
-                    Some((open, len))
-                        if marker == open
-                            && run >= len
-                            && line.trim_start()[run..].trim().is_empty() =>
-                    {
-                        fence = None;
-                    }
-                    Some(_) => {}
-                }
+                advance_fence(&mut fence, line, marker, run);
                 push_content(&mut current, line, number, kind, article, &known)?;
                 continue;
             }
@@ -913,17 +973,29 @@ impl Body {
             parsed.push((seen, lines.join("\n").trim().to_string()));
         }
 
-        Ok(Self { sections: parsed })
+        Ok(Self::Sections(parsed))
     }
 
     /// Content for `section`, or `None` when the caller did not supply it.
     /// An unsupplied section renders exactly as the empty template does.
     fn content_for(&self, section: &str) -> Option<&str> {
-        self.sections
-            .iter()
-            .find(|(name, _)| name == section)
-            .map(|(_, content)| content.as_str())
-            .filter(|content| !content.is_empty())
+        match self {
+            Self::Sections(sections) => sections
+                .iter()
+                .find(|(name, _)| name == section)
+                .map(|(_, content)| content.as_str())
+                .filter(|content| !content.is_empty()),
+            Self::Verbatim(_) => None,
+        }
+    }
+
+    /// The whole body for a template-free collection, or `None` when this
+    /// body was mapped onto sections.
+    fn verbatim(&self) -> Option<&str> {
+        match self {
+            Self::Verbatim(text) if !text.is_empty() => Some(text),
+            _ => None,
+        }
     }
 }
 
@@ -944,9 +1016,16 @@ fn render_artifact(template: &Template<'_>) -> String {
         "---\n\
          id: {id}\n\
          sequence: {sequence}\n\
-         kind: {kind}\n\
-         status: {status}\n"
+         kind: {kind}\n"
     );
+    // Omitted entirely for a stateless collection, whose artifacts carry
+    // no lifecycle to record; the reader refuses the line rather than
+    // ignoring it, so writing an empty one would be corruption.
+    if let Some(status) = status {
+        content.push_str("status: ");
+        content.push_str(status);
+        content.push('\n');
+    }
     for (key, value) in *extra_fields {
         content.push_str(key);
         content.push_str(": ");
@@ -959,6 +1038,14 @@ fn render_artifact(template: &Template<'_>) -> String {
          \n\
          # {title}\n"
     ));
+    // A template-free collection renders its body straight beneath the
+    // title, byte-identical to what the author supplied: no headings are
+    // introduced, because none are owned.
+    if let Some(text) = body.and_then(Body::verbatim) {
+        content.push('\n');
+        content.push_str(text);
+        content.push('\n');
+    }
     for section in *sections {
         content.push_str("\n## ");
         content.push_str(section);
@@ -1330,6 +1417,68 @@ mod tests {
 
     /// The unknown-section refusal has to name the sections that exist, or
     /// the caller cannot act on it (decision 4).
+    #[test]
+    fn a_template_free_body_is_written_verbatim_beneath_the_title() {
+        // Logs own no headings, so none are policed: the author's `## `
+        // and `### ` headings survive exactly as written, in order.
+        let tmp = temp_repo();
+        let body = "Opening prose.\n\n## An author heading\n\nMore.\n\n### Deeper\n";
+        let created = create_log(tmp.path(), "A log", Some(body)).unwrap();
+        let written = fs::read_to_string(tmp.path().join(&created.relative_path)).unwrap();
+
+        assert!(
+            written.ends_with(
+                "# A log\n\nOpening prose.\n\n## An author heading\n\nMore.\n\n### Deeper\n"
+            ),
+            "verbatim body must follow the title untouched:\n{written}"
+        );
+        assert!(
+            !written.contains("status:"),
+            "a stateless artifact must carry no status line:\n{written}"
+        );
+        assert!(written.contains("id: log_"), "{written}");
+    }
+
+    #[test]
+    fn a_template_free_artifact_without_a_body_is_just_its_title() {
+        let tmp = temp_repo();
+        let created = create_log(tmp.path(), "A log", None).unwrap();
+        let written = fs::read_to_string(tmp.path().join(&created.relative_path)).unwrap();
+
+        assert!(written.ends_with("---\n\n# A log\n"), "{written}");
+    }
+
+    #[test]
+    fn a_verbatim_body_refuses_a_competing_level_one_heading() {
+        let tmp = temp_repo();
+        let err = create_log(tmp.path(), "A log", Some("ok\n\n# Another title\n")).unwrap_err();
+        let message = err.to_string();
+
+        assert!(
+            message.contains("level-1 heading") && message.contains("Another title"),
+            "{message}"
+        );
+        // Refused before any write: a rejected body leaves no artifact.
+        assert!(!tmp.path().join(crate::repo::LOGS_DIR).exists());
+    }
+
+    #[test]
+    fn a_fenced_hash_comment_is_not_a_competing_title() {
+        // The refusal above must not fire on a shell snippet, because
+        // title extraction ignores fenced text too — refusing here would
+        // reject a body that reads back perfectly.
+        let tmp = temp_repo();
+        let body = "Setup:\n\n```sh\n# install it\ncargo install scarp\n```\n";
+        let created = create_log(tmp.path(), "A log", Some(body)).unwrap();
+        let written = fs::read_to_string(tmp.path().join(&created.relative_path)).unwrap();
+
+        assert!(written.contains("# install it"), "{written}");
+        // The written artifact must survive the reader that will parse it.
+        let logs = crate::read::scan(tmp.path(), &LOG).unwrap();
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0].summary.title, "A log");
+    }
+
     #[test]
     fn unknown_section_refusal_names_the_offender_and_the_template() {
         let tmp = temp_repo();
