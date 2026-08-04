@@ -68,3 +68,35 @@ rewriting, are both barred by preserve-history.
   with an `adopted-by` edge naming this task, and records what of its
   sketch was not built.
 - `scripts/check.sh` passes.
+
+## Adjudicated: principles ship single-state (2026-08-04)
+
+Owner direction, before execution. This supersedes the `active -> retired`
+lifecycle in the Objective and the first acceptance criterion above; the
+original text stands as the reasoning that was overruled.
+
+The principle collection ships with **one admitted state and no
+transitions**, exactly as `decision` does. The argument that a principle
+makes a live claim and must therefore be retractable is sound about
+principles and unsound about *now*: it settles lifecycle semantics on
+zero specimens. There is evidence for durable principles — four
+instances in one sprint — and none whatsoever for principle retirement.
+
+Retirement is **deferred, not rejected**. The specific risk in choosing
+now is that a future specimen may not be "retired" at all. A principle
+that stops applying because the world changed, one that is replaced by a
+sharper statement of the same force, and one that turns out to have been
+wrong are three different events, and the last two look much more like
+[[ide_01KY7S6GMN26BFTEVGGKZHN4ZC|idea 26]]'s supersession-versus-erratum
+distinction than like a lifecycle transition. Picking `retired` today
+would name the first and quietly foreclose the other two — the same
+mistake decision 11's original universal placement claim made, and the
+same one its amendment had to undo.
+
+The revised criterion: principles are created in a single admitted
+state, `active`, with an empty transition table; no `retire` verb, no
+new `Status` variant. `Collection::transitions` being empty already
+makes every lifecycle verb refuse a principle with truthful guidance,
+which is the decision collection's existing behaviour and needs no new
+code. The first principle worth retiring is the evidence that reopens
+this.
