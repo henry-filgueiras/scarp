@@ -37,6 +37,38 @@ diagnostic. Specimen: while authoring idea 28, an agent pasted
 idea 22's ULID into a link labeled "idea 26"; self-caught before
 commit, but doctor could not have flagged it.
 
+### Second specimen, 2026-08-04: the same fault, committed and green
+
+The addendum's specimen was self-caught before commit. This one was not.
+
+Closing [[tsk_01KZ738BECT3VAFX99CKPM9VDB|task 61]], its Result carried
+two hand-written bound markers. One named a fabricated id and `doctor`
+flagged it immediately as `dangling-reference`, which is the check
+working. The other was written as `[[tsk_...391|task 62]]`, and
+`...391` is **task 63's** id. `doctor` passed it. The corpus was green
+with a marker whose frozen label named one artifact and whose target
+resolved to another, and it was caught only because a human read the
+prose.
+
+Two things this adds beyond the addendum.
+
+**The proposed check would have caught it.** The label was literally
+`task 62` — the `kind N` shape the addendum names — against a target
+whose sequence is 63. That is the cheap comparison working on a real
+specimen rather than a constructed one, which is the evidence this
+idea was missing.
+
+**The failure mode is structural, not careless.** Both markers were
+written by an agent transcribing ULIDs by hand, in a terminal narrative,
+at the moment of closing — where there is no scaffold and no
+verification. [[tsk_01KZ738BG7HDGBJDM57TW40ED5|Task 62]] removes the
+transcription for the authoring path by binding legal sugar at write
+time, which shrinks the population that can exhibit this fault but does
+not eliminate it: fully bound markers stay legal, hand-editing stays
+legal, and neither is validated. The check proposed here remains the
+only thing that would catch a wrong-but-resolving label, and it stays
+parked with one more reason to exist.
+
 ## Evidence
 
 Decision 0006 (`dec-bootstrap-reference-model`), which requires each typed
