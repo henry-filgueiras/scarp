@@ -2,9 +2,10 @@
 id: tsk_01KZ738BQTR4H7Z7YBKPPCXGHT
 sequence: 66
 kind: task
-status: pending
+status: closed
 sprint: spr_01KZ7352BYX19E0DNDG05744AM
 created: 2026-08-04
+closed: 2026-08-04
 ---
 
 # Measure the collection-definition duplication three collections cost
@@ -56,3 +57,97 @@ recorded and the idea left parked.
   managed sections has no ordering or ownership conflict to resolve and
   therefore bounds what that idea still has to answer.
 - `scripts/check.sh` passes.
+
+## Result
+
+Measured, adjudicated, and **no framework built** — which the task
+commissioned as a legitimate outcome and which the evidence supports
+unambiguously.
+
+### The measurements
+
+**Semantic collection data.** `Collection` carries six fields across
+eight collections, holding 7, 5, 2 and 4 distinct values for `states`,
+`transitions`, `stamp_closed` and `terminal`. That is real variation,
+not boilerplate that happens to be spelled per collection. Half of
+[[idea-declarative-collection-specs|Declarative collection specs instead of a policy-template framework]]'s proposal — "generalize with data, not types" — is already
+built, arrived at by extraction from working code exactly as that idea
+prescribed, without anyone writing a spec interpreter.
+
+**Mechanical dispatch, measured directly rather than counted by eye.** A
+throwaway ninth variant was added to `cli::Collection` and `cargo check`
+was asked what it demanded: **eight exhaustive match arms**, two in
+`cli.rs` and six in `main.rs`. Three are mechanical relay — `scan`, the
+transition descriptor map, the reachability probe. Five carry genuine
+per-collection meaning — `name`, `plural`, `verb_guidance`, `close`
+dispatch, `create`.
+
+The decisive property is that all eight are **compiler-enforced**. The
+standard argument for extraction is that someone will forget a site;
+here nothing can be forgotten, because a missing arm is a build failure.
+A `descriptor(Collection) -> &'static read::Collection` helper would
+collapse the three mechanical arms: it removes about twenty lines and
+adds twelve, net eight lines, no correctness gain, one more indirection.
+Not worth disturbing an explicit design for.
+
+**Necessary irregularity.** `maintenance` is a mass noun, so `plural()`
+exists: seven mechanical arms and one real exception. A spec that moved
+this to `plural: "maintenance"` would have relocated the exception, not
+removed it — the irregularity is in English, not in the architecture.
+
+**Marginal cost is falling.** Source lines per collection, excluding
+tests and one-time bundled work: log +471 (dominated by the optional-
+`status` model change it forced), principle +103, maintenance +118. Log
+was expensive because it falsified two model assumptions, not because a
+sixth collection is expensive. Principle was the first collection that
+was pure declaration. The vocabulary is converging, which is the
+opposite of the trend that would justify a framework.
+
+### What the measurement actually found
+
+The risk was never the duplication. Three sites are **not** behind
+exhaustive matches: `doctor`'s validated set, `show`'s bare-id union,
+and `close`'s bare-id union. The first fails **silently** — a collection
+missing from it is never read, and the repository reports healthy with
+an entire collection unchecked. That is a worse failure than anything
+the duplication could cause, and no extraction was needed to fix it.
+
+`tests/collection_coverage.rs` pins it: it takes the CLI's own
+advertised vocabulary as the authority, asserts this test's list matches
+it, then creates one artifact in every collection and proves `doctor`
+accounts for all eight and that every one resolves by bare stable id. A
+ninth collection forces an update to the advertised list, which fails
+the first assertion, which pulls the author into the second.
+
+That is the whole code change: one test file, no production code
+touched.
+
+### Two properties any future extraction must preserve
+
+- **Backward compatibility comes from explicit enumeration.**
+  [[tsk_01KZ738BNX70HQWFCBYV8CF9F1|Validate the consumer affordances in WitnessGlass]] measured it: released 0.2.0 read a corpus containing
+  `archaeology/maintenance/` and reported the same 33 artifacts as
+  before the directory existed, because `doctor` iterates a known list
+  rather than asserting authority over all of `archaeology/`. A
+  discovery-driven engine that treated unknown directories as errors
+  would destroy that, and it is worth more than the duplication it would
+  remove.
+- **The set of collections a binary understands must stay readable from
+  source.** Line-count reduction is not a win if it obscures the
+  authority boundary.
+
+### Disposition
+
+[[idea-declarative-collection-specs|Declarative collection specs instead of a policy-template framework]] stays parked, with its question changed rather than
+answered. Its data half is built; what remains is the end-state it
+mentions in passing — user-defined collections in `.scarp.toml` — which
+is an explicit CLAUDE.md non-goal and now needs a different
+justification, because duplication is no longer the argument. Reopening
+it should require a user who wants a collection Scarp does not ship, not
+a developer counting match arms.
+
+[[ide_01KY7S6GMN26BFTEVGGKZHN4ZC|Managed amendments: dated in-place supersession]] gained the stronger evidence this task was asked to record:
+WitnessGlass independently filed the same missing mechanism as its own
+local idea 4, in a different repository with entirely different subject
+matter. Two corpora, two separately-authored ideas, one gap. The
+mechanism was deliberately not built here.

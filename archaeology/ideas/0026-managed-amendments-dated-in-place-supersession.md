@@ -154,3 +154,37 @@ Recorded, as ever, by hand-appending to this file. Sprint 12's
 commissioning round needed to add dated evidence to two parked ideas and
 had no Scarp operation for either, which is one more specimen of exactly
 what is described above.
+
+### 2026-08-04: two repositories reached this independently, and both fell through to `cat >>`
+
+The section above records WitnessGlass's dragon appends as evidence for
+this idea. Task 65 found something stronger: WitnessGlass had already
+filed the mechanism itself, as its own local idea 4 — *"Scarp: amend an
+existing artifact, including a closed one, and record that it
+happened."*
+
+That was written without knowledge of this idea, in a different
+repository, by a project whose archaeology has entirely different
+subject matter. Two independent corpora, two separately-authored ideas,
+one missing mechanism. This idea's Evidence section previously rested on
+Scarp's own specimens and on prior art; it now rests on a second
+project's independent reinvention of the same request.
+
+Sprint 12 sharpened the boundary rather than closing it. Authored prose
+that becomes canonical through a Scarp write now has its sugar bound at
+the write boundary, on both paths that exist:
+
+- **creation** prose — `new --body-file` — binds;
+- **terminal** prose — `close --body-file` — binds;
+- **a dated section added to an artifact that already exists** is not a
+  Scarp write at all, and is where every remaining hand-transcription
+  lives.
+
+That third case is this idea. The evidence for it in sprint 12 alone:
+the dated sections appended to ideas 26, 41, 2, 28 and 10 in this
+repository, and to WitnessGlass's idea 1 — every one by `cat >>`, and
+the two bound markers in the idea 28 append transcribed by hand from a
+terminal, which is the fault [[idea-doctor-reference-graph|idea 2]]
+records. Sprint 12 deliberately did not build the mechanism; the
+boundary is now documented precisely enough that whoever does will know
+exactly which case they are adding.
