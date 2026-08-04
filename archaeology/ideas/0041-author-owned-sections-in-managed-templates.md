@@ -111,3 +111,30 @@ The asymmetry was found by looking, not by failing — `doctor` was
 checked for section validation while writing this idea, and has none. A
 constraint enforced on write and unenforced on read is a constraint the
 corpus can drift away from without anything noticing, and it has.
+
+### 2026-08-04, two problems that look like one
+
+Sprint 12's commissioning round separated this idea from a neighbour it
+was being conflated with. WitnessGlass reported its `## Result` friction
+and its dragon follow-up friction together, and both read as "Scarp will
+not write a `##` section I need". They are different problems:
+
+- a **terminal narrative** is a section the collection already owns,
+  written at a transition Scarp already performs —
+  [[ide_01KYE386E7T9AZW4Z6MW39JB0R|idea 30]], being built now;
+- a **dated follow-up** is an author-titled section appended to a live
+  artifact over its lifetime —
+  [[ide_01KY7S6GMN26BFTEVGGKZHN4ZC|idea 26]], where the specimens are
+  now recorded;
+- **this** idea is about author-authored sections *interleaved with
+  managed ones at creation time*, where ordering and ownership are the
+  hard part. Neither of the other two touches that.
+
+Sprint 12 resolves none of it. What it does supply is a bounding case:
+the `log` collection is being adopted with no managed sections at all,
+because its three existing artifacts share no section vocabulary. A
+collection with an empty template has no ordering question and no
+ownership conflict — its body is authored verbatim. That is worth
+stating because it shows the tension here is not "authors want `##`
+headings" but specifically "authors want them *among* Scarp's", which is
+a narrower and harder claim than the Problem section currently makes.

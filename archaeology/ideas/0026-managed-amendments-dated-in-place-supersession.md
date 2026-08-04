@@ -97,3 +97,60 @@ useful — the original local evidence was sound and its insufficiency
 is the lesson. Any managed form must make append-without-rewrite the
 easy path, since the tempting edit is always to fix the sentence in
 place.
+
+### 2026-08-04, a second repository, and the shape is appending not amending
+
+Commissioning sprint 12 examined WitnessGlass, the first outside
+consumer, and found the same operation being hand-performed there — but
+the specimens narrow what this idea is actually about.
+
+WitnessGlass's task 12 recorded two pieces of friction. The first, a
+task's `## Result` arriving by `cat >>`, is
+[[ide_01KYE386E7T9AZW4Z6MW39JB0R|idea 30]]'s terminal narrative and is
+being built now. The second is this idea's, and it was easy to mistake
+for the first. Its three dragons — all still `open` — carry six
+hand-appended sections between them:
+
+| Heading written | Dragon |
+|---|---|
+| `## Findings from first contact (task:4)` | 1, 2 |
+| `## Follow-up: the absent duration was confirmed by payload inspection, and one tool self-reports` | 1 |
+| `## Correction: the duration was arriving all along, and this dragon was reading the adapter's own output` | 1 |
+| `## Pass 3: denial fires nothing, parentage is genuinely absent, and timing lands` | 1 |
+| `## The "attachable session" experiment, and the two ways it did not hold` | 2 |
+| `## Observation: two real turns, two prompt_id values, and that is still not a licence to segment` | 3 |
+
+Three things follow.
+
+**The headings are prose, not a vocabulary.** Every one is
+author-composed and states a finding; none is a section name a template
+could hold. WitnessGlass proposed `scarp append <ref> --body-file` "that
+knows which sections a collection has" as the more useful of its two
+candidate affordances. It is the less useful one: an append restricted
+to a collection's declared sections would have refused all six of these.
+Sprint 12 therefore builds the terminal-narrative half and explicitly
+does not build a general append, because the general shape is this one
+and it is unsolved.
+
+**The nouns keep multiplying, now across repositories.** Scarp's corpus
+had already produced `Update`, `Amendment`, and `Erratum`. WitnessGlass
+independently produced `Findings`, `Follow-up`, `Correction`,
+`Observation`, and a bare `Pass 3:` — with `Correction` landing on an
+*open* dragon and meaning something close to Scarp's `Erratum`, which
+landed on a *closed* task. The section above asks whether "amend" and
+"correct" are one operation or two; a second repository, with no
+knowledge of that question, produced five words and a colon convention
+for what may be one operation. That strengthens the case for a recorded
+grammar preceding any command, which this idea's Sketch already allows
+as possibly the whole first slice.
+
+**Neither repository's `doctor` noticed anything.** Both corpora are
+green. Every one of these sections is valid, which is the same asymmetry
+[[ide_01KYZY233Z7GAKFPFSKEAF89ZD|idea 41]] records from the creation
+side: the constraint lives only where files are written, never where
+they are judged.
+
+Recorded, as ever, by hand-appending to this file. Sprint 12's
+commissioning round needed to add dated evidence to two parked ideas and
+had no Scarp operation for either, which is one more specimen of exactly
+what is described above.
