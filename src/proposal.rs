@@ -558,14 +558,120 @@ fn task_body(report: &str, url: &str) -> String {
 
 /// Where and when an artifact reached the branch readers see.
 struct Landing {
-    /// The commit that *introduced* the artifact, not the most recent one
-    /// to touch it. A later edit is not the landing.
+    /// The commit the comment cites, and whose copy of the artifact was
+    /// read to prove the claim being made about it.
+    ///
+    /// Which commit that is depends on what the class needs proven. For
+    /// an idea it is the one that *introduced* the artifact — a later
+    /// edit is not the landing. For a bug it is the most recent commit to
+    /// touch the path, because the claim is about a terminal state the
+    /// introducing commit did not contain: the file arrived `pending` and
+    /// became `closed` later, so citing its arrival would pin a revision
+    /// that contradicts the sentence it appears in.
     commit: String,
     /// Permalink to the artifact at that commit — pinned rather than
     /// branch-relative, because the comment citing it is never revisited.
     permalink: String,
     /// Permalink to the commit itself.
     commit_url: String,
+}
+
+/// What the default branch actually holds for a realizing artifact.
+///
+/// A value rather than a control-flow shortcut, so [`plan`] decides what
+/// to do about each case in one pure place. Everything a public, terminal
+/// claim depends on is observed before anything is said.
+enum Remote {
+    /// No such path on the branch a reader sees.
+    Absent,
+    /// Present, and its contents prove exactly the claim about to be made.
+    Proven(Landing),
+    /// Present, but its contents do not support the claim — the wrong
+    /// artifact, unreadable front matter, or work that has not reached
+    /// its terminal state yet. Both strings are already phrased for the
+    /// operator.
+    Unproven { observed: String, remedy: String },
+}
+
+impl Remote {
+    fn landing(&self) -> Option<&Landing> {
+        match self {
+            Remote::Proven(landing) => Some(landing),
+            _ => None,
+        }
+    }
+}
+
+/// The front matter reconciliation reads back off the default branch.
+///
+/// Every field is optional so a missing one produces a specific sentence
+/// rather than a serde parse error: the operator needs to know *which*
+/// fact could not be established.
+#[derive(Debug, serde::Deserialize)]
+struct RemoteFrontMatter {
+    id: Option<String>,
+    kind: Option<String>,
+    status: Option<String>,
+    proposal: Option<String>,
+}
+
+/// Prove that the remote artifact is the one being claimed, and — for a
+/// class whose filer is waiting on an outcome — that it reached its
+/// terminal state.
+///
+/// **Remote contents are the authority, and nothing else is.** Not the
+/// local status, which says only what this disk believes; not a
+/// remote-tracking ref, which says what this machine last fetched; not a
+/// substring search, which cannot tell `status: closed` in front matter
+/// from the same words quoted in a `Result`; and not the mere existence
+/// of the path, which was enough for an idea and is not enough here.
+///
+/// Pure, so every way this can fail is testable without a network.
+fn prove(local: &read::Summary, issue_url: &str, content: &str) -> Result<(), String> {
+    let Some((front_matter, _)) = read::split_front_matter(content) else {
+        return Err(format!(
+            "`{}` on the default branch has no front matter, so nothing \
+             about it can be proven",
+            local.path
+        ));
+    };
+    let meta: RemoteFrontMatter = serde_yaml_ng::from_str(front_matter).map_err(|err| {
+        format!(
+            "`{}` on the default branch has unreadable front matter: {err}",
+            local.path
+        )
+    })?;
+
+    let mismatch = |field: &str, expected: &str, found: Option<&String>| {
+        format!(
+            "`{}` on the default branch has {field} `{}`, but the artifact \
+             realized from this proposal has `{expected}` — the remote file \
+             is not the one being claimed",
+            local.path,
+            found.map_or("<absent>", String::as_str)
+        )
+    };
+
+    if meta.id.as_deref() != Some(local.id.as_str()) {
+        return Err(mismatch("id", &local.id, meta.id.as_ref()));
+    }
+    if meta.kind.as_deref() != Some(local.kind.as_str()) {
+        return Err(mismatch("kind", &local.kind, meta.kind.as_ref()));
+    }
+    if meta.proposal.as_deref() != Some(issue_url) {
+        return Err(mismatch("proposal", issue_url, meta.proposal.as_ref()));
+    }
+
+    let terminal = read::Status::Closed.name();
+    if meta.status.as_deref() != Some(terminal) {
+        return Err(format!(
+            "`{}` is on the default branch but its status there is `{}`, \
+             not `{terminal}`",
+            local.path,
+            meta.status.as_deref().unwrap_or("<absent>")
+        ));
+    }
+    Ok(())
 }
 
 /// The conventional abbreviation of a commit sha.
@@ -587,8 +693,39 @@ fn introducing_commit(shas: &str) -> Option<&str> {
     shas.lines().map(str::trim).rfind(|s| !s.is_empty())
 }
 
-/// Prove that `path` is on the branch a reader sees, and say what put it
+/// The most recent commit to touch a path, from `gh`'s newest-first list.
+///
+/// The counterpart to [`introducing_commit`], and the one a terminal
+/// claim needs: no later commit touched the path, so this revision's copy
+/// of the file is byte-identical to the default branch's.
+fn newest_commit(shas: &str) -> Option<&str> {
+    shas.lines().map(str::trim).find(|s| !s.is_empty())
+}
+
+/// Fetch one path's contents at one reference, or `None` when it is not
 /// there.
+///
+/// Asks for the raw file rather than the API's base64 envelope, so the
+/// bytes arrive as bytes and no decoding step sits between GitHub's
+/// answer and the proof drawn from it.
+fn contents_at(
+    operation: &str,
+    repo: &Repo,
+    path: &str,
+    reference: &str,
+) -> Result<Option<String>, Error> {
+    let endpoint = format!(
+        "repos/{}/contents/{path}?ref={reference}",
+        repo.name_with_owner
+    );
+    gh_absent_is_none(
+        operation,
+        &["api", "-H", "Accept: application/vnd.github.raw", &endpoint],
+    )
+}
+
+/// Observe what the branch a reader sees actually holds for `realized`,
+/// and prove as much about it as `class` requires.
 ///
 /// **GitHub is asked, not the local checkout.** The alternative — reading
 /// the `origin/main` remote-tracking ref — is cheaper and fails safe when
@@ -599,17 +736,23 @@ fn introducing_commit(shas: &str) -> Option<&str> {
 /// there is no offline path being sacrificed, and no `git` shell-out has
 /// to be introduced into a module that has none.
 ///
-/// Two questions, deliberately separate. Presence answers the invariant —
-/// a file added and later deleted has commits but is not there — and the
-/// commit list answers what to cite.
-fn landed(operation: &str, repo: &Repo, path: &str) -> Result<Option<Landing>, Error> {
-    let contents = format!(
-        "repos/{}/contents/{}?ref={}",
-        repo.name_with_owner, path, repo.default_branch
-    );
-    if gh_absent_is_none(operation, &["api", &contents])?.is_none() {
-        return Ok(None);
-    }
+/// For a creation-aware class, presence is the whole invariant — a file
+/// added and later deleted has commits but is not there — and the commit
+/// list only answers what to cite. For a bug it is the beginning: the
+/// artifact arrived `pending` and the filer is waiting on what it became,
+/// so its contents are read back and checked, and the commit cited is the
+/// one whose copy was read.
+fn observe_remote(
+    operation: &str,
+    repo: &Repo,
+    realized: &read::Summary,
+    class: Class,
+    issue_url: &str,
+) -> Result<Remote, Error> {
+    let path = &realized.path;
+    let Some(head) = contents_at(operation, repo, path, &repo.default_branch)? else {
+        return Ok(Remote::Absent);
+    };
 
     // `--jq` streams one sha per page-item, which sidesteps `--paginate`
     // emitting several concatenated arrays that are not themselves JSON.
@@ -622,7 +765,16 @@ fn landed(operation: &str, repo: &Repo, path: &str) -> Result<Option<Landing>, E
         &["api", "--paginate", "--jq", ".[].sha", &commits],
     )?;
 
-    Ok(introducing_commit(&shas).map(|commit| Landing {
+    let chosen = if class.creation_aware() {
+        introducing_commit(&shas)
+    } else {
+        newest_commit(&shas)
+    };
+    let Some(commit) = chosen else {
+        return Ok(Remote::Absent);
+    };
+
+    let landing = Landing {
         permalink: format!(
             "https://github.com/{}/blob/{commit}/{path}",
             repo.name_with_owner
@@ -632,7 +784,54 @@ fn landed(operation: &str, repo: &Repo, path: &str) -> Result<Option<Landing>, E
             repo.name_with_owner
         ),
         commit: commit.to_string(),
-    }))
+    };
+
+    if class.creation_aware() {
+        return Ok(Remote::Proven(landing));
+    }
+
+    // Read the file back at the exact revision the comment will pin. The
+    // default-branch copy above answered presence; this one answers
+    // whether the permalink a reader clicks shows the state the sentence
+    // beside it claims. They should be identical — no commit after this
+    // one touched the path — and a difference means the branch moved
+    // mid-run, which is a reason to stop rather than to pick one.
+    let Some(pinned) = contents_at(operation, repo, path, &landing.commit)? else {
+        return Ok(Remote::Unproven {
+            observed: format!(
+                "`{path}` is on the default branch but absent from \
+                 `{}`, the commit that most recently touched it",
+                short_commit(&landing.commit)
+            ),
+            remedy: "retry — the default branch appears to have moved \
+                     while this ran"
+                .to_string(),
+        });
+    };
+    if pinned != head {
+        return Ok(Remote::Unproven {
+            observed: format!(
+                "`{path}` differs between the default branch and `{}`, the \
+                 commit that most recently touched it",
+                short_commit(&landing.commit)
+            ),
+            remedy: "retry — the default branch moved while this ran".to_string(),
+        });
+    }
+
+    match prove(realized, issue_url, &head) {
+        Ok(()) => Ok(Remote::Proven(landing)),
+        Err(observed) => Ok(Remote::Unproven {
+            observed,
+            remedy: format!(
+                "close the work locally, then commit and push it — a \
+                 reporter waiting on this issue is waiting for an outcome, \
+                 and closing it now would announce one that the record \
+                 does not contain. Re-run `scarp proposal reconcile` once \
+                 `{path}` is `closed` on the default branch"
+            ),
+        }),
+    }
 }
 
 /// Parse `gh` JSON output, reporting a malformed payload as an
@@ -906,7 +1105,7 @@ fn plan(
     operation: &str,
     issue: &Issue,
     realized: Option<&read::Summary>,
-    landing: Option<&Landing>,
+    remote: &Remote,
 ) -> Result<Plan, Error> {
     // The same exactly-one-recognized-label rule realization enforces,
     // and enforced first for the same reason: commenting on an issue is
@@ -944,17 +1143,32 @@ fn plan(
         ));
     };
 
-    let Some(_) = landing else {
-        return Err(unmet(
-            "the realizing artifact on the default branch",
-            format!(
-                "`{}` exists here but is not on the branch a reader sees",
-                realized.path
-            ),
-            "commit and push it, then retry — closing the proposal would \
-             advertise an artifact nobody else can find",
-        ));
-    };
+    match remote {
+        Remote::Proven(_) => {}
+        Remote::Absent => {
+            return Err(unmet(
+                "the realizing artifact on the default branch",
+                format!(
+                    "`{}` exists here but is not on the branch a reader sees",
+                    realized.path
+                ),
+                "commit and push it, then retry — closing the proposal would \
+                 advertise an artifact nobody else can find",
+            ));
+        }
+        // The stronger refusal: the artifact is there, and what it says
+        // does not support what closing the issue would claim. A locally
+        // closed item whose remote copy is still pending lands here, which
+        // is exactly the case a local status check would have waved
+        // through.
+        Remote::Unproven { observed, remedy } => {
+            return Err(unmet(
+                "the realizing artifact closed on the default branch",
+                observed.clone(),
+                remedy,
+            ));
+        }
+    }
 
     Ok(if issue.commented {
         Plan::CloseOnly
@@ -968,7 +1182,58 @@ fn plan(
 /// Written for someone arriving cold, months later, and never revised:
 /// nothing revisits this comment, so it states a settled fact rather than
 /// a status. Kept pure so its wording is testable.
-fn comment_body(realized: &read::Summary, landing: &Landing) -> String {
+fn comment_body(realized: &read::Summary, landing: &Landing, class: Class) -> String {
+    match class {
+        Class::Idea => realized_comment(realized, landing),
+        Class::Bug => investigated_comment(realized, landing),
+    }
+}
+
+/// The comment closing a bug report, whose filer was waiting on an
+/// outcome rather than on an artifact existing.
+///
+/// It says the work reached its terminal result, and it deliberately
+/// never says the report was fixed. The `Result` it points at may
+/// conclude that no defect existed at all, and a comment claiming
+/// otherwise would be a public false statement that nothing here ever
+/// comes back to correct.
+fn investigated_comment(realized: &read::Summary, landing: &Landing) -> String {
+    format!(
+        "Investigated as **{reference}**, which has reached its terminal \
+         result in the canonical record.\n\
+         \n\
+         | | |\n\
+         |---|---|\n\
+         | Work item | [`{path}`]({permalink}) |\n\
+         | Stable id | `{id}` |\n\
+         | Terminal state | `closed`, proven in [`{short}`]({commit_url}) |\n\
+         \n\
+         **Read the `Result` for what was concluded.** Reaching a terminal \
+         result is not a claim that a defect existed: an investigation can \
+         end in a confirmed defect, in behavior that turned out to be \
+         intended, in a report nobody could reproduce, in a duplicate of \
+         something already handled, or in a considered decision not to \
+         act. All of those close the same way, and only the artifact says \
+         which one happened here.\n\
+         \n\
+         The Scarp artifact is the canonical record; this issue is not. \
+         Its lifecycle is tracked there, and nothing will update this \
+         issue again — editing or reopening it does not change the \
+         artifact.\n\
+         \n\
+         {RECONCILED_MARKER}\n",
+        reference = realized.reference(),
+        path = realized.path,
+        permalink = landing.permalink,
+        id = realized.id,
+        short = short_commit(&landing.commit),
+        commit_url = landing.commit_url,
+    )
+}
+
+/// The comment closing an idea proposal, for whom the artifact's
+/// existence *is* the outcome.
+fn realized_comment(realized: &read::Summary, landing: &Landing) -> String {
     format!(
         "Realized as **{reference}** — this proposal is now part of the \
          canonical record.\n\
@@ -1064,19 +1329,21 @@ pub fn reconcile(root: &std::path::Path, number: u64) -> Result<Reconciled, Erro
     // Gathered in refusal order, so a proposal that will be refused early
     // costs neither a repository scan nor two API calls. `plan` reaches
     // the same verdict either way: what was not looked for is absent.
-    let recognized = classify(issue.number, &issue.labels).is_ok();
-    let realized = if recognized && issue.open {
+    let class = classify(issue.number, &issue.labels).ok();
+    let realized = if class.is_some() && issue.open {
         realized_from(root, &issue.url)?
     } else {
         None
     };
-    let landing = match &realized {
-        Some(summary) => landed(OPERATION, &repo, &summary.path)?,
-        None => None,
+    let remote = match (&realized, class) {
+        (Some(summary), Some(class)) => {
+            observe_remote(OPERATION, &repo, summary, class, &issue.url)?
+        }
+        _ => Remote::Absent,
     };
 
     let done = |outcome| {
-        let (realized, landing) = (realized.as_ref(), landing.as_ref());
+        let (realized, landing) = (realized.as_ref(), remote.landing());
         Ok(Reconciled {
             number,
             outcome,
@@ -1087,12 +1354,12 @@ pub fn reconcile(root: &std::path::Path, number: u64) -> Result<Reconciled, Erro
         })
     };
 
-    match plan(OPERATION, &issue, realized.as_ref(), landing.as_ref())? {
+    match plan(OPERATION, &issue, realized.as_ref(), &remote)? {
         Plan::Nothing => return done("already-reconciled"),
         Plan::CommentAndClose => {
             let (summary, landing) = (
                 realized.as_ref().expect("planned with an artifact"),
-                landing.as_ref().expect("planned with a landing"),
+                remote.landing().expect("planned with a proven landing"),
             );
             gh(
                 OPERATION,
@@ -1101,7 +1368,7 @@ pub fn reconcile(root: &std::path::Path, number: u64) -> Result<Reconciled, Erro
                     "comment",
                     &number.to_string(),
                     "--body",
-                    &comment_body(summary, landing),
+                    &comment_body(summary, landing, class.expect("planned with a class")),
                 ],
             )?;
         }
@@ -1355,7 +1622,7 @@ mod tests {
             OPERATION,
             &proposal_issue(),
             Some(&summary()),
-            Some(&landing()),
+            &Remote::Proven(landing()),
         );
 
         assert_eq!(plan.unwrap(), Plan::CommentAndClose);
@@ -1370,7 +1637,12 @@ mod tests {
             ..proposal_issue()
         };
 
-        let plan = plan(OPERATION, &issue, Some(&summary()), Some(&landing()));
+        let plan = plan(
+            OPERATION,
+            &issue,
+            Some(&summary()),
+            &Remote::Proven(landing()),
+        );
 
         assert_eq!(plan.unwrap(), Plan::CloseOnly);
     }
@@ -1379,7 +1651,13 @@ mod tests {
     /// operator's disk must not have a public claim made about it.
     #[test]
     fn an_unlanded_artifact_refuses_rather_than_closing() {
-        let error = plan(OPERATION, &proposal_issue(), Some(&summary()), None).unwrap_err();
+        let error = plan(
+            OPERATION,
+            &proposal_issue(),
+            Some(&summary()),
+            &Remote::Absent,
+        )
+        .unwrap_err();
 
         assert_eq!(error.code(), "precondition-unmet");
         let message = error.to_string();
@@ -1394,7 +1672,7 @@ mod tests {
     /// mistyped command by code: nothing is wrong, it is merely early.
     #[test]
     fn an_unrealized_proposal_refuses_and_names_realize() {
-        let error = plan(OPERATION, &proposal_issue(), None, None).unwrap_err();
+        let error = plan(OPERATION, &proposal_issue(), None, &Remote::Absent).unwrap_err();
 
         assert_eq!(error.code(), "precondition-unmet");
         assert!(
@@ -1412,7 +1690,13 @@ mod tests {
             ..proposal_issue()
         };
 
-        let error = plan(OPERATION, &issue, Some(&summary()), Some(&landing())).unwrap_err();
+        let error = plan(
+            OPERATION,
+            &issue,
+            Some(&summary()),
+            &Remote::Proven(landing()),
+        )
+        .unwrap_err();
 
         assert_eq!(error.code(), "invalid-invocation");
         assert_eq!(error.exit_code(), 2);
@@ -1428,7 +1712,7 @@ mod tests {
             ..proposal_issue()
         };
 
-        let plan = plan(OPERATION, &issue, None, None);
+        let plan = plan(OPERATION, &issue, None, &Remote::Absent);
 
         assert_eq!(plan.unwrap(), Plan::Nothing);
     }
@@ -1443,9 +1727,238 @@ mod tests {
             ..proposal_issue()
         };
 
-        let error = plan(OPERATION, &issue, None, None).unwrap_err();
+        let error = plan(OPERATION, &issue, None, &Remote::Absent).unwrap_err();
 
         assert_eq!(error.code(), "invalid-invocation");
+    }
+
+    /// The stronger refusal task 68 added: the artifact is on the default
+    /// branch, and what it says there does not support what closing the
+    /// issue would claim. A local status check would have waved this
+    /// through, which is exactly why the remote copy is the authority.
+    #[test]
+    fn an_unproven_remote_refuses_and_carries_its_own_diagnosis() {
+        let remote = Remote::Unproven {
+            observed: "`archaeology/maintenance/0004-x.md` is on the default \
+                       branch but its status there is `pending`, not `closed`"
+                .to_string(),
+            remedy: "close the work locally, then commit and push it".to_string(),
+        };
+
+        let error = plan(OPERATION, &proposal_issue(), Some(&summary()), &remote).unwrap_err();
+
+        assert_eq!(error.code(), "precondition-unmet");
+        let message = error.to_string();
+        assert!(message.contains("status there is `pending`"), "{message}");
+        assert!(message.contains("commit and push"), "{message}");
+    }
+
+    /// Distinguishable from the absent case: "not there" and "there but
+    /// not finished" send the operator to do different things.
+    #[test]
+    fn absent_and_unproven_are_different_diagnoses() {
+        let absent = plan(
+            OPERATION,
+            &proposal_issue(),
+            Some(&summary()),
+            &Remote::Absent,
+        )
+        .unwrap_err()
+        .to_string();
+        let unproven = plan(
+            OPERATION,
+            &proposal_issue(),
+            Some(&summary()),
+            &Remote::Unproven {
+                observed: "status there is `pending`".to_string(),
+                remedy: "close it".to_string(),
+            },
+        )
+        .unwrap_err()
+        .to_string();
+
+        assert!(
+            absent.contains("not on the branch a reader sees"),
+            "{absent}"
+        );
+        assert!(
+            !unproven.contains("not on the branch a reader sees"),
+            "{unproven}"
+        );
+    }
+
+    /// Both recognized labels refuse reconciliation by the same rule
+    /// realization uses. Commenting is public and posted under the
+    /// repository's name, so an underdetermined issue gets nothing said
+    /// on it either.
+    #[test]
+    fn a_dual_labeled_issue_refuses_reconciliation() {
+        let issue = Issue {
+            labels: vec!["idea".to_string(), "bug".to_string()],
+            ..proposal_issue()
+        };
+
+        let error = plan(
+            OPERATION,
+            &issue,
+            Some(&summary()),
+            &Remote::Proven(landing()),
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code(), "invalid-invocation");
+        assert!(error.to_string().contains("`idea` and `bug`"), "{error}");
+    }
+
+    // Proving a remote artifact. Every failure below is a sentence an
+    // operator has to act on, so each names the fact that could not be
+    // established rather than reporting a parse failure.
+
+    fn remote_artifact(id: &str, kind: &str, status: &str, proposal: &str) -> String {
+        format!(
+            "---\nid: {id}\nsequence: 4\nkind: {kind}\nstatus: {status}\n\
+             proposal: {proposal}\ncreated: 2026-08-06\nclosed: 2026-08-07\n---\n\n\
+             # Investigate reported behavior: something\n\n## Work\n\nx\n\n\
+             ## Result\n\nWorking as intended.\n"
+        )
+    }
+
+    fn work_item() -> read::Summary {
+        read::Summary {
+            id: "mnt_01ABC".to_string(),
+            sequence: 4,
+            kind: "maintenance".to_string(),
+            status: Some(read::Status::Closed),
+            title: "Investigate reported behavior: something".to_string(),
+            created: "2026-08-06".to_string(),
+            sprint: None,
+            proposal: Some("https://github.com/o/r/issues/3".to_string()),
+            path: "archaeology/maintenance/0004-investigate.md".to_string(),
+        }
+    }
+
+    const ISSUE_URL: &str = "https://github.com/o/r/issues/3";
+
+    #[test]
+    fn a_matching_closed_remote_artifact_is_proven() {
+        let content = remote_artifact("mnt_01ABC", "maintenance", "closed", ISSUE_URL);
+
+        assert_eq!(prove(&work_item(), ISSUE_URL, &content), Ok(()));
+    }
+
+    /// The headline case. The item is closed here and still pending
+    /// there, so the reporter's issue must stay open.
+    #[test]
+    fn a_remote_artifact_that_is_still_pending_is_not_proven() {
+        let content = remote_artifact("mnt_01ABC", "maintenance", "pending", ISSUE_URL);
+
+        let reason = prove(&work_item(), ISSUE_URL, &content).unwrap_err();
+
+        assert!(reason.contains("`pending`"), "{reason}");
+        assert!(reason.contains("not `closed`"), "{reason}");
+    }
+
+    #[test]
+    fn a_remote_artifact_with_the_wrong_identity_is_not_proven() {
+        for (id, kind, proposal, needle) in [
+            ("mnt_OTHER", "maintenance", ISSUE_URL, "id"),
+            ("mnt_01ABC", "task", ISSUE_URL, "kind"),
+            (
+                "mnt_01ABC",
+                "maintenance",
+                "https://github.com/o/r/issues/99",
+                "proposal",
+            ),
+        ] {
+            let content = remote_artifact(id, kind, "closed", proposal);
+
+            let reason = prove(&work_item(), ISSUE_URL, &content).unwrap_err();
+
+            assert!(reason.contains(needle), "for {needle}: {reason}");
+            assert!(
+                reason.contains("not the one being claimed"),
+                "for {needle}: {reason}"
+            );
+        }
+    }
+
+    /// A file that is not an artifact at all — the path was replaced,
+    /// or the fetch returned something unexpected — proves nothing.
+    #[test]
+    fn unreadable_remote_content_is_not_proven() {
+        for content in [
+            "not an artifact at all\n",
+            "---\nid: [unclosed\n---\n\n# T\n",
+            "",
+        ] {
+            assert!(
+                prove(&work_item(), ISSUE_URL, content).is_err(),
+                "{content:?} must not prove anything"
+            );
+        }
+    }
+
+    /// `status: closed` quoted inside a `Result` must not be mistaken for
+    /// front matter. This is why the proof parses rather than searching.
+    #[test]
+    fn a_substring_in_the_body_cannot_stand_in_for_front_matter() {
+        let content = "---\nid: mnt_01ABC\nsequence: 4\nkind: maintenance\n\
+                       status: pending\nproposal: https://github.com/o/r/issues/3\n\
+                       created: 2026-08-06\n---\n\n# T\n\n## Work\n\n\
+                       The front matter should say `status: closed` when done.\n";
+
+        let reason = prove(&work_item(), ISSUE_URL, content).unwrap_err();
+
+        assert!(reason.contains("`pending`"), "{reason}");
+    }
+
+    /// The two commit selections, side by side: an idea cites where the
+    /// artifact arrived, a bug cites the revision proven to hold its
+    /// terminal state.
+    #[test]
+    fn the_newest_commit_is_the_first_listed() {
+        let shas = "ccc333\nbbb222\naaa111\n";
+
+        assert_eq!(newest_commit(shas), Some("ccc333"));
+        assert_eq!(introducing_commit(shas), Some("aaa111"));
+        assert_eq!(newest_commit(""), None);
+        assert_eq!(newest_commit("\n \n"), None);
+    }
+
+    /// The wording rule, asserted rather than trusted. The `Result` this
+    /// comment points at may conclude that no defect existed, so a
+    /// comment claiming a fix would be a public false statement nothing
+    /// here ever comes back to correct.
+    #[test]
+    fn the_investigation_comment_claims_a_terminal_result_and_never_a_fix() {
+        let body = investigated_comment(&work_item(), &landing());
+
+        assert!(body.contains("maintenance:4"), "{body}");
+        assert!(body.contains("mnt_01ABC"), "{body}");
+        assert!(
+            body.contains("archaeology/maintenance/0004-investigate.md"),
+            "{body}"
+        );
+        assert!(body.contains("reached its terminal result"), "{body}");
+        assert!(
+            body.contains("[`abc1234`](https://github.com/o/r/commit/abc1234def5678)"),
+            "{body}"
+        );
+        assert!(body.contains("not a claim that a defect existed"), "{body}");
+        assert!(
+            body.contains("canonical record; this issue is not"),
+            "{body}"
+        );
+        assert!(body.contains(RECONCILED_MARKER), "{body}");
+
+        // The words that would make it a lie.
+        let lowered = body.to_lowercase();
+        for forbidden in ["fix", "resolved", "the bug", "confirmed the"] {
+            assert!(
+                !lowered.contains(forbidden),
+                "the comment must not say `{forbidden}`: {body}"
+            );
+        }
     }
 
     /// `gh` lists commits newest first, so the landing is the last one.
@@ -1476,7 +1989,7 @@ mod tests {
     /// cold reader needs and say plainly which record wins.
     #[test]
     fn the_comment_cites_the_artifact_and_claims_no_authority_for_the_issue() {
-        let body = comment_body(&summary(), &landing());
+        let body = comment_body(&summary(), &landing(), Class::Idea);
 
         assert!(body.contains("idea:40"), "{body}");
         assert!(body.contains("ide_01ABC"), "{body}");
@@ -1496,7 +2009,7 @@ mod tests {
     /// wants; the link behind it keeps the exact identity.
     #[test]
     fn the_landing_commit_is_an_abbreviated_link_not_a_wall_of_hex() {
-        let body = comment_body(&summary(), &landing());
+        let body = comment_body(&summary(), &landing(), Class::Idea);
 
         assert!(
             body.contains("[`abc1234`](https://github.com/o/r/commit/abc1234def5678)"),
@@ -1519,7 +2032,7 @@ mod tests {
     /// survive into the comment `issue_state` will later read back.
     #[test]
     fn the_comment_carries_the_marker_that_detects_it() {
-        let body = comment_body(&summary(), &landing());
+        let body = comment_body(&summary(), &landing(), Class::Idea);
 
         assert!(body.contains(RECONCILED_MARKER), "{body}");
         assert!(

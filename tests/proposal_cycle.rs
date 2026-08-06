@@ -130,6 +130,28 @@ impl Harness {
         fs::write(self.gh_dir.join(name), body).expect("write canned response");
     }
 
+    /// Write the canned body of one `gh api` path. The fake derives the
+    /// same filename from the path it is asked for; an unwritten path
+    /// answers HTTP 404, which is how "not on the default branch" is
+    /// expressed here.
+    fn canned_api(&self, path: &str, body: &str) {
+        fs::write(self.gh_dir.join("api").join(api_slug(path)), body).expect("write canned api");
+    }
+
+    /// Publish `path` on the fake default branch: the contents a reader
+    /// would see, the commit list, and the same contents pinned at each
+    /// listed commit. `commits` is newest first, as `gh` returns them.
+    fn publish(&self, path: &str, commits: &[&str], content: &str) {
+        self.canned_api(&format!("repos/o/r/contents/{path}?ref=main"), content);
+        self.canned_api(
+            &format!("repos/o/r/commits?path={path}&sha=main&per_page=100"),
+            &commits.iter().map(|c| format!("{c}\n")).collect::<String>(),
+        );
+        for commit in commits {
+            self.canned_api(&format!("repos/o/r/contents/{path}?ref={commit}"), content);
+        }
+    }
+
     fn scarp(&self, args: &[&str]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_scarp"))
             .args(args)
@@ -167,6 +189,14 @@ impl Harness {
         names.sort();
         names
     }
+}
+
+/// The fake `gh`'s filename for one API path. Must agree with the `tr`
+/// expression in [`FAKE_GH`].
+fn api_slug(path: &str) -> String {
+    path.chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect()
 }
 
 fn read_log(path: &Path) -> Vec<String> {
@@ -731,4 +761,292 @@ fn list_refuses_rather_than_guessing_at_a_dual_labeled_issue() {
         stdout(&out).is_empty(),
         "a refused listing must emit no partial classification"
     );
+}
+
+// ---------------------------------------------------------------------
+// Reconciliation. What is asserted here is the *`gh` call sequence*: the
+// ordering that makes a crashed run recoverable, and the absence of any
+// mutation when a precondition fails.
+// ---------------------------------------------------------------------
+
+/// A canned `gh issue view --json number,url,state,labels,comments`
+/// payload.
+fn issue_state(number: u64, open: bool, labels: &[&str], comments: &[&str]) -> String {
+    serde_json::json!({
+        "number": number,
+        "url": format!("https://github.com/o/r/issues/{number}"),
+        "state": if open { "OPEN" } else { "CLOSED" },
+        "labels": labels.iter().map(|l| serde_json::json!({"name": l})).collect::<Vec<_>>(),
+        "comments": comments.iter().map(|b| serde_json::json!({"body": b})).collect::<Vec<_>>(),
+    })
+    .to_string()
+}
+
+/// Realize issue 7 as a maintenance item and return its repository
+/// path — the setup every reconciliation test below shares.
+fn realized_maintenance(h: &Harness) -> String {
+    h.canned(
+        "issue-7-view.json",
+        &issue_view(7, "Reported crash", REPORT, &["bug"]),
+    );
+    let out = h.scarp(&["proposal", "realize", "7"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    "archaeology/maintenance/0001-investigate-reported-behavior-reported-crash.md".to_string()
+}
+
+/// An idea's reconciliation is unchanged: existence on the default
+/// branch is the whole invariant, and the commit cited is the one that
+/// introduced it.
+#[test]
+fn idea_reconciliation_is_creation_aware_and_cites_the_introducing_commit() {
+    let h = Harness::new();
+    h.canned(
+        "issue-2-view.json",
+        &issue_view(2, "An idea", "### Problem\n\nx\n", &["idea"]),
+    );
+    assert!(h.scarp(&["proposal", "realize", "2"]).status.success());
+    let path = "archaeology/ideas/0001-an-idea.md";
+    // Still parked, and still only the creation commit matters.
+    h.publish(path, &["ccc333", "aaa111"], &h.read(path));
+    h.canned("issue-2-state.json", &issue_state(2, true, &["idea"], &[]));
+
+    let out = h.scarp(&["proposal", "reconcile", "2", "--json"]);
+
+    assert!(out.status.success(), "{}", stderr(&out));
+    let parsed: serde_json::Value = serde_json::from_str(stdout(&out).trim()).unwrap();
+    assert_eq!(parsed["outcome"], "reconciled");
+    assert_eq!(parsed["reference"], "idea:1");
+    assert_eq!(parsed["commit"], "aaa111", "the introducing commit");
+    assert_eq!(h.mutations(), vec!["comment 2", "close 2"]);
+}
+
+/// The headline refusal. The item is closed on this disk and still
+/// pending on the branch a reader sees, so nothing is said publicly.
+#[test]
+fn a_locally_closed_item_with_a_pending_remote_refuses_and_mutates_nothing() {
+    let h = Harness::new();
+    let path = realized_maintenance(&h);
+    // The remote copy as it was when the file first landed: pending.
+    let pending = h.read(&path);
+    fs::write(h.root().join("result.md"), "Confirmed and repaired.\n").unwrap();
+    assert!(
+        h.scarp(&["close", "maintenance:1", "--body-file", "result.md"])
+            .status
+            .success()
+    );
+    h.publish(&path, &["aaa111"], &pending);
+    h.canned("issue-7-state.json", &issue_state(7, true, &["bug"], &[]));
+
+    let out = h.scarp(&["proposal", "reconcile", "7"]);
+
+    assert_eq!(out.status.code(), Some(12), "{}", stderr(&out));
+    let message = stderr(&out);
+    assert!(
+        message.starts_with("error[precondition-unmet]:"),
+        "{message}"
+    );
+    assert!(message.contains("status there is `pending`"), "{message}");
+    assert!(
+        h.mutations().is_empty(),
+        "an unproven claim must never reach the issue: {:?}",
+        h.mutations()
+    );
+}
+
+/// The passing case, and the ordering the recovery story depends on:
+/// prove, then comment, then close.
+#[test]
+fn a_closed_remote_item_is_proven_then_commented_then_closed() {
+    let h = Harness::new();
+    let path = realized_maintenance(&h);
+    fs::write(h.root().join("result.md"), "Working as intended.\n").unwrap();
+    assert!(
+        h.scarp(&["close", "maintenance:1", "--body-file", "result.md"])
+            .status
+            .success()
+    );
+    // `bbb222` closed it; `aaa111` only created it pending.
+    h.publish(&path, &["bbb222", "aaa111"], &h.read(&path));
+    h.canned("issue-7-state.json", &issue_state(7, true, &["bug"], &[]));
+
+    let out = h.scarp(&["proposal", "reconcile", "7", "--json"]);
+
+    assert!(out.status.success(), "{}", stderr(&out));
+    let parsed: serde_json::Value = serde_json::from_str(stdout(&out).trim()).unwrap();
+    assert_eq!(parsed["outcome"], "reconciled");
+    assert_eq!(parsed["reference"], "maintenance:1");
+    // The revision cited is the one proven to hold the terminal state,
+    // not the one that introduced the pending file.
+    assert_eq!(parsed["commit"], "bbb222");
+    assert_eq!(h.mutations(), vec!["comment 7", "close 7"]);
+
+    // The pinned commit was actually read back, not merely named.
+    let calls = h.calls();
+    assert!(
+        calls.iter().any(|c| c.contains("ref=bbb222")),
+        "the cited revision must be fetched and checked: {calls:?}"
+    );
+}
+
+/// The same, for a bug promoted into a sprint task.
+#[test]
+fn a_closed_remote_task_reconciles_the_same_way() {
+    let h = Harness::new();
+    assert!(h.scarp(&["new", "sprint", "Bug fixing"]).status.success());
+    h.canned(
+        "issue-7-view.json",
+        &issue_view(7, "Reported crash", REPORT, &["bug"]),
+    );
+    assert!(
+        h.scarp(&["proposal", "realize", "7", "--sprint", "sprint:1"])
+            .status
+            .success()
+    );
+    let path = "archaeology/sprints/0001-bug-fixing/\
+                0001-investigate-reported-behavior-reported-crash.md";
+    fs::write(h.root().join("result.md"), "Could not reproduce.\n").unwrap();
+    assert!(
+        h.scarp(&["close", "task:1", "--body-file", "result.md"])
+            .status
+            .success()
+    );
+    h.publish(path, &["bbb222", "aaa111"], &h.read(path));
+    h.canned("issue-7-state.json", &issue_state(7, true, &["bug"], &[]));
+
+    let out = h.scarp(&["proposal", "reconcile", "7", "--json"]);
+
+    assert!(out.status.success(), "{}", stderr(&out));
+    let parsed: serde_json::Value = serde_json::from_str(stdout(&out).trim()).unwrap();
+    assert_eq!(parsed["reference"], "task:1");
+    assert_eq!(parsed["commit"], "bbb222");
+    assert_eq!(h.mutations(), vec!["comment 7", "close 7"]);
+}
+
+/// The path is on the default branch but holds a different artifact —
+/// the file was replaced, or two branches disagreed. Nothing is said.
+#[test]
+fn a_remote_identity_mismatch_mutates_nothing() {
+    let h = Harness::new();
+    let path = realized_maintenance(&h);
+    fs::write(h.root().join("result.md"), "Done.\n").unwrap();
+    assert!(
+        h.scarp(&["close", "maintenance:1", "--body-file", "result.md"])
+            .status
+            .success()
+    );
+    let impostor = h.read(&path).replacen("id: mnt_", "id: mnt_OTHER", 1);
+    h.publish(&path, &["bbb222"], &impostor);
+    h.canned("issue-7-state.json", &issue_state(7, true, &["bug"], &[]));
+
+    let out = h.scarp(&["proposal", "reconcile", "7"]);
+
+    assert_eq!(out.status.code(), Some(12), "{}", stderr(&out));
+    assert!(
+        stderr(&out).contains("not the one being claimed"),
+        "{}",
+        stderr(&out)
+    );
+    assert!(h.mutations().is_empty(), "{:?}", h.mutations());
+}
+
+#[test]
+fn malformed_remote_content_mutates_nothing() {
+    let h = Harness::new();
+    let path = realized_maintenance(&h);
+    fs::write(h.root().join("result.md"), "Done.\n").unwrap();
+    assert!(
+        h.scarp(&["close", "maintenance:1", "--body-file", "result.md"])
+            .status
+            .success()
+    );
+    h.publish(&path, &["bbb222"], "<html>404 page</html>\n");
+    h.canned("issue-7-state.json", &issue_state(7, true, &["bug"], &[]));
+
+    let out = h.scarp(&["proposal", "reconcile", "7"]);
+
+    assert_eq!(out.status.code(), Some(12), "{}", stderr(&out));
+    assert!(stderr(&out).contains("front matter"), "{}", stderr(&out));
+    assert!(h.mutations().is_empty(), "{:?}", h.mutations());
+}
+
+/// An artifact that exists only on the operator's disk.
+#[test]
+fn an_absent_remote_artifact_refuses_with_the_other_diagnosis() {
+    let h = Harness::new();
+    realized_maintenance(&h);
+    h.canned("issue-7-state.json", &issue_state(7, true, &["bug"], &[]));
+
+    let out = h.scarp(&["proposal", "reconcile", "7"]);
+
+    assert_eq!(out.status.code(), Some(12), "{}", stderr(&out));
+    assert!(
+        stderr(&out).contains("not on the branch a reader sees"),
+        "{}",
+        stderr(&out)
+    );
+    assert!(h.mutations().is_empty(), "{:?}", h.mutations());
+}
+
+/// Recovery: a previous run commented and died before closing. The
+/// re-run finishes the job without saying it twice.
+#[test]
+fn a_commented_but_open_issue_is_only_closed() {
+    let h = Harness::new();
+    let path = realized_maintenance(&h);
+    fs::write(h.root().join("result.md"), "Done.\n").unwrap();
+    assert!(
+        h.scarp(&["close", "maintenance:1", "--body-file", "result.md"])
+            .status
+            .success()
+    );
+    h.publish(&path, &["bbb222"], &h.read(&path));
+    h.canned(
+        "issue-7-state.json",
+        &issue_state(
+            7,
+            true,
+            &["bug"],
+            &["Investigated as **maintenance:1** …\n\n<!-- scarp:reconciled -->"],
+        ),
+    );
+
+    let out = h.scarp(&["proposal", "reconcile", "7"]);
+
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert_eq!(h.mutations(), vec!["close 7"]);
+}
+
+/// Closing is terminal whatever put the issue there, including a human
+/// who closed it as unwanted. Reopening to reconcile would be the
+/// synchronization this design refuses.
+#[test]
+fn an_already_closed_issue_is_a_no_op() {
+    let h = Harness::new();
+    realized_maintenance(&h);
+    h.canned("issue-7-state.json", &issue_state(7, false, &["bug"], &[]));
+
+    let out = h.scarp(&["proposal", "reconcile", "7"]);
+
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(stdout(&out).contains("already closed"), "{}", stdout(&out));
+    assert!(h.mutations().is_empty(), "{:?}", h.mutations());
+}
+
+#[test]
+fn reconciliation_enforces_the_one_recognized_label_rule() {
+    let h = Harness::new();
+    realized_maintenance(&h);
+
+    for (labels, needle) in [
+        (vec!["idea", "bug"], "`idea` and `bug`"),
+        (vec!["question"], "is not a proposal"),
+    ] {
+        h.canned("issue-7-state.json", &issue_state(7, true, &labels, &[]));
+
+        let out = h.scarp(&["proposal", "reconcile", "7"]);
+
+        assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+        assert!(stderr(&out).contains(needle), "{}", stderr(&out));
+        assert!(h.mutations().is_empty(), "{:?}", h.mutations());
+    }
 }
