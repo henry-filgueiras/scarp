@@ -2,8 +2,9 @@
 id: spr_01KZCCCPGW3V959HBDTZC56JAE
 sequence: 13
 kind: sprint
-status: active
+status: closed
 created: 2026-08-06
+closed: 2026-08-06
 ---
 
 # Honest bug proposal cycle
@@ -92,3 +93,84 @@ as a side effect of needing to exist.
   end-to-end path is dogfooded afterwards, deliberately.
 - No release. Publishing 0.3.0 remains [[mnt_01KZA6MH5SCW0MDEJTKKW26Y9G|Publish 0.3.0 to crates.io]]'s work, and this
   sprint only keeps its public-API inventory and runbook honest.
+
+## Retrospective (2026-08-06)
+
+All three tasks closed. A `bug`-labeled GitHub issue can now become
+bounded investigative work, and the issue stays open until the canonical
+default branch proves that work reached its terminal result.
+
+## What the adjudication bought
+
+[[ide_01KZC769HTAF6F7GDDZW4HQGH7|Promote bug reports from GitHub issues into maintenance items or sprint tasks]] parked two questions and refused to guess at either, which
+was the right call: both answers turned out to shape the code rather than
+just the prose.
+
+**"Promotion means worth investigating, not confirmed"** is not a
+disclaimer. It decides the generated title (`Investigate reported
+behavior: …` rather than the reporter's claim repeated as the project's),
+it decides the generated body, it decides the wording of the
+reconciliation comment, and it is the reason no new lifecycle state was
+needed. A design that had promoted reports as confirmed defects would
+have needed `cancelled` — and would then have had to explain what
+`cancelled` means when the investigation was real and only the defect was
+not.
+
+**"The `Result` carries the finding, not the status"** is what made the
+existing `pending -> closed` lifecycle sufficient. It is worth stating
+plainly because it generalizes: a terminal state says the work is over,
+and the narrative says what happened. Adding a status per outcome would
+have been vocabulary growth standing in for prose.
+
+## Three findings worth keeping
+
+**A defect fell out of the feature.** `proposal realize` never fetched
+labels, so before this sprint any issue number at all could be realized
+as an idea — a support question, someone else's bug report, a pull
+request. Nothing caught it because the only proposal form applied the
+only recognized label, so every issue the operator would plausibly type
+was in fact an idea. Adding a second class made the assumption
+observable. Generalizing a hardcoded constant is a good way to find out
+what was silently depending on it.
+
+**GitHub intersects repeated `--label` flags.** A single
+`gh issue list --label idea --label bug` returns issues carrying *both* —
+the ambiguous set, and empty for every ordinary case. That is wrong in
+the shape that survives review: plausible, compact, and it would have
+produced an empty listing that reads as "no open proposals" rather than
+as a bug. Two queries and a `BTreeMap` union instead. Recorded because
+the next forge integration will be tempted by the same one-liner.
+
+**The obvious gate would have been the wrong one.** Checking the local
+`status: closed` before reconciling is one field access and it is
+exactly backwards: it closes a reporter's issue on the strength of what
+the operator's disk believes, which is the one thing a reporter cannot
+see. The invariant had to be phrased against remote *contents* — parsed,
+not searched, since `status: closed` quoted inside a `Result` is not the
+front matter saying so — and the commit cited had to move from the one
+that introduced the file to the one proven to hold its terminal state. A
+bug artifact arrives `pending`, so the introducing commit is a permalink
+that contradicts the sentence beside it.
+
+## What the sprint deliberately did not build
+
+No provider registry and no label configuration. Two classes are
+enumerated in a two-row table, and what they actually need from each
+other is different semantics — `Class::creation_aware` — which a lookup
+table would not have expressed. No triage, severity, priority, or
+assignment. No synchronization, no new terminal state, no HTTP client, no
+workflow.
+
+## The honest gap
+
+**The bug half has never been run against GitHub.** It is covered end to
+end by 28 hermetic tests driving the compiled binary against a fake `gh`,
+which prove Scarp builds the invocations it intends to and never mutates
+an issue on an unproven claim — and prove nothing about how GitHub
+answers them. The docs, the task result, and the test module all say so
+in those words, so no later reader can mistake the harness for a
+performance. Dogfooding the live path is the next thing to do, and it is
+deliberately not something this sprint claimed.
+
+Nothing here published, bumped, tagged, or released. [[mnt_01KZA6MH5SCW0MDEJTKKW26Y9G|Publish 0.3.0 to crates.io]]
+remains pending, with its public API-break inventory now complete.
