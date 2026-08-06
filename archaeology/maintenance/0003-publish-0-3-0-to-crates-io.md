@@ -17,9 +17,18 @@ the prior release's task record.
 
 Publication is human-owned per
 [[tsk_01KYK0PTQV9PGZTHRDAPG6YGYM|Publish and verify v0.1.0]]'s boundary: an agent prepares and verifies, Henry runs
-`cargo publish`, the tag push, and the credential handling. The runbook
-encodes that split — the irreversible cells are marked
-`excludeFromRunAll`, so a `runme run --all` cannot publish.
+`cargo publish`, the tag push, the GitHub release, and the credential
+handling. The runbook encodes that split by marking every mutating cell
+`excludeFromRunAll` and forbidding `run --all` operationally — an
+exclusion keeps a cell out of a sweep, it does not make the cell harder
+to run on purpose, and the runbook says so rather than implying a safety
+catch it does not have.
+
+Closure is the same handoff in reverse: Henry captures the release
+provenance, and Claude writes the `Result` and performs the transitions.
+The runbook deliberately has no closure cell, because a cell named
+`close` that exits zero without closing anything is a lie in the shape
+of a command.
 
 This item subsumes [[mnt_01KZ7A8KPX088RA46TKXG65N7G|Bump the version before the next publish]], which asked for a version bump
 before the next publish; close it here rather than separately.
@@ -28,14 +37,26 @@ before the next publish; close it here rather than separately.
 
 Prior releases recorded the version as a judgment. This one is closer to
 forced. Scarp ships a library as well as a binary, and pre-1.0 the minor
-position is where Cargo's semver rules put a breaking change. Two broke:
+position is where Cargo's SemVer rules put a breaking change. Multiple
+public surfaces broke, including:
 
 - `read::Summary.status` changed from `Status` to `Option<Status>`, so
   stateless collections carry no lifecycle state;
-- `transition::close_sprint` gained a terminal-narrative parameter.
+- `transition::close_sprint` gained a terminal-narrative parameter;
+- `read::Collection` gained a public `terminal` field, and
+  `cli::Command::Close` gained a public `body_file` field;
+- three variants were added to `cli::Collection` (`Log`, `Principle`,
+  `Maintenance`), one to `cli::ProposalCommand` (`Reconcile`), and one to
+  `error::Error` (`PreconditionUnmet`).
 
-So 0.3.0 is what the library requires, and the accumulated surface says
-the same thing independently:
+The last two categories are breaking only because nothing here is
+`#[non_exhaustive]`: a downstream `match` over `Error` or a struct
+literal for `Collection` stops compiling. That is worth stating rather
+than waving at, because it is also the cheapest thing to fix before 1.0
+and nobody has decided to.
+
+So 0.3.0 is what the library requires, and the accumulated command
+surface says the same thing independently:
 
 | Change | Surface |
 |---|---|
@@ -45,10 +66,21 @@ the same thing independently:
 | `scarp proposal reconcile` | new command surface, closing a landed proposal on GitHub |
 | `precondition-unmet`, exit 12 | new entry in the error contract |
 
-Nothing was removed from the CLI and no existing invocation changes
-behaviour. The `--json` contract is deliberately additive: `status` is
-omitted rather than emitted as null for the stateless collections, so
-every stateful collection's output is unchanged byte for byte.
+Nothing was removed from the CLI, and the `--json` contract is
+deliberately additive: `status` is omitted rather than emitted as null
+for the stateless collections, so every stateful collection's output is
+unchanged byte for byte.
+
+The behaviour claim has to be narrower than that, though. **One existing
+invocation does change.** `new --body-file` shipped in 0.2.0 copying the
+body through verbatim; it now binds resolvable `[[kind:N]]` sugar to
+`[[stable-id|label]]` and refuses the write outright when the sugar
+resolves to nothing or to more than one artifact. A body that 0.2.0
+wrote through unchanged may now be rewritten, and one citing a
+nonexistent artifact that 0.2.0 accepted is now rejected before a
+sequence is allocated. Both are the intended repair — the alternative is
+canonical prose carrying markers that were never checked — but they are
+behaviour changes to an unchanged command line, not additions beside it.
 
 The version number's only audience is someone deciding whether to look,
 and 0.2.1 would tell them nothing happened.
