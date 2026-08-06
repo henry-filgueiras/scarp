@@ -561,18 +561,37 @@ fn proposal_command(command: &ProposalCommand) -> Result<(), Error> {
                 println!("no open proposals");
             } else {
                 for p in &proposals {
+                    // The target column is what a reader needs before
+                    // deciding to realize: with two recognized labels,
+                    // what a proposal becomes is no longer inferable
+                    // from the command.
                     match &p.realized_as {
-                        Some(path) => {
-                            println!("#{}  realized  {}  ({path})", p.number, p.title);
-                        }
-                        None => println!("#{}  open      {}", p.number, p.title),
+                        Some(path) => println!(
+                            "#{}  realized  {:<11}  {}  ({path})",
+                            p.number, p.target, p.title
+                        ),
+                        None => println!("#{}  open      {:<11}  {}", p.number, p.target, p.title),
                     }
                 }
             }
             Ok(())
         }
-        ProposalCommand::Realize { number, json } => {
-            let created = proposal::realize(&root, *number)?;
+        ProposalCommand::Realize {
+            number,
+            sprint,
+            json,
+        } => {
+            // Parsed through the same seam `scarp new task --sprint`
+            // uses, so a promoted report is selected into its sprint by
+            // exactly the rules a hand-created task would be.
+            let selection = sprint.as_deref().map(parse_sprint_selector).transpose()?;
+            let created = proposal::realize(
+                &root,
+                *number,
+                selection
+                    .as_ref()
+                    .map(|(target, display)| (selector(target), display.as_str())),
+            )?;
             if *json {
                 println!("{}", to_json(&created.record()));
             } else {

@@ -40,6 +40,12 @@ pub enum ProposalCommand {
     Realize {
         /// The proposal's issue number
         number: u64,
+        /// `bug` proposals only: the active sprint that will own the
+        /// realized task, as `sprint:N` or a sprint's stable id. Without
+        /// it a `bug` realizes an unsprinted maintenance item; an `idea`
+        /// never takes it
+        #[arg(long)]
+        sprint: Option<String>,
         /// Emit a deterministic JSON object describing the created
         /// artifact instead of the human-readable line
         #[arg(long)]

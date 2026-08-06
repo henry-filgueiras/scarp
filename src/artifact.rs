@@ -213,12 +213,7 @@ pub fn create_idea_from(
     proposal: Option<&str>,
 ) -> Result<NewArtifact, Error> {
     let sections = crate::read::IDEA_SECTIONS;
-    let proposal = proposal
-        .map(|raw| {
-            crate::read::validated_proposal(raw)
-                .map_err(|message| Error::InvalidInvocation { message })
-        })
-        .transpose()?;
+    let proposal = validate_proposal(proposal)?;
     let extra: Vec<(&str, &str)> = match proposal.as_deref() {
         Some(url) => vec![("proposal", url)],
         None => Vec::new(),
@@ -235,14 +230,50 @@ pub fn create_maintenance(
     title: &str,
     body: Option<&str>,
 ) -> Result<NewArtifact, Error> {
-    create(
+    create_maintenance_from(root, title, body, None)
+}
+
+/// Create a new pending maintenance item, optionally stamped with the
+/// proposal it was realized from.
+///
+/// The `proposal` argument carries exactly the semantics
+/// [`create_idea_from`] gives it — one-way provenance, written once,
+/// never updated, never checked for reachability. Maintenance is a
+/// second collection the stamp can land on, not a second meaning for it.
+pub fn create_maintenance_from(
+    root: &Path,
+    title: &str,
+    body: Option<&str>,
+    proposal: Option<&str>,
+) -> Result<NewArtifact, Error> {
+    let proposal = validate_proposal(proposal)?;
+    let extra: Vec<(&str, &str)> = match proposal.as_deref() {
+        Some(url) => vec![("proposal", url)],
+        None => Vec::new(),
+    };
+    create_with(
         root,
         &MAINTENANCE,
         MAINTENANCE_ID_PREFIX,
         crate::read::MAINTENANCE_SECTIONS,
         title,
         body,
+        &extra,
     )
+}
+
+/// Check an optional `proposal:` stamp before anything is allocated or
+/// written, returning it normalized.
+///
+/// Shared by every collection that can carry the field, so a value one
+/// creation path would refuse cannot slip in through another.
+fn validate_proposal(proposal: Option<&str>) -> Result<Option<String>, Error> {
+    proposal
+        .map(|raw| {
+            crate::read::validated_proposal(raw)
+                .map_err(|message| Error::InvalidInvocation { message })
+        })
+        .transpose()
 }
 
 /// Create a new active principle in the repository at `root`.
@@ -527,8 +558,27 @@ pub fn create_task(
     sprint: Option<(crate::read::Selector<'_>, &str)>,
     body: Option<&str>,
 ) -> Result<NewArtifact, Error> {
+    create_task_from(root, title, sprint, body, None)
+}
+
+/// Create a new pending task, optionally stamped with the proposal it was
+/// realized from.
+///
+/// The stamp is [`create_idea_from`]'s, unchanged: one-way provenance
+/// written once at creation. A task carries it beside — never instead of
+/// — the `sprint:` field naming its owner, so a promoted report is an
+/// ordinary member of its sprint that happens to record where it came
+/// from.
+pub fn create_task_from(
+    root: &Path,
+    title: &str,
+    sprint: Option<(crate::read::Selector<'_>, &str)>,
+    body: Option<&str>,
+    proposal: Option<&str>,
+) -> Result<NewArtifact, Error> {
     const SECTIONS: &[&str] = &["Objective", "Acceptance criteria"];
     validate_title(TASK.kind, title)?;
+    let proposal = validate_proposal(proposal)?;
     let body = body
         .map(|raw| Body::parse(TASK.kind, SECTIONS, raw))
         .transpose()?;
@@ -617,12 +667,19 @@ pub fn create_task(
     let sequence = max + 1;
     let id = format!("{TASK_ID_PREFIX}{}", ulid::Ulid::new());
     let created = jiff::Zoned::now().strftime("%Y-%m-%d").to_string();
+    // `sprint` first, then the optional stamp: extra fields render in the
+    // order given, and the owning sprint is the more load-bearing of the
+    // two.
+    let mut extra_fields: Vec<(&str, &str)> = vec![("sprint", &active.summary.id)];
+    if let Some(url) = proposal.as_deref() {
+        extra_fields.push(("proposal", url));
+    }
     let content = render_artifact(&Template {
         id: &id,
         sequence,
         kind: TASK.kind,
         status: Some(Status::Pending.name()),
-        extra_fields: &[("sprint", &active.summary.id)],
+        extra_fields: &extra_fields,
         created: &created,
         title,
         sections: SECTIONS,
@@ -800,7 +857,7 @@ const MAX_BODY_BYTES: usize = 64 * 1024;
 /// A Markdown fenced-code-block delimiter: three or more backticks or
 /// tildes, optionally indented. Returns the marker character and run
 /// length so a closing fence can be matched against its opener.
-fn fence_marker(line: &str) -> Option<(char, usize)> {
+pub(crate) fn fence_marker(line: &str) -> Option<(char, usize)> {
     let trimmed = line.trim_start();
     let marker = trimmed.chars().next().filter(|c| *c == '`' || *c == '~')?;
     let run = trimmed.chars().take_while(|c| *c == marker).count();
@@ -815,7 +872,12 @@ fn fence_marker(line: &str) -> Option<(char, usize)> {
 /// Advance fenced-code-block state across a line already known to be a
 /// fence marker. A closing fence matches the opener's character, is at
 /// least as long, and carries no info string.
-fn advance_fence(fence: &mut Option<(char, usize)>, line: &str, marker: char, run: usize) {
+pub(crate) fn advance_fence(
+    fence: &mut Option<(char, usize)>,
+    line: &str,
+    marker: char,
+    run: usize,
+) {
     match *fence {
         None => *fence = Some((marker, run)),
         Some((open, len))

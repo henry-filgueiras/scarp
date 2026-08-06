@@ -42,6 +42,7 @@
 //! idea is later adopted or rejected, and nothing here ever reopens,
 //! edits, or re-reads what it closed.
 
+use std::collections::BTreeMap;
 use std::process::Command;
 
 use serde::Serialize;
@@ -50,9 +51,116 @@ use crate::artifact::{self, NewArtifact};
 use crate::error::Error;
 use crate::read;
 
-/// The label a proposal issue carries. Applied automatically by the issue
-/// form, so `list` sees exactly the issues filed as proposals.
-const PROPOSAL_LABEL: &str = "idea";
+/// What a proposal issue asks the repository for, decided by the label
+/// its issue form applied.
+///
+/// Two classes, enumerated rather than configured. A registry of labels
+/// to collections would be a framework built for one more entry than
+/// exists; what the two classes actually need is different *semantics*
+/// — see [`Class::creation_aware`] — and that is not something a lookup
+/// table would have expressed anyway.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Class {
+    /// An `idea` proposal, realized as a parked idea. Ideas are never
+    /// load-bearing, which is what made this the class that went first.
+    Idea,
+    /// A `bug` proposal, realized as bounded investigative work: a
+    /// pending maintenance item, or a pending task when an active sprint
+    /// is named.
+    ///
+    /// Realizing one accepts an obligation to investigate. It does not
+    /// assert the reporter's diagnosis is correct, and nothing here ever
+    /// says a defect was confirmed.
+    Bug,
+}
+
+/// The recognized proposal labels, and what each realizes into. Order is
+/// the order refusals name them in.
+const RECOGNIZED: &[(&str, Class)] = &[("idea", Class::Idea), ("bug", Class::Bug)];
+
+impl Class {
+    /// The GitHub label that selects this class.
+    fn label(self) -> &'static str {
+        match self {
+            Class::Idea => "idea",
+            Class::Bug => "bug",
+        }
+    }
+
+    /// The collection `realize` targets with no `--sprint`.
+    fn default_target(self) -> &'static str {
+        match self {
+            Class::Idea => "idea",
+            Class::Bug => "maintenance",
+        }
+    }
+
+    /// Whether the artifact's *existence* on the default branch is what
+    /// the filer was waiting for.
+    ///
+    /// For an idea it is: the idea is the deliverable, so creating it
+    /// discharges the proposal. For a bug it is not — the filer is
+    /// waiting on an outcome, and closing their issue to announce that a
+    /// tracking item now exists would be worse than saying nothing. That
+    /// is the whole asymmetry between the two classes, and it lives here
+    /// rather than in reconciliation's control flow.
+    fn creation_aware(self) -> bool {
+        matches!(self, Class::Idea)
+    }
+}
+
+/// Classify one issue from its labels, refusing anything underdetermined.
+///
+/// Unrelated labels are ignored — a proposal may also be tagged
+/// `documentation` or `good first issue` without that meaning anything
+/// here — but exactly one *recognized* label must remain. Both classes at
+/// once is a real ambiguity about what the operator is asking for, and
+/// guessing at it would create the wrong kind of artifact in the
+/// canonical record.
+///
+/// Pure, and called before anything is allocated or written, so the
+/// refusal ordering that keeps a stranger's report from becoming
+/// canonical state by accident is testable without a network.
+fn classify(number: u64, labels: &[String]) -> Result<Class, Error> {
+    let found: Vec<Class> = RECOGNIZED
+        .iter()
+        .filter(|(name, _)| labels.iter().any(|label| label == name))
+        .map(|(_, class)| *class)
+        .collect();
+
+    match found.as_slice() {
+        [only] => Ok(*only),
+        [] => Err(Error::InvalidInvocation {
+            message: format!(
+                "issue {number} is not a proposal: it carries neither the \
+                 `idea` nor the `bug` label, and Scarp acts only on issues \
+                 filed through a proposal form — check the number, or label \
+                 the issue on GitHub if it really is one"
+            ),
+        }),
+        several => Err(Error::InvalidInvocation {
+            message: format!(
+                "issue {number} carries {} recognized proposal labels ({}); \
+                 exactly one decides what it realizes into, and Scarp will \
+                 not guess between an idea and a bug report — remove the \
+                 wrong label on GitHub, then retry",
+                several.len(),
+                several
+                    .iter()
+                    .map(|class| format!("`{}`", class.label()))
+                    .collect::<Vec<_>>()
+                    .join(" and ")
+            ),
+        }),
+    }
+}
+
+/// Prefix for the title of work realized from a bug report.
+///
+/// The report's own title is a stranger's claim about what is wrong. The
+/// artifact's title is the project's own statement of what it undertook,
+/// and it undertook an investigation.
+const INVESTIGATE_PREFIX: &str = "Investigate reported behavior: ";
 
 /// GitHub's placeholder for an optional form field the filer left blank.
 /// It is presentation, not content, and must never reach an artifact.
@@ -76,6 +184,15 @@ pub struct ProposalSummary {
     pub title: String,
     /// The issue's canonical URL, stamped into a realized artifact.
     pub url: String,
+    /// The collection `scarp proposal realize` would create from this
+    /// proposal with no `--sprint`: `idea` or `maintenance`.
+    ///
+    /// Stated rather than left to be inferred. With one recognized label
+    /// the target was derivable from the command itself; with two it is
+    /// a property of the issue, and a listing that made the operator go
+    /// look it up would be withholding the one fact that decides what
+    /// `realize` does next.
+    pub target: &'static str,
     /// Repository-relative path of the artifact already realized from
     /// this proposal, when there is one.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -87,6 +204,7 @@ struct Proposal {
     title: String,
     body: String,
     url: String,
+    labels: Vec<String>,
 }
 
 /// Run `gh` with `args` and return its stdout.
@@ -299,11 +417,143 @@ fn to_body(issue_body: &str, sections: &[&str]) -> String {
 /// Reads the managed `proposal:` front-matter field rather than searching
 /// prose, so the answer is exact. It sees only what is on this branch;
 /// the merge-time case is `doctor`'s `duplicate-proposal` finding.
+///
+/// Every collection the stamp can land on is searched, in a fixed order,
+/// because the uniqueness rule is global: **one proposal realizes at most
+/// one canonical artifact**, not one per collection. A per-collection
+/// check would let the same report become both a maintenance item and a
+/// task, which is exactly the duplicate the field exists to prevent.
 fn realized_from(root: &std::path::Path, url: &str) -> Result<Option<read::Summary>, Error> {
-    Ok(read::scan(root, &read::IDEA)?
-        .into_iter()
-        .find(|a| a.summary.proposal.as_deref() == Some(url))
-        .map(|a| a.summary))
+    let stamped = |artifacts: Vec<read::Artifact>| {
+        artifacts
+            .into_iter()
+            .find(|a| a.summary.proposal.as_deref() == Some(url))
+            .map(|a| a.summary)
+    };
+    for artifacts in [
+        read::scan(root, &read::IDEA)?,
+        read::scan(root, &read::MAINTENANCE)?,
+        read::scan_tasks(root)?,
+    ] {
+        if let Some(found) = stamped(artifacts) {
+            return Ok(Some(found));
+        }
+    }
+    Ok(None)
+}
+
+/// Nest a reporter's Markdown beneath the one canonical section that will
+/// hold it.
+///
+/// A bug report is prose Scarp did not write, landing whole inside a
+/// section Scarp owns. Every unindented ATX heading outside a fenced code
+/// block is therefore demoted to level three, so no reporter-authored
+/// line can become — or split — a `## ` section the template defines.
+/// Unindented is the whole surface that needs covering: the body parser
+/// recognizes a section only as a line beginning exactly `## `, so a
+/// heading it would not read as one needs no rewriting.
+///
+/// Fenced code survives byte for byte. A report quoting Markdown is
+/// quoting, and a shell transcript's `# comment` is a comment; those
+/// lines are the evidence being reported, and rewriting them would
+/// corrupt the report to protect a structure they were never going to
+/// reach.
+fn to_report(issue_body: &str) -> String {
+    let mut out = String::with_capacity(issue_body.len());
+    let mut fence: Option<(char, usize)> = None;
+
+    for line in issue_body.replace("\r\n", "\n").lines() {
+        if let Some((marker, run)) = artifact::fence_marker(line) {
+            artifact::advance_fence(&mut fence, line, marker, run);
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        }
+        if fence.is_none() {
+            // GitHub's blank-field placeholder is presentation, exactly as
+            // it is on the idea path.
+            if line.trim() == NO_RESPONSE {
+                continue;
+            }
+            if let Some(demoted) = demote_heading(line) {
+                out.push_str(&demoted);
+                out.push('\n');
+                continue;
+            }
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    out.trim().to_string()
+}
+
+/// Rewrite an unindented level-one or level-two ATX heading to level
+/// three, or `None` when the line is not one.
+///
+/// `#hashtag` is not a heading — ATX requires the run to be followed by
+/// space or end of line — and deeper headings are already safe.
+fn demote_heading(line: &str) -> Option<String> {
+    let hashes = line.chars().take_while(|c| *c == '#').count();
+    if !(1..=2).contains(&hashes) {
+        return None;
+    }
+    let rest = &line[hashes..];
+    if !(rest.is_empty() || rest.starts_with(' ') || rest.starts_with('\t')) {
+        return None;
+    }
+    Some(format!("###{rest}"))
+}
+
+/// Scarp's own framing of a realized bug report, which is not the
+/// reporter's and must not read as though it were.
+///
+/// Mechanically generated, identical for every report, and deliberately
+/// explicit that promotion is an obligation to look rather than a finding
+/// — the artifact exists from the moment it is created, and someone will
+/// read it long before anyone has investigated anything.
+fn investigation_preamble(url: &str) -> String {
+    format!(
+        "Investigate the behavior reported in {url}.\n\
+         \n\
+         Realizing a report accepts an obligation to look into it; it does \
+         not assert that the reporter's diagnosis is correct. Close this \
+         with a `Result` stating the finding and its evidence — a confirmed \
+         defect, working as intended, unreproducible, a duplicate, already \
+         handled, or consciously declined are all honest terminal \
+         findings.\n\
+         \n\
+         ### The report as filed\n"
+    )
+}
+
+/// The maintenance body a realized bug report becomes: one `## Work`
+/// section, Scarp's framing, then the nested report.
+fn maintenance_body(report: &str, url: &str) -> String {
+    format!("## Work\n\n{}\n{report}\n", investigation_preamble(url))
+}
+
+/// The task body a realized bug report becomes.
+///
+/// The acceptance criteria are generated rather than solicited: an
+/// outside reporter has no way to know what this project considers done,
+/// and the answer is the same for every promoted report — reproduce it or
+/// record the attempt, conclude with evidence, and cover a real
+/// behavioral change with a test that fails without the fix.
+fn task_body(report: &str, url: &str) -> String {
+    format!(
+        "## Objective\n\n{}\n{report}\n\
+         \n\
+         ## Acceptance criteria\n\
+         \n\
+         - The reported behavior is reproduced, or the attempt to reproduce \
+         it is recorded with the exact commands run and the output \
+         observed.\n\
+         - The task closes with a `Result` stating the terminal finding and \
+         the evidence for it.\n\
+         - If a confirmed defect changes behavior, a regression test \
+         covering it lands with the change and fails without it.\n",
+        investigation_preamble(url)
+    )
 }
 
 /// Where and when an artifact reached the branch readers see.
@@ -385,47 +635,100 @@ fn landed(operation: &str, repo: &Repo, path: &str) -> Result<Option<Landing>, E
     }))
 }
 
-/// Open proposals, newest issue number first, each annotated with the
-/// artifact it has already been realized as.
+/// Parse `gh` JSON output, reporting a malformed payload as an
+/// unavailable integration rather than a repository problem.
+fn parse_json<T: serde::de::DeserializeOwned>(
+    operation: &str,
+    command: &str,
+    raw: &str,
+) -> Result<T, Error> {
+    serde_json::from_str(raw).map_err(|source| Error::IntegrationUnavailable {
+        operation: operation.to_string(),
+        requirement: "a GitHub repository".to_string(),
+        reason: format!("`{command}` returned unreadable JSON: {source}"),
+        remedy: "retry, and report this if it persists".to_string(),
+    })
+}
+
+/// Collect one string field out of each element of a JSON array field —
+/// label names, comment bodies — skipping anything shaped unexpectedly.
+fn json_strings(value: &serde_json::Value, field: &str, key: &str) -> Vec<String> {
+    value
+        .get(field)
+        .and_then(|v| v.as_array())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.get(key).and_then(|v| v.as_str()))
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Open proposals of every recognized class, newest issue number first,
+/// each annotated with its default target and with the artifact it has
+/// already been realized as.
 pub fn list(root: &std::path::Path) -> Result<Vec<ProposalSummary>, Error> {
     const OPERATION: &str = "`scarp proposal list`";
     github_repo(OPERATION)?;
-    let raw = gh(
-        OPERATION,
-        &[
-            "issue",
-            "list",
-            "--label",
-            PROPOSAL_LABEL,
-            "--state",
-            "open",
-            "--json",
-            "number,title,url",
-            "--limit",
-            "100",
-        ],
-    )?;
-    let issues: Vec<serde_json::Value> =
-        serde_json::from_str(&raw).map_err(|source| Error::IntegrationUnavailable {
-            operation: OPERATION.to_string(),
-            requirement: "a GitHub repository".to_string(),
-            reason: format!("`gh issue list` returned unreadable JSON: {source}"),
-            remedy: "retry, and report this if it persists".to_string(),
-        })?;
+
+    // One query per recognized label, deduplicated by issue number.
+    //
+    // Not one query with repeated `--label` flags: GitHub *intersects*
+    // them, so a single call would return only the issues carrying every
+    // recognized label at once — which is precisely the ambiguous set
+    // that must be refused, and an empty result for the ordinary case.
+    // A `BTreeMap` keyed by number also makes the union deterministic
+    // regardless of what order `gh` returned either page in.
+    let mut issues: BTreeMap<u64, serde_json::Value> = BTreeMap::new();
+    for (label, _) in RECOGNIZED {
+        let raw = gh(
+            OPERATION,
+            &[
+                "issue",
+                "list",
+                "--label",
+                label,
+                "--state",
+                "open",
+                "--json",
+                "number,title,url,labels",
+                "--limit",
+                "100",
+            ],
+        )?;
+        for issue in parse_json::<Vec<serde_json::Value>>(OPERATION, "gh issue list", &raw)? {
+            let number = issue.get("number").and_then(|v| v.as_u64()).unwrap_or(0);
+            issues.insert(number, issue);
+        }
+    }
 
     let mut proposals = Vec::new();
-    for issue in issues {
+    for (number, issue) in issues {
+        // A dual-labeled issue refuses the whole listing rather than
+        // appearing under a guessed target. A listing is what an operator
+        // reads before deciding what to realize, so a confidently wrong
+        // row in it is worse than no listing at all.
+        let class =
+            classify(number, &json_strings(&issue, "labels", "name")).map_err(|err| match err {
+                Error::InvalidInvocation { message } => Error::InvalidInvocation {
+                    message: format!("cannot list proposals: {message}"),
+                },
+                other => other,
+            })?;
         let url = issue
             .get("url")
             .and_then(|v| v.as_str())
             .unwrap_or_default();
         proposals.push(ProposalSummary {
-            number: issue.get("number").and_then(|v| v.as_u64()).unwrap_or(0),
+            number,
             title: issue
                 .get("title")
                 .and_then(|v| v.as_str())
                 .unwrap_or_default()
                 .to_string(),
+            target: class.default_target(),
             realized_as: realized_from(root, url)?.map(|s| s.path),
             url: url.to_string(),
         });
@@ -434,7 +737,12 @@ pub fn list(root: &std::path::Path) -> Result<Vec<ProposalSummary>, Error> {
     Ok(proposals)
 }
 
-/// Fetch one proposal.
+/// Fetch one proposal, labels included.
+///
+/// The labels are what decide the target collection, so they are fetched
+/// here rather than assumed. Before they were, any issue number at all
+/// could be realized as an idea — including one that was never a
+/// proposal.
 fn view(number: u64) -> Result<Proposal, Error> {
     const OPERATION: &str = "`scarp proposal realize`";
     let raw = gh(
@@ -444,16 +752,10 @@ fn view(number: u64) -> Result<Proposal, Error> {
             "view",
             &number.to_string(),
             "--json",
-            "number,title,body,url",
+            "number,title,body,url,labels",
         ],
     )?;
-    let value: serde_json::Value =
-        serde_json::from_str(&raw).map_err(|source| Error::IntegrationUnavailable {
-            operation: OPERATION.to_string(),
-            requirement: "a GitHub repository".to_string(),
-            reason: format!("`gh issue view` returned unreadable JSON: {source}"),
-            remedy: "retry, and report this if it persists".to_string(),
-        })?;
+    let value: serde_json::Value = parse_json(OPERATION, "gh issue view", &raw)?;
     let field = |name: &str| {
         value
             .get(name)
@@ -465,18 +767,48 @@ fn view(number: u64) -> Result<Proposal, Error> {
         title: field("title"),
         body: field("body"),
         url: field("url"),
+        labels: json_strings(&value, "labels", "name"),
     })
 }
 
-/// Realize proposal `number` as a canonical idea.
+/// Realize proposal `number` as the canonical artifact its label asks
+/// for: a parked idea, a pending maintenance item, or — with `sprint` —
+/// a pending task in that active sprint.
+///
+/// `sprint` is the explicit `--sprint` selection as `(selector, display)`,
+/// carrying exactly the semantics `scarp new task --sprint` gives it. It
+/// applies only to a `bug`; an idea is never a sprint's work.
 ///
 /// Refuses rather than duplicating if this proposal already has an
-/// artifact on this branch. Nothing is committed: the operator reviews
-/// the new file and commits it through the ordinary workflow.
-pub fn realize(root: &std::path::Path, number: u64) -> Result<NewArtifact, Error> {
+/// artifact on this branch, in any collection. Nothing is committed: the
+/// operator reviews the new file and commits it through the ordinary
+/// workflow.
+///
+/// Every refusal below happens before a sequence is allocated or a path
+/// is touched. A stranger's report becoming canonical state is the thing
+/// this ordering exists to prevent, so classification comes first — Scarp
+/// learns what an issue is before it does anything on its behalf.
+pub fn realize(
+    root: &std::path::Path,
+    number: u64,
+    sprint: Option<(read::Selector<'_>, &str)>,
+) -> Result<NewArtifact, Error> {
     const OPERATION: &str = "`scarp proposal realize`";
     github_repo(OPERATION)?;
     let proposal = view(number)?;
+    let class = classify(number, &proposal.labels)?;
+
+    if class.creation_aware() && sprint.is_some() {
+        return Err(Error::InvalidInvocation {
+            message: format!(
+                "cannot realize proposal {number} into a sprint: `--sprint` \
+                 attaches a `bug` report to an active sprint as a task, and \
+                 this issue is labeled `idea` — an idea is an uncommitted \
+                 proposal, never a sprint's committed work, so drop \
+                 `--sprint`"
+            ),
+        });
+    }
 
     if proposal.url.is_empty() {
         return Err(Error::IntegrationUnavailable {
@@ -492,8 +824,9 @@ pub fn realize(root: &std::path::Path, number: u64) -> Result<NewArtifact, Error
         return Err(Error::ArtifactConflict {
             path: std::path::PathBuf::from(&path),
             reason: format!(
-                "proposal {} has already been realized as `{path}`; \
-                 one proposal realizes at most one artifact",
+                "proposal {} has already been realized as `{path}`; one \
+                 proposal realizes at most one artifact, across every \
+                 collection",
                 proposal.url
             ),
         });
@@ -508,18 +841,42 @@ pub fn realize(root: &std::path::Path, number: u64) -> Result<NewArtifact, Error
         });
     }
 
-    let sections = read::IDEA_SECTIONS;
-    let body = to_body(&proposal.body, sections);
-    artifact::create_idea_from(root, &proposal.title, Some(&body), Some(&proposal.url))
+    match class {
+        Class::Idea => {
+            let body = to_body(&proposal.body, read::IDEA_SECTIONS);
+            artifact::create_idea_from(root, &proposal.title, Some(&body), Some(&proposal.url))
+        }
+        Class::Bug => {
+            let report = to_report(&proposal.body);
+            let title = format!("{INVESTIGATE_PREFIX}{}", proposal.title.trim());
+            match sprint {
+                None => artifact::create_maintenance_from(
+                    root,
+                    &title,
+                    Some(&maintenance_body(&report, &proposal.url)),
+                    Some(&proposal.url),
+                ),
+                Some(selection) => artifact::create_task_from(
+                    root,
+                    &title,
+                    Some(selection),
+                    Some(&task_body(&report, &proposal.url)),
+                    Some(&proposal.url),
+                ),
+            }
+        }
+    }
 }
 
 /// One proposal's state on GitHub, as observed at invocation.
 struct Issue {
     number: u64,
     url: String,
-    /// `true` when the issue carries the proposal label. An issue that is
-    /// not a proposal is not this command's business, whatever it says.
-    is_proposal: bool,
+    /// Every label the issue carries, classified by [`plan`] rather than
+    /// here. An issue that is not a proposal is not this command's
+    /// business, whatever else it says, and one that is two proposals at
+    /// once is not either.
+    labels: Vec<String>,
     open: bool,
     /// Whether Scarp has already commented here, by
     /// [`RECONCILED_MARKER`] rather than by reading prose.
@@ -551,16 +908,11 @@ fn plan(
     realized: Option<&read::Summary>,
     landing: Option<&Landing>,
 ) -> Result<Plan, Error> {
-    if !issue.is_proposal {
-        return Err(Error::InvalidInvocation {
-            message: format!(
-                "cannot reconcile issue {}: it is not a proposal — it carries no \
-                 `{PROPOSAL_LABEL}` label, and Scarp comments only on issues filed \
-                 through the proposal form",
-                issue.number
-            ),
-        });
-    }
+    // The same exactly-one-recognized-label rule realization enforces,
+    // and enforced first for the same reason: commenting on an issue is
+    // public and posted under the repository's name, so Scarp proves what
+    // an issue *is* before it says anything on it.
+    classify(issue.number, &issue.labels)?;
 
     // Closing is terminal, so an already-closed proposal is finished
     // whatever put it there — including a human who closed it as
@@ -654,27 +1006,7 @@ fn issue_state(operation: &str, number: u64) -> Result<Issue, Error> {
             "number,url,state,labels,comments",
         ],
     )?;
-    let value: serde_json::Value =
-        serde_json::from_str(&raw).map_err(|source| Error::IntegrationUnavailable {
-            operation: operation.to_string(),
-            requirement: "a GitHub repository".to_string(),
-            reason: format!("`gh issue view` returned unreadable JSON: {source}"),
-            remedy: "retry, and report this if it persists".to_string(),
-        })?;
-
-    let strings = |field: &str, key: &str| -> Vec<String> {
-        value
-            .get(field)
-            .and_then(|v| v.as_array())
-            .map(|items| {
-                items
-                    .iter()
-                    .filter_map(|i| i.get(key).and_then(|v| v.as_str()))
-                    .map(str::to_string)
-                    .collect()
-            })
-            .unwrap_or_default()
-    };
+    let value: serde_json::Value = parse_json(operation, "gh issue view", &raw)?;
 
     Ok(Issue {
         number,
@@ -683,11 +1015,9 @@ fn issue_state(operation: &str, number: u64) -> Result<Issue, Error> {
             .and_then(|v| v.as_str())
             .unwrap_or_default()
             .to_string(),
-        is_proposal: strings("labels", "name")
-            .iter()
-            .any(|l| l == PROPOSAL_LABEL),
+        labels: json_strings(&value, "labels", "name"),
         open: value.get("state").and_then(|v| v.as_str()) == Some("OPEN"),
-        commented: strings("comments", "body")
+        commented: json_strings(&value, "comments", "body")
             .iter()
             .any(|b| b.contains(RECONCILED_MARKER)),
     })
@@ -734,7 +1064,8 @@ pub fn reconcile(root: &std::path::Path, number: u64) -> Result<Reconciled, Erro
     // Gathered in refusal order, so a proposal that will be refused early
     // costs neither a repository scan nor two API calls. `plan` reaches
     // the same verdict either way: what was not looked for is absent.
-    let realized = if issue.is_proposal && issue.open {
+    let recognized = classify(issue.number, &issue.labels).is_ok();
+    let realized = if recognized && issue.open {
         realized_from(root, &issue.url)?
     } else {
         None
@@ -854,6 +1185,129 @@ mod tests {
         assert!(body.starts_with("## Problem\n"), "{body}");
     }
 
+    // Classification. Pure, and the first thing every command does, so
+    // what an issue *is* is settled before anything acts on it.
+
+    fn labels(names: &[&str]) -> Vec<String> {
+        names.iter().map(|n| n.to_string()).collect()
+    }
+
+    #[test]
+    fn one_recognized_label_decides_the_class() {
+        assert_eq!(classify(1, &labels(&["idea"])).unwrap(), Class::Idea);
+        assert_eq!(classify(1, &labels(&["bug"])).unwrap(), Class::Bug);
+    }
+
+    /// A proposal may be tagged anything else without that meaning a
+    /// thing here.
+    #[test]
+    fn unrelated_labels_do_not_participate() {
+        let noisy = labels(&["documentation", "bug", "good first issue", "P1"]);
+
+        assert_eq!(classify(1, &noisy).unwrap(), Class::Bug);
+    }
+
+    #[test]
+    fn no_recognized_label_is_not_a_proposal() {
+        let error = classify(9, &labels(&["question"])).unwrap_err();
+
+        assert_eq!(error.code(), "invalid-invocation");
+        assert!(error.to_string().contains("is not a proposal"), "{error}");
+    }
+
+    /// The ambiguity that must never be guessed at: an idea is never
+    /// load-bearing and a promoted report is work the project owes, so
+    /// picking the wrong one puts the wrong kind of claim in the record.
+    #[test]
+    fn both_recognized_labels_refuse_and_name_them() {
+        let error = classify(9, &labels(&["bug", "idea"])).unwrap_err();
+
+        assert_eq!(error.code(), "invalid-invocation");
+        let message = error.to_string();
+        assert!(message.contains("`idea` and `bug`"), "{message}");
+        assert!(message.contains("will not guess"), "{message}");
+    }
+
+    /// The asymmetry the whole sprint turns on, asserted where it lives.
+    #[test]
+    fn only_ideas_are_discharged_by_creation() {
+        assert!(Class::Idea.creation_aware());
+        assert!(!Class::Bug.creation_aware());
+        assert_eq!(Class::Idea.default_target(), "idea");
+        assert_eq!(Class::Bug.default_target(), "maintenance");
+    }
+
+    // Report normalization. A bug report is prose Scarp did not write,
+    // landing whole inside a section Scarp owns.
+
+    #[test]
+    fn a_reporters_headings_are_nested_beneath_the_canonical_section() {
+        let report = to_report("## Work\n\nForged.\n\n# Title\n\n### Already deep\n");
+
+        assert!(report.starts_with("### Work\n"), "{report}");
+        assert!(report.contains("\n### Title\n"), "{report}");
+        assert!(report.contains("\n### Already deep"), "{report}");
+        assert!(!report.contains("\n## "), "{report}");
+    }
+
+    /// A report quoting Markdown is quoting. Rewriting the quoted lines
+    /// would corrupt the evidence to protect a structure they were never
+    /// going to reach.
+    #[test]
+    fn fenced_code_in_a_report_survives_byte_for_byte() {
+        let report = to_report("### Steps\n\n```console\n$ scarp doctor\n# a comment\n```\n");
+
+        assert!(
+            report.contains("```console\n$ scarp doctor\n# a comment\n```"),
+            "{report}"
+        );
+    }
+
+    #[test]
+    fn a_report_drops_the_no_response_placeholder_and_normalizes_crlf() {
+        let report =
+            to_report("### Environment\r\n\r\n_No response_\r\n\r\n### Context\r\n\r\nx\r\n");
+
+        assert!(!report.contains('\r'), "{report:?}");
+        assert!(!report.contains(NO_RESPONSE), "{report}");
+        assert!(report.contains("### Environment"), "{report}");
+    }
+
+    #[test]
+    fn a_hashtag_is_not_a_heading() {
+        assert_eq!(demote_heading("#hashtag"), None);
+        assert_eq!(demote_heading("text # here"), None);
+        assert_eq!(demote_heading("### already deep"), None);
+        assert_eq!(demote_heading("## Work"), Some("### Work".to_string()));
+        assert_eq!(demote_heading("#"), Some("###".to_string()));
+    }
+
+    /// The generated bodies must name every honest terminal finding, or
+    /// the first person to close one as "not a bug" has no precedent to
+    /// follow and invents a status instead.
+    #[test]
+    fn generated_bodies_frame_promotion_as_an_obligation_to_look() {
+        let url = "https://github.com/o/r/issues/7";
+        let work = maintenance_body("### Observed\n\nx", url);
+        let task = task_body("### Observed\n\nx", url);
+
+        for body in [&work, &task] {
+            assert!(body.contains(url), "{body}");
+            assert!(
+                body.contains("does not assert that the reporter's diagnosis is correct"),
+                "{body}"
+            );
+            assert!(body.contains("unreproducible"), "{body}");
+            assert!(body.contains("### The report as filed"), "{body}");
+        }
+        assert!(work.starts_with("## Work\n"), "{work}");
+        assert!(task.starts_with("## Objective\n"), "{task}");
+        assert!(task.contains("\n## Acceptance criteria\n"), "{task}");
+        assert!(task.contains("regression test"), "{task}");
+        // The framing is Scarp's, and must never claim a defect exists.
+        assert!(!work.contains("the bug"), "{work}");
+    }
+
     // Reconciliation. Every refusal below is decided by `plan`, which is
     // pure precisely so this file needs neither a network nor a
     // repository to prove the ordering that keeps a public, terminal
@@ -865,7 +1319,7 @@ mod tests {
         Issue {
             number: 3,
             url: "https://github.com/o/r/issues/3".to_string(),
-            is_proposal: true,
+            labels: vec!["idea".to_string()],
             open: true,
             commented: false,
         }
@@ -954,7 +1408,7 @@ mod tests {
     #[test]
     fn a_non_proposal_issue_is_an_invalid_invocation() {
         let issue = Issue {
-            is_proposal: false,
+            labels: Vec::new(),
             ..proposal_issue()
         };
 
@@ -984,7 +1438,7 @@ mod tests {
     #[test]
     fn a_closed_non_proposal_still_refuses() {
         let issue = Issue {
-            is_proposal: false,
+            labels: Vec::new(),
             open: false,
             ..proposal_issue()
         };
