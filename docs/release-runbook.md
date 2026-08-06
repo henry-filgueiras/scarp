@@ -595,8 +595,30 @@ fi
 echo "terminal narrative written"
 
 "$BIN" doctor
+
+# The proposal surfaces this release adds. `--help` is the whole check
+# that can run here: exercising them for real would need an
+# authenticated `gh` and a live issue, which is a dogfooding step and
+# not a release gate.
 "$BIN" proposal reconcile --help > /dev/null
 echo "proposal reconcile present"
+
+REALIZE="$("$BIN" proposal realize --help)"
+if ! grep -q -- '--sprint' <<<"$REALIZE"; then
+  echo "FAIL: installed binary has no \`proposal realize --sprint\`"
+  echo "$REALIZE"
+  exit 1
+fi
+echo "proposal realize --sprint present"
+
+# The classification refusal, proven rather than assumed: with no `gh`
+# on PATH the integration is unavailable (exit 11), which is also the
+# proof that every ordinary command above ran without one.
+if PATH=/nonexistent "$BIN" proposal list > /dev/null 2>&1; then
+  echo "FAIL: \`proposal list\` succeeded with no \`gh\` on PATH"
+  exit 1
+fi
+echo "proposal commands refuse cleanly without gh"
 
 echo "shipped surfaces verified against $BIN"
 ```

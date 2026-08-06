@@ -1,0 +1,89 @@
+name: Bug report
+description: Report something Scarp did wrong — a crash, wrong output, or damaged files
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Filing this is a report, not project state.** It records what
+        you saw. It is not a canonical Scarp artifact, and it is not a
+        confirmation that a defect exists — nobody has looked yet.
+
+        A maintainer may **promote** this report into an investigative
+        maintenance item, or into a task inside an active sprint. That
+        creates a canonical artifact titled *Investigate reported
+        behavior: <your title>*, stamped with this issue's URL, and it
+        commits the project to looking — not to agreeing. The
+        investigation may end in a confirmed defect, in behavior that
+        turned out to be intended, in something nobody could reproduce,
+        in a duplicate, or in a considered decision not to act. All five
+        are honest outcomes, and the artifact's `Result` says which one
+        happened.
+
+        If promoted, this issue stays open until that work has reached
+        its terminal result on the default branch. Then it gets one
+        comment citing the artifact, and closes.
+
+        **Write the title as the thing that went wrong** — "`scarp
+        doctor` miscounts artifacts after a merge", not "Bug in doctor".
+        Scarp adds its own prefix, so please do not add `[Bug]`.
+
+        If any file was lost or corrupted, say so prominently. Content
+        loss violates the project's mutation contract and is the most
+        serious class of report.
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      description: >-
+        What Scarp actually did. Paste real output rather than
+        describing it, and include the exact command you ran.
+      placeholder: |
+        $ scarp doctor
+        ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected instead, and why.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction and evidence
+      description: >-
+        The shortest sequence that reproduces it, starting from `scarp
+        init` where practical. If the repository's state is involved,
+        describe it as specifically as you can — relevant paths, front
+        matter, and whether the files were hand-edited or Scarp-created
+        — and paste `scarp doctor` output from before and, if it
+        changed, after. If you could not reproduce it a second time, say
+        that; it is useful information, not a disqualification.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: >-
+        `scarp --version` (or the commit you built), your OS, and the
+        filesystem if it is unusual — a network mount, a case-insensitive
+        volume, or a container bind mount are all worth mentioning.
+      placeholder: |
+        scarp 0.3.0
+        macOS 15.4, APFS
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: >-
+        Optional. Related issues, a workaround you found, or a guess at
+        the cause — a guess is welcome and will not be treated as a
+        diagnosis.
+    validations:
+      required: false

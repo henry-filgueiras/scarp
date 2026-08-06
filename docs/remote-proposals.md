@@ -1,17 +1,33 @@
 # Remote proposals
 
-How an idea captured away from your development machine becomes a
-canonical Scarp artifact — and, more importantly, what this deliberately
-does not do.
+How something captured away from your development machine — an idea, or
+a bug report from a stranger — becomes a canonical Scarp artifact, and,
+more importantly, what this deliberately does not do.
 
 The short version: **a GitHub issue carries mutation intent; Scarp
 realizes canonical state.** Those are different authorities, held by
 different parties, and keeping them apart is the entire design.
 
+## Two classes, one loop
+
+A proposal issue carries exactly one recognized label, and that label
+decides what realizing it produces.
+
+| Label | Command | Canonical result |
+|---|---|---|
+| `idea` | `scarp proposal realize N` | a parked idea |
+| `bug` | `scarp proposal realize N` | a pending maintenance item |
+| `bug` | `scarp proposal realize N --sprint sprint:X` | a pending task in that active sprint |
+
+Other labels are ignored — a proposal may also be `documentation` or
+`good first issue` — but exactly one *recognized* label must remain. An
+issue with neither is not a proposal; an issue with both is refused
+rather than guessed at.
+
 ## The shape
 
 ```text
-phone or remote conversation
+phone, or a stranger's browser
     ↓
 structured GitHub proposal issue      ← durable immediately
     ↓
@@ -19,13 +35,14 @@ structured GitHub proposal issue      ← durable immediately
     ↓
 operator, on a trusted machine        ← scarp proposal realize <n>
     ↓
-canonical idea artifact
+canonical artifact: idea, maintenance item, or task
     ↓
 ordinary review, commit, and push
     ↓
-the artifact is on the default branch ← the loop's precondition
-    ↓
-operator, again                       ← scarp proposal reconcile <n>
+    ├─ idea:  the artifact is on the default branch
+    └─ bug:   the work is `closed` on the default branch
+    ↓                                   ← the loop's precondition
+operator, again                        ← scarp proposal reconcile <n>
     ↓
 issue cites the artifact and closes
 ```
@@ -44,7 +61,8 @@ Landing is a later, independent event — a commit and a push that
 has four steps, not three, and the fourth one is gated:
 
 > **A proposal is closed only because the branch a reader sees already
-> contains the artifact claiming it.**
+> contains the artifact claiming it — and, for a bug, because that
+> artifact has reached its terminal state there.**
 
 ## Why not just write the file?
 
@@ -137,13 +155,16 @@ resolves, because no canonical operation may depend on a network.
 
 Because the field is managed rather than prose, realizing one proposal
 twice is **corruption Scarp can see**. `scarp proposal realize` refuses
-if the artifact already exists on your branch, and `scarp doctor`
-reports `duplicate-proposal` for the case no single run can catch: two
-branches that each realized once, merged.
+if the artifact already exists on your branch — in **any** collection,
+because the uniqueness rule is global rather than per-collection, and a
+per-collection check would let one report become both a maintenance item
+and a task. `scarp doctor` reports `duplicate-proposal` for the case no
+single run can catch: two branches that each realized once, merged.
 
 ## Reconciliation is terminal too
 
-Once the artifact is on the default branch:
+Once the precondition holds — the artifact is on the default branch, and
+for a bug, closed there:
 
 ```console
 $ scarp proposal reconcile 2
@@ -151,12 +172,12 @@ reconciled proposal #2: closed, citing idea:38
 ```
 
 The issue gets one comment naming the artifact — display sequence,
-stable id, path, and the commit that introduced it, each linked and
-pinned so they still resolve after the file moves — and then closes as
-completed.
+stable id, path, and the cited commit, each linked and pinned so they
+still resolve after the file moves — and then closes as completed.
 
 **That comment is never revisited.** Adopting or rejecting the idea
-later does not amend, reopen, or annotate it. Editing the issue
+later does not amend, reopen, or annotate it, and neither does anything
+that happens to a maintenance item after it closes. Editing the issue
 afterwards reaches nothing. It is a settled fact, written once, and the
 artifact is where the lifecycle actually lives.
 
@@ -175,14 +196,78 @@ run that died after commenting closes on the next attempt without saying
 it twice, which is why the comment is posted first: no reachable state
 has a proposal closed without its explanation.
 
-## Why ideas went first
+## Why ideas went first, and what bugs had to earn
 
 Ideas are never load-bearing. No typed edge may target one, and a bad
-idea landing costs a `reject` transition rather than an invariant.
+idea landing costs a `reject` transition rather than an invariant. That
+is what made realizing one a cheap, reversible act an operator can
+perform on a stranger's say-so.
 
-That is a property of the collection, not a convenience. Any proposal to
-extend this channel to dragons, decisions, or tasks has to re-argue it
-for that collection, where the answer is different and worse.
+**A promoted bug report is not that.** A maintenance item asserts that
+work exists; a task inside an active sprint can be planned around and
+depended on. The safety argument above does not transfer, so the second
+class had to earn its own, and it did so by narrowing what promotion
+claims:
+
+> **Realizing a `bug` accepts an obligation to investigate. It does not
+> assert that the reporter's diagnosis is correct.**
+
+That is why the artifact is titled *Investigate reported behavior:
+&lt;issue title&gt;* rather than repeating the reporter's words as though
+the project agreed with them, and why the generated body says so in
+prose that a reader six months later will see before they see the report.
+
+The obvious worry is what happens when the report turns out to be
+wrong — recording a non-bug as completed maintenance sounds like a false
+statement in the archaeology. It is not, because the finding lives in the
+`Result`, not in the status. Working as intended, unreproducible, a
+duplicate, already handled, and a considered decision not to act are all
+things a `Result` says plainly, and all of them are true statements about
+work that is over. Scarp therefore added **no** `cancelled` or
+`withdrawn` state: they would have added vocabulary without adding
+honesty.
+
+Dragons and decisions still have no path here, and each would have to
+re-argue the question for itself.
+
+## Reconciling a bug is gated harder
+
+An idea *is* the deliverable, so its arrival on the default branch is
+what the filer was waiting for. A bug reporter is waiting on an outcome.
+Closing their issue to announce that a tracking item now exists would be
+worse than saying nothing.
+
+So for a maintenance item or a task, reconciliation fetches the default
+branch's copy of the artifact, parses it, and requires four facts before
+it will speak: the stable id, the `kind`, the `proposal:` URL, and
+`status: closed`. Four cheaper checks are deliberately **not** used:
+
+- the **local status** — it says only what your disk believes, and a
+  closed item you have not pushed is exactly the case that must refuse;
+- a **remote-tracking ref** — it answers a question about your last
+  fetch, not about what a reader sees;
+- a **substring search** — it cannot tell `status: closed` in front
+  matter from the same words quoted inside a `Result`;
+- **path existence** — sufficient for an idea, and not sufficient here.
+
+The commit the comment cites is the newest one to touch the path, not the
+one that introduced the file, and Scarp re-reads the artifact at that
+exact revision before citing it. A bug artifact arrives `pending`; citing
+its arrival would pin a permalink that contradicts the sentence beside
+it.
+
+The comment itself says the work **reached its terminal result**, and
+never that it was fixed:
+
+> Investigated as **maintenance:4**, which has reached its terminal
+> result in the canonical record.
+>
+> **Read the `Result` for what was concluded.** Reaching a terminal
+> result is not a claim that a defect existed […]
+
+That wording is enforced by a test, not by care. The `Result` may
+conclude that nothing was wrong, and nothing ever comes back to correct a
+published comment.
 
 ## Setting this up in your own repository
 
@@ -192,34 +277,61 @@ fewer thing to get wrong.
 
 1. **Install Scarp**, and have [`gh`](https://cli.github.com)
    authenticated (`gh auth login`).
-2. **Add the proposal issue form** — copy
-   [`.github/ISSUE_TEMPLATE/idea.yml`](../.github/ISSUE_TEMPLATE/idea.yml).
-   Its textarea labels must match your idea template's sections exactly:
-   `Problem`, `Sketch`, `Boundaries`, `Evidence`. It needs an `idea`
-   label to exist — `gh label create idea --description "Uncommitted
-   proposals to explore"` if yours does not have one.
-   *The form only takes effect once it is on your default branch.*
-3. **Capture ideas remotely** as structured issues, from anything with a
-   browser.
-4. **List and realize**, from an authenticated development machine:
+2. **Add the issue forms** — copy
+   [`.github/ISSUE_TEMPLATE/idea.yml`](../.github/ISSUE_TEMPLATE/idea.yml)
+   and
+   [`.github/ISSUE_TEMPLATE/bug.yml`](../.github/ISSUE_TEMPLATE/bug.yml).
+   The idea form's textarea labels must match your idea template's
+   sections exactly — `Problem`, `Sketch`, `Boundaries`, `Evidence` —
+   because they become those sections. The bug form's labels are free:
+   the whole report lands inside one section Scarp owns, so its headings
+   are nested rather than promoted.
+
+   Both labels must exist. Check with `gh label list`; `bug` is one of
+   GitHub's defaults, and `idea` usually is not:
+   ```console
+   $ gh label create idea --description "Uncommitted proposals to explore"
+   ```
+   *A form only takes effect once it is on your default branch.*
+3. **Capture proposals remotely** as structured issues, from anything
+   with a browser. Bug reports arrive this way from people who have
+   never seen your archaeology.
+4. **List and realize**, from an authenticated development machine. The
+   listing states what each proposal would become:
    ```console
    $ scarp proposal list
-   $ scarp proposal realize 2
+   #9  open      maintenance  Doctor miscounts artifacts after a merge
+   #4  open      idea         Prebuilt release binaries
+
+   $ scarp proposal realize 4                       # a parked idea
+   $ scarp proposal realize 9                       # a maintenance item
+   $ scarp proposal realize 9 --sprint sprint:13    # or a task, if a
+                                                    # sprint owns it
    ```
 5. **Review** the created artifact like any other new file.
-6. **Commit and push** normally.
-7. **Reconcile**, once it is on your default branch:
+6. **Commit and push** normally. For a bug, also **do the work** and
+   close the item with a `Result` — that is what reconciliation waits
+   for.
+7. **Reconcile**, once the precondition holds:
    ```console
-   $ scarp proposal reconcile 2
+   $ scarp proposal reconcile 4    # idea: once it is on the branch
+   $ scarp proposal reconcile 9    # bug: once it is closed there
    ```
 
 Steps 1–2 are one-time; 3–7 are the loop.
 
-The GitHub half of this recipe has been exercised in one repository —
-this one. The Scarp half was followed into an unrelated project with no
-Rust and no existing corpus and worked unchanged. Nothing about the
-GitHub half is repository-specific, but "expected to work" is a weaker
-claim than "was run", and it is the accurate one.
+**What has actually been run, precisely.** The idea half of this recipe
+has been exercised live against GitHub in one repository — this one. The
+Scarp half was followed into an unrelated project with no Rust and no
+existing corpus and worked unchanged.
+
+The **bug half has not yet been performed live.** It is covered
+end to end by hermetic tests that drive the compiled binary against a
+fake `gh`, which prove that Scarp builds the invocations it intends to
+and never mutates an issue on an unproven claim — and prove nothing at
+all about how GitHub answers them. Nothing about it is
+repository-specific, but "expected to work" is a weaker claim than "was
+run", and for that half it is the accurate one.
 
 ### When it refuses
 
@@ -228,10 +340,16 @@ problem you have.
 
 | | Code | Exit | What to do |
 |---|---|---|---|
-| `gh` missing, unauthenticated, offline, or no GitHub remote | `integration-unavailable` | 11 | Install or authenticate `gh` — or skip it entirely, since `scarp new idea --body-file` produces the identical artifact by hand. |
-| The artifact is realized but not on the default branch | `precondition-unmet` | 12 | Commit and push it, then retry. Nothing is wrong; you are early. |
+| `gh` missing, unauthenticated, offline, or no GitHub remote | `integration-unavailable` | 11 | Install or authenticate `gh` — or skip it entirely, since `scarp new … --body-file` produces the identical artifact by hand. |
+| The issue carries neither `idea` nor `bug` | `invalid-invocation` | 2 | Check the number, or label it on GitHub if it really is a proposal. |
+| The issue carries **both** `idea` and `bug` | `invalid-invocation` | 2 | Remove the wrong label on GitHub. Scarp will not guess which one you meant. |
+| `--sprint` on an `idea` | `invalid-invocation` | 2 | Drop it. An idea is an uncommitted proposal, never a sprint's committed work. |
+| `--sprint` names a closed, missing, or ambiguous sprint | `invalid-invocation` / `artifact-not-found` | 2 / 7 | The same rules `scarp new task --sprint` applies. |
+| The proposal was already realized | `artifact-conflict` | 4 | Nothing to do. One proposal realizes at most one artifact, across every collection. |
 | No artifact records this proposal | `precondition-unmet` | 12 | Realize it first — or switch to the branch that already did. |
-| The issue is not a proposal | `invalid-invocation` | 2 | Check the number. Scarp comments only on issues filed through the proposal form. |
+| The artifact is realized but not on the default branch | `precondition-unmet` | 12 | Commit and push it, then retry. Nothing is wrong; you are early. |
+| A bug's artifact is on the default branch but not `closed` there | `precondition-unmet` | 12 | Close the work, then commit and push. The reporter is waiting on an outcome. |
+| The default branch's copy is not the artifact being claimed | `precondition-unmet` | 12 | Investigate the mismatch by hand. Something replaced the file or two branches disagree. |
 
 The distinction between exit 11 and 12 is worth knowing: **11 means
 something is broken or absent, 12 means retrying later can succeed with
@@ -246,9 +364,11 @@ operator has never installed `gh` is fully usable.
 Each is deliberately absent, with the question it would have to settle
 first:
 
-- **Other collections** (dragons, decisions, tasks) — are they
-  non-load-bearing enough that a bad realization is cheap? For ideas the
-  answer is yes; elsewhere it is not.
+- **Other collections** (dragons, decisions) — is a bad realization
+  cheap, and if not, what narrower claim can promotion make instead?
+  Ideas answered the first question; bugs answered the second. A dragon
+  is an unresolved risk the project asserts it holds, and neither answer
+  obviously transfers.
 - **Typed edges from a proposal** — an edge targets a managed artifact,
   and an issue is not one. What would the target be?
 - **Task closure from a proposal** — closing is a lifecycle transition

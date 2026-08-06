@@ -2,8 +2,9 @@
 id: ide_01KZC769HTAF6F7GDDZW4HQGH7
 sequence: 43
 kind: idea
-status: parked
+status: adopted
 created: 2026-08-06
+adopted-by: "[[tsk_01KZCCE4MCVWXVWXPCQ3NNHVJ7|Classify and realize bug proposals]]"
 ---
 
 # Promote bug reports from GitHub issues into maintenance items or sprint tasks

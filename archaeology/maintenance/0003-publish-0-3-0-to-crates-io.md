@@ -42,9 +42,13 @@ public surfaces broke, including:
 
 - `read::Summary.status` changed from `Status` to `Option<Status>`, so
   stateless collections carry no lifecycle state;
-- `transition::close_sprint` gained a terminal-narrative parameter;
-- `read::Collection` gained a public `terminal` field, and
-  `cli::Command::Close` gained a public `body_file` field;
+- `transition::close_sprint` gained a terminal-narrative parameter, and
+  `proposal::realize` gained a third parameter selecting the owning
+  sprint;
+- `read::Collection` gained a public `terminal` field,
+  `cli::Command::Close` gained a public `body_file` field,
+  `cli::ProposalCommand::Realize` gained a public `sprint` field, and
+  `proposal::ProposalSummary` gained a public `target` field;
 - three variants were added to `cli::Collection` (`Log`, `Principle`,
   `Maintenance`), one to `cli::ProposalCommand` (`Reconcile`), and one to
   `error::Error` (`PreconditionUnmet`).
@@ -55,6 +59,11 @@ literal for `Collection` stops compiling. That is worth stating rather
 than waving at, because it is also the cheapest thing to fix before 1.0
 and nobody has decided to.
 
+Purely additive beside those: `artifact::create_maintenance_from` and
+`artifact::create_task_from` joined `create_idea_from`, and
+`artifact::create_maintenance` and `create_task` now delegate to them
+with unchanged signatures and behavior.
+
 So 0.3.0 is what the library requires, and the accumulated command
 surface says the same thing independently:
 
@@ -64,6 +73,7 @@ surface says the same thing independently:
 | `scarp close --body-file` | new CLI flag; the terminal narrative lands in the same atomic write as the transition |
 | sugar binding at every write boundary | `[[kind:N]]` in authored bodies is bound to `[[stable-id\|label]]`, and unresolvable sugar refuses the write |
 | `scarp proposal reconcile` | new command surface, closing a landed proposal on GitHub |
+| `scarp proposal realize --sprint` | a second proposal source class: a `bug`-labeled issue realizes a maintenance item, or a task in a named active sprint |
 | `precondition-unmet`, exit 12 | new entry in the error contract |
 
 Nothing was removed from the CLI, and the `--json` contract is
@@ -93,9 +103,9 @@ and 0.2.1 would tell them nothing happened.
   probing for `unknown collection`, because the obvious identifier
   lied.
 - The shipped binary — installed from crates.io, not built here — must
-  create a log, a principle, and a maintenance item, and close one with
-  `--body-file`. A surface that only works from `cargo run` in this
-  checkout did not ship.
+  create a log, a principle, and a maintenance item, close one with
+  `--body-file`, and expose `proposal realize --sprint`. A surface that
+  only works from `cargo run` in this checkout did not ship.
 - Cold-install timing goes to [[ide_01KYX31AE8WX1HMBFNRZ3XQK4V|Prebuilt release binaries for CI and non-Rust consumers]], with its usual caveat.
 - The crates.io rendering is checked in a browser, anchors included.
   [[tsk_01KYTS3BZDRHEFVG0H5FBK4RW5|Repair the crates.io quickstart anchor]]'s defect was invisible on GitHub and dead on crates.io,
